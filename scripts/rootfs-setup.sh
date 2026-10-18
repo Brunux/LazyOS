@@ -124,7 +124,21 @@ ConditionFirstBoot=
 ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
 EOF
 
-if [ -f "$PKGDIR/$UI.list" ] && [ "$UI" = "sway" ]; then
+# Which command the greeter runs when no session is picked from the menu. The
+# default_session below always launches tuigreet, which also lists the sessions
+# in /usr/share/wayland-sessions; --cmd is only the fallback default, so each UI
+# supplies its own. A UI without a greeter command (none today) leaves greetd
+# unconfigured.
+GREETD_CMD=
+case "$UI" in
+	sway) GREETD_CMD=sway ;;
+	# The Omarchy/Hyprland session entry (uis/omarchy/files): UWSM starts
+	# Hyprland as a systemd user session. Shipped as a wrapper because greetd
+	# splits the command into argv and the session needs several arguments.
+	omarchy) GREETD_CMD=omarchy-session ;;
+esac
+
+if [ -n "$GREETD_CMD" ] && [ -f "$PKGDIR/$UI.list" ]; then
 	log "Configuring greetd"
 	# Debian's greetd package creates the '_greetd' system user while the
 	# upstream documentation uses 'greetd'. Pick whichever exists, otherwise
@@ -149,7 +163,7 @@ if [ -f "$PKGDIR/$UI.list" ] && [ "$UI" = "sway" ]; then
 vt = 7
 
 [default_session]
-command = "tuigreet --time --time-format '%a, %d %b  %H:%M' --greeting 'Welcome back to Debian' --greet-align center --width 60 --window-padding 2 --container-padding 1 --prompt-padding 1 --asterisks --asterisks-char '*' --kb-command 2 --kb-sessions 3 --kb-power 12 --power-no-setsid --remember --remember-session --theme 'border=cyan;text=white;time=cyan;container=black;title=yellow;greet=cyan;prompt=cyan;input=white;action=blue;button=yellow' --cmd sway"
+command = "tuigreet --time --time-format '%a, %d %b  %H:%M' --greeting 'Welcome back to Debian' --greet-align center --width 60 --window-padding 2 --container-padding 1 --prompt-padding 1 --asterisks --asterisks-char '*' --kb-command 2 --kb-sessions 3 --kb-power 12 --power-no-setsid --remember --remember-session --theme 'border=cyan;text=white;time=cyan;container=black;title=yellow;greet=cyan;prompt=cyan;input=white;action=blue;button=yellow' --cmd $GREETD_CMD"
 user = "$GREETD_USER"
 EOF
 	systemctl enable greetd 2>/dev/null || true
@@ -177,6 +191,14 @@ if [ -d /tmp/ui-files ]; then
 	fi
 else
 	warn "no UI files staged for '$UI'"
+fi
+
+# Optional per-UI hook, run after the file tree is in place. It exists for what a
+# plain tree cannot express (seeding ~/.config from a vendored tree, symlink
+# farms) and is where uis/omarchy/ wires the Omarchy CLI and its configs.
+if [ -x /tmp/ui-setup.sh ]; then
+	log "Running the $UI setup hook"
+	USERNAME="$USERNAME" HOME="/home/$USERNAME" UI="$UI" /tmp/ui-setup.sh
 fi
 
 log "Installing the repository copy ($REPO_NAME)"

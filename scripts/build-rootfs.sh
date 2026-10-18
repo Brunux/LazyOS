@@ -65,6 +65,12 @@ if [ -d "$UI_DIR/files" ]; then
 	cp -a "$UI_DIR/files" "$ROOTFS/tmp/ui-files"
 	chown -R root:root "$ROOTFS/tmp/ui-files"
 fi
+# A UI may ship an optional setup.sh, run by rootfs-setup.sh inside the chroot
+# after its files are overlaid. It exists for work that cannot be expressed as a
+# plain file tree: seeding ~/.config from a vendored tree, or creating symlink
+# farms, without duplicating those files in files/.
+rm -f "$ROOTFS/tmp/ui-setup.sh"
+[ -f "$UI_DIR/setup.sh" ] && install -Dm755 "$UI_DIR/setup.sh" "$ROOTFS/tmp/ui-setup.sh"
 # The image carries this repository, because the scripts that partition the
 # internal storage, rewrite the ChromeOS kernel partition and report on the
 # system are all meant to run *on* the device (scripts/install-emmc.sh,
@@ -115,8 +121,8 @@ if [ -d "$WIFI_DIR" ]; then
 	"$REPO_DIR/scripts/wifi.sh" import "$WIFI_DIR" "$ROOTFS"
 fi
 
-rm -rf "$ROOTFS/tmp/packages" "$ROOTFS/tmp/ui-files" "$ROOTFS/tmp/repo" \
-	"$ROOTFS/root/rootfs-setup.sh"
+rm -rf "$ROOTFS/tmp/packages" "$ROOTFS/tmp/ui-files" "$ROOTFS/tmp/ui-setup.sh" \
+	"$ROOTFS/tmp/repo" "$ROOTFS/root/rootfs-setup.sh"
 
 # Whatever is built here ships as a disk (write-sd.sh, make-image.sh) or is
 # cloned onto one (install-emmc.sh), so it has to leave as a first boot: from an

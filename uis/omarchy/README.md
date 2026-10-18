@@ -42,8 +42,11 @@ itself uses.
 | `PROVENANCE.md` | The pinned upstream commit and exactly what was vendored or excluded. |
 | `patches/` | `*.patch` + `series` against the pinned tree; empty until the port needs one. |
 | `files/usr/share/omarchy/` | The curated vendored Omarchy tree (`config/`, `shell/`, `applications/`, `etc/`, `bin/`, `default/`, `themes/`, `version`) at upstream's runtime path. |
-| `files/etc/...` | System overlay (ported): units, sysctl, udev, xkb, portals, the `greetd` session entry. **Not landed yet.** |
-| `files/home/...` | User overlay (ported): `~/.config`, `~/.local`, the home seed. **Not landed yet.** |
+| `files/usr/share/wayland-sessions/omarchy.desktop` | The session entry tuigreet lists; runs UWSM → Hyprland. |
+| `files/usr/local/bin/omarchy-session` | The command greetd runs by default: `uwsm start … hyprland.desktop`, as one argv. |
+| `files/etc/systemd/user/wayland-wm@hyprland.desktop.service.d/10-keep-shell.conf` | Upstream's `KillMode=mixed` drop-in for the UWSM unit. |
+| `files/etc/profile.d/omarchy.sh` | Puts `$OMARCHY_PATH` in login shells. |
+| `setup.sh` | Runs in the chroot: symlinks the shipped `omarchy-*` commands into `/usr/bin`, seeds `~/.config` from the vendored tree, installs the UWSM env file and applies the Tokyo Night theme. **Landed (F3).** |
 
 The vendored tree is what upstream expects at `$OMARCHY_PATH`, so the shell and the
 `omarchy-*` commands find their files unchanged. The port's job is the *edges*: the
@@ -58,6 +61,22 @@ Omarchy starts Hyprland through **UWSM** behind **SDDM**. This port keeps the
 Debian side's **`greetd` + `tuigreet`** and starts the same **Hyprland via
 UWSM** session from there (see `docs/plan-omarchy.md` §2). SDDM is not installed
 and upstream's `etc/sddm.conf.d/*` and `install/login/sddm.sh` do not ship.
+
+The chain on this port is: `greetd` → `tuigreet` (which lists
+`/usr/share/wayland-sessions/omarchy.desktop`) → `/usr/local/bin/omarchy-session`
+→ `uwsm start -g -1 -e -D Hyprland hyprland.desktop` → Hyprland.
+`scripts/rootfs-setup.sh` became UI-aware and writes `--cmd omarchy-session` into
+`/etc/greetd/config.toml` (`--cmd sway` for the sway UI), enabling `greetd` for
+either UI.
+
+Upstream ships the `omarchy-*` commands as `/usr/bin/omarchy-*` (they come in the
+Arch `omarchy` package). Here `setup.sh` symlinks them from the vendored
+`$OMARCHY_PATH/bin` into `/usr/bin`, and `/etc/profile.d/omarchy.sh` plus
+`/usr/share/uwsm/env.d/10-omarchy` set `$OMARCHY_PATH`. The Arch-only command
+families (package management and updates, the installer/provisioner,
+AUR/web-app/gaming/AI installers, and helpers that call `pacman`/`yay`) are left
+off PATH rather than shipped broken: that list is the `EXCLUDE` block in
+`setup.sh`, and every other command is linked.
 
 ### Hyprland configuration is Lua
 
@@ -131,12 +150,12 @@ and key bindings invoke are all listed there with a comment saying why.
 | F0 recon + pin | done — this README and the plan record it |
 | F1 `packages.list` | done — 128 names, all resolved on forky/arm64 |
 | F2a vendor the pinned tree (`files/usr/share/omarchy/`, curated) | done — 24 MB, see `PROVENANCE.md` |
-| F2b port the system/user overlay and the `bin/` subset | not started |
-| F3 session/login (Hyprland via UWSM under greetd) | not started |
+| F2b seed `~/.config` + link the `bin/` subset (`setup.sh`) | done — Arch-only commands excluded, rest linked |
+| F3 session/login (Hyprland via UWSM under greetd) | wired — greetd is UI-aware, the session entry and env are shipped; **not yet booted** |
 | F4 Quickshell shell | not started |
 | F5 Hayato quirks (keyd, ALSA UCM, backlight, RAM) | not started |
 | F6 build + off-device validation | not started |
 | F7 hardware validation + release | not started |
 
-Nothing here claims to boot yet: the vendored tree is upstream's, and the port is only
-real once a card boots it (F7).
+Nothing here claims to boot yet: the wiring is in place but the port is only real
+once a card boots it (F7).

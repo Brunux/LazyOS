@@ -1,0 +1,6 @@
+#!/bin/sh
+# Session command greetd runs when no session is picked from the tuigreet menu.
+# greetd splits its command into argv, so the several arguments UWSM needs live
+# here instead of inline in /etc/greetd/config.toml. It is the same command as
+# the Exec= of /usr/share/wayland-sessions/omarchy.desktop.
+exec uwsm start -g -1 -e -D Hyprland hyprland.desktop

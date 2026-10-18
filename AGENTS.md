@@ -80,6 +80,9 @@ uis/<ui>/                  one directory per graphical shell
   packages.list            UI packages (Debian names)
   files/                   tree overlaid onto the rootfs; `etc/` is copied as
                            root, `home/` is merged into /home/$USERNAME
+  setup.sh                 optional; run inside the chroot after files/ is
+                           overlaid, for what a plain tree cannot express
+                           (seeding ~/.config from a vendored tree, symlink farms)
   README.md                what the shell ships and how it deviates upstream
 packages/                  device-agnostic base package lists (base.list)
 scripts/                   lib.sh (device/kernel/UI resolution), lib-cgpt.sh
