@@ -25,6 +25,7 @@ vendored so the port is reproducible and the image can be built offline.
 | `default/` | The runtime defaults Hyprland loads by path (`default/hypr/bootstrap.lua`, `default/hypr/omarchy*.lua`), the home seed, the Wayland session entry and UWSM/environment defaults. |
 | `themes/` | All theme definitions (`colors.toml`, `*.theme`, `icons.theme`, previews) **and the Tokyo Night backgrounds only** — Tokyo Night is Omarchy's default theme (`install/user/theme.sh`). |
 | `version` | `4.0.0.alpha`. |
+| `icon.png` | The tree root icon, which `default/chromium/extensions/copy-url/icon.png` symlinks to. |
 
 ## What is deliberately excluded
 

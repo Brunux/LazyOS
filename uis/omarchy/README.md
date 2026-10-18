@@ -107,6 +107,17 @@ legacy `hyprland.conf`. Debian `forky` ships **hyprland 0.56.2**, so the pinned
 tree's Lua configuration is used as-is; v3-era `hyprland.conf` material is not
 ported.
 
+### The shell (Quickshell)
+
+The shell's QML imports (`Quickshell*`, `qs.Commons`, `qs.Ui`, `QtQuick*`,
+`QtQml.Models`) all resolve against Debian's `quickshell` 0.3.2 plus the
+`qml6-module-qtquick*` set in `packages.list`; the `Quickshell.Services.*`
+modules ship inside the binary and use PipeWire, UPower, polkit, Pam, BlueZ and
+NetworkManager, all installed. One import, `Owe.LockFeed`, comes from the
+`omarchy-pkgs` app `owe` and is deferred with the rest of that set (F8) — the lock
+screen may fall back until then. This is the F4 gate: it is a **shape check on
+the imports**, not a boot.
+
 ### Package-manager and installer tooling
 
 Everything tied to Arch's package flow is dropped: `pacman`, `yay`,
@@ -173,7 +184,7 @@ and key bindings invoke are all listed there with a comment saying why.
 | F2a vendor the pinned tree (`files/usr/share/omarchy/`, curated) | done — 24 MB, see `PROVENANCE.md` |
 | F2b seed `~/.config` + link the `bin/` subset (`setup.sh`) | done — Arch-only commands excluded, rest linked |
 | F3 session/login (Hyprland via UWSM under greetd) | wired — greetd is UI-aware, the session entry and env are shipped; **not yet booted** |
-| F4 Quickshell shell | not started |
+| F4 Quickshell shell | imports resolve against Debian's quickshell 0.3.2 (shape check, not a boot); `Owe.LockFeed` deferred |
 | F5 Hayato quirks (keyd, ALSA UCM, backlight, RAM) | device files + the system subset installed; **not yet booted** |
 | F6 build + off-device validation | not started |
 | F7 hardware validation + release | not started |
