@@ -187,10 +187,16 @@ and key bindings invoke are all listed there with a comment saying why.
 | F4 Quickshell shell | imports resolve against Debian's quickshell 0.3.2 (shape check, not a boot); `Owe.LockFeed` deferred |
 | F5 Hayato quirks (keyd, ALSA UCM, backlight, RAM) | device files + the system subset installed; **not yet booted** |
 | F6 build + off-device validation | done — `UI=omarchy` rootfs builds; see the validation notes below |
-| F7 hardware validation + release | not started |
+| F7 hardware validation + release | card written 2026-10-18 from this build; **awaiting boot + report** |
 
-Nothing here claims to boot yet: the wiring is in place but the port is only real
-once a card boots it (F7).
+Nothing here claims to boot yet: the wiring is in place and a card carries it,
+but the port is only real once that card boots it (F7).
+
+> The card was written from a rootfs stamped `commit 5fd928c` whose setup hook was
+> then re-run by hand with the later EXCLUDE fix, so its `omarchy-*` links are the
+> corrected set while its `/etc/debian-aarch64-revision` still says `5fd928c`, and
+> its `/usr/local/sbin/check-system.sh` is the older sway-oriented report. A clean
+> rebuild + re-write makes the stamp match the content.
 
 ### What was actually validated off-device
 
