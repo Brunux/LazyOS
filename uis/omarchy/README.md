@@ -36,17 +36,19 @@ itself uses.
 
 ## Layout
 
-Only `packages.list` is landed so far; `files/` and `upstream/` are staged in
-`docs/plan-omarchy.md` F2. The intended shape:
-
 | Path | What it is |
 |---|---|
 | `packages.list` | The Debian package set (this file's companion), the Arch→Debian map in table form below. |
-| `files/etc/...` | System files from upstream `etc/`: units, sysctl, udev, xkb, sudoers, portals, the `greetd` session entry. |
-| `files/home/.config/hypr/...` | Hyprland's Lua configuration (`hyprland.lua`, `autostart.lua`, `bindings.lua`, `input.lua`, `looknfeel.lua`, `monitors.lua`). |
-| `files/home/.config/omarchy/...` | Shell hooks, extensions and `shell.json`. |
-| `files/home/.local/share/omarchy/...` | The vendored Omarchy tree: `shell/`, `themes/`, `applications/`, `config/`, `bin/`. |
-| `upstream/` | The pinned Omarchy checkout (trimmed) plus `patches/` and `PROVENANCE.md`. |
+| `PROVENANCE.md` | The pinned upstream commit and exactly what was vendored or excluded. |
+| `patches/` | `*.patch` + `series` against the pinned tree; empty until the port needs one. |
+| `files/usr/share/omarchy/` | The curated vendored Omarchy tree (`config/`, `shell/`, `applications/`, `etc/`, `bin/`, `default/`, `themes/`, `version`) at upstream's runtime path. |
+| `files/etc/...` | System overlay (ported): units, sysctl, udev, xkb, portals, the `greetd` session entry. **Not landed yet.** |
+| `files/home/...` | User overlay (ported): `~/.config`, `~/.local`, the home seed. **Not landed yet.** |
+
+The vendored tree is what upstream expects at `$OMARCHY_PATH`, so the shell and the
+`omarchy-*` commands find their files unchanged. The port's job is the *edges*: the
+package list (done), the Debian-ised system/user overlay (pending), the session entry
+(greetd, pending) and the device quirks (pending).
 
 ## What changed from Arch/Omarchy
 
@@ -128,12 +130,13 @@ and key bindings invoke are all listed there with a comment saying why.
 |---|---|
 | F0 recon + pin | done — this README and the plan record it |
 | F1 `packages.list` | done — 128 names, all resolved on forky/arm64 |
-| F2 overlay (`files/`, `upstream/`, `bin/` subset) | not started |
+| F2a vendor the pinned tree (`files/usr/share/omarchy/`, curated) | done — 24 MB, see `PROVENANCE.md` |
+| F2b port the system/user overlay and the `bin/` subset | not started |
 | F3 session/login (Hyprland via UWSM under greetd) | not started |
 | F4 Quickshell shell | not started |
 | F5 Hayato quirks (keyd, ALSA UCM, backlight, RAM) | not started |
 | F6 build + off-device validation | not started |
 | F7 hardware validation + release | not started |
 
-Nothing here claims to boot yet: the UI is a package list until F2–F4 land, and
-the port is only real once a card boots it (F7).
+Nothing here claims to boot yet: the vendored tree is upstream's, and the port is only
+real once a card boots it (F7).

@@ -57,6 +57,7 @@ Lua configuration is the one to use — do not port Omarchy v3's `hyprland.conf`
 | Login / session | **keep `greetd` + `tuigreet`**; start **Hyprland through UWSM**. No SDDM port in this milestone. |
 | Scope | **desktop shell only**: Hyprland + Quickshell + `config/`, `themes/`, `applications/`, `etc/` + the core `omarchy-*` CLI. Arch-only pieces are substituted or dropped; `omarchy-pkgs` apps are deferred. |
 | Upstream pin | `quattro` @ `da2db1a2` (4.0.0.alpha) |
+| Themes | **curated subset**: all theme definitions, only the default theme's (**Tokyo Night**) backgrounds, English-only shell translations. The other ~160 MB of backgrounds are fetched from the pinned commit only if wanted (`uis/omarchy/PROVENANCE.md`). |
 | Where it plugs in | the existing device-agnostic **`uis/<ui>/`** axis: add `uis/omarchy/`, selected with `UI=omarchy` (`uis/sway/` stays as the other choice) |
 | Plan location | this file |
 
@@ -70,17 +71,19 @@ kernel, boot chain, GPT layout or installer has to change.
 ```
 uis/omarchy/
   packages.list          # Debian package names (the Arch->Debian map, documented inline)
-  files/                 # overlay: etc/, home/ (Hyprland, Quickshell, omarchy CLI, themes)
-  upstream/              # vendored omarchy checkout (pinned) + patches/ + PROVENANCE.md
+  PROVENANCE.md          # the pinned commit and what was vendored/excluded
+  patches/               # *.patch + series against the pinned tree
+  files/                 # overlay: usr/share/omarchy/ (the vendored tree), etc/, home/
   README.md              # what ships and every deliberate deviation from upstream
 docs/plan-omarchy.md     # this plan
 ```
 
-- `uis/omarchy/upstream/` will vendor only the trees this port actually uses (`config/`, `shell/`,
-  `themes/`, `applications/`, `etc/`, the `bin/` subset, `version`) rather than the whole 1.2 GB
-  checkout (which also carries `manual/`, `test/`, `migrations/`, screenshots...). A
-  `PROVENANCE.md` records the pinned commit and what was trimmed, in the style of the existing
-  `devices/google-asurada/PROVENANCE.md`.
+- The vendored tree lives at its **runtime path**, `uis/omarchy/files/usr/share/omarchy/` (upstream's
+  `$OMARCHY_PATH` default), so the shell and the `omarchy-*` commands find their files unchanged. It
+  is a curated subset of the pinned checkout (`config/`, `shell/`, `applications/`, `etc/`, `bin/`,
+  `default/`, `themes/`, `version`): all theme definitions but only Tokyo Night's backgrounds, and
+  English-only shell translations. `PROVENANCE.md` records the commit and exactly what was trimmed,
+  in the style of the existing reference files here.
 - Anything patched is kept as a `*.patch` against the pinned tree with a `series` file, the same
   convention as `kernels/<flavor>/patches/`.
 - `uis/omarchy/files/etc/` carries the system-level files (units, sysctl, udev, xkb, sudoers,
@@ -170,12 +173,13 @@ Turn §4 into the list, one Debian name per line, with the deviations documented
 `uis/omarchy/README.md`. *Verify:* every name resolves on `forky/arm64`; `build-rootfs.sh` installs
 the list without `apt` errors; nothing drops out of the base list.
 
-**F2 — The overlay: `config/`, `themes/`, `applications/`, `etc/`.**
-Vendor the pinned trees under `upstream/` and lay them into `files/`, rewriting Arch paths and
-package calls. Port the `bin/` subset the desktop itself needs (theme switching, OSD, capture,
-audio, network, power, session, lock) and stub or omit the rest. *Verify:* `sh -n`/`bash -n` on
-every shipped script; no shipped script references `pacman`/`yay`/`omarchy-pkg-*` on a code path
-the desktop reaches.
+**F2 — The overlay.**
+(a) Vendor the pinned trees into `files/usr/share/omarchy/` as a curated subset (definitions + Tokyo
+Night backgrounds + English translations), with `PROVENANCE.md` and `patches/`. (b) Lay the
+Debian-ised `etc/` and `home/` overlay on top, rewriting Arch paths and package calls. Port the
+`bin/` subset the desktop itself needs (theme switching, OSD, capture, audio, network, power,
+session, lock) and stub or omit the rest. *Verify:* `sh -n`/`bash -n` on every shipped script; no
+shipped script references `pacman`/`yay`/`omarchy-pkg-*` on a code path the desktop reaches.
 
 **F3 — Session and login.**
 A Hyprland session through UWSM, selected by `greetd` + `tuigreet` (a `hyprland.desktop` wayland
