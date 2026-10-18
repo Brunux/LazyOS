@@ -25,57 +25,62 @@ warn() { printf '\n\033[1;33m[omarchy] WARN: %s\033[0m\n' "$*" >&2; }
 # the installer/provisioner, AUR/web-app/gaming/AI installers, and the helpers
 # that call pacman, yay or systemd units Debian does not have. The desktop does
 # not offer features it cannot perform here; the rest of bin/ is linked.
-EXCLUDE='omarchy-update*
-omarchy-pkg-*
-omarchy-install-*
-omarchy-remove-*
-omarchy-migrate*
-omarchy-upgrade-to-quattro
-omarchy-reinstall*
-omarchy-dev-*
-omarchy-refresh-pacman
-omarchy-refresh-limine
-omarchy-refresh-plymouth
-omarchy-refresh-sddm
-omarchy-plymouth-*
-omarchy-snapshot
-omarchy-boot-direct
-omarchy-setup-direct-boot
-omarchy-mise-*
-omarchy-agent*
-omarchy-voxtype*
-omarchy-dictation*
-omarchy-tailscale-*
-omarchy-openclaw*
-omarchy-webapp*
-omarchy-games-*
-omarchy-drive-*
-omarchy-hibernation-*
-omarchy-cmd-*
-omarchy-security-*
-omarchy-setup-security-*
-omarchy-remove-security-*
-omarchy-tui-*
-omarchy-locale-generate
-omarchy-sudo-docker
-omarchy-sudo-keepalive
-omarchy-sudo-passwordless
-omarchy-windows-*
-omarchy-upload-log
-omarchy-transcode
-omarchy-transcode-ascii
-omarchy-capture-webcam-list
-omarchy-capture-webcam-resize
-omarchy-apply-hardware
-omarchy-apply-lock
-omarchy-apply-system
-omarchy-apply-n1x-gpu-memory
-omarchy-gpu-screen-recorder
-omarchy-provision-*
-omarchy-system-factory-reset
-omarchy-system-factory-reset-finish
-omarchy-n1x-probe
-omarchy-cliamp'
+#
+# An array, matched with [[ ]], because a multi-line string in a `case` pattern
+# list is not word-split by bash and would silently match nothing.
+EXCLUDE=(
+	'omarchy-update*'
+	'omarchy-pkg-*'
+	'omarchy-install-*'
+	'omarchy-remove-*'
+	'omarchy-migrate*'
+	'omarchy-upgrade-to-quattro'
+	'omarchy-reinstall*'
+	'omarchy-dev-*'
+	'omarchy-refresh-pacman'
+	'omarchy-refresh-limine'
+	'omarchy-refresh-plymouth'
+	'omarchy-refresh-sddm'
+	'omarchy-plymouth-*'
+	'omarchy-snapshot'
+	'omarchy-boot-direct'
+	'omarchy-setup-direct-boot'
+	'omarchy-mise-*'
+	'omarchy-agent*'
+	'omarchy-voxtype*'
+	'omarchy-dictation*'
+	'omarchy-tailscale-*'
+	'omarchy-openclaw*'
+	'omarchy-webapp*'
+	'omarchy-games-*'
+	'omarchy-drive-*'
+	'omarchy-hibernation-*'
+	'omarchy-cmd-*'
+	'omarchy-security-*'
+	'omarchy-setup-security-*'
+	'omarchy-remove-security-*'
+	'omarchy-tui-*'
+	'omarchy-locale-generate'
+	'omarchy-sudo-docker'
+	'omarchy-sudo-keepalive'
+	'omarchy-sudo-passwordless'
+	'omarchy-windows-*'
+	'omarchy-upload-log'
+	'omarchy-transcode'
+	'omarchy-transcode-ascii'
+	'omarchy-capture-webcam-list'
+	'omarchy-capture-webcam-resize'
+	'omarchy-apply-hardware'
+	'omarchy-apply-lock'
+	'omarchy-apply-system'
+	'omarchy-apply-n1x-gpu-memory'
+	'omarchy-gpu-screen-recorder'
+	'omarchy-provision-*'
+	'omarchy-system-factory-reset'
+	'omarchy-system-factory-reset-finish'
+	'omarchy-n1x-probe'
+	'omarchy-cliamp'
+)
 
 log "Putting the omarchy-* commands on PATH (/usr/bin)"
 linked=0
@@ -83,10 +88,15 @@ skipped=0
 for f in "$OMARCHY_PATH"/bin/*; do
 	[ -f "$f" ] || continue
 	n="${f##*/}"
-	# shellcheck disable=SC2254  # the patterns are meant to be globs
-	case "$n" in
-		$EXCLUDE) skipped=$((skipped + 1)); continue ;;
-	esac
+	skip=0
+	for pat in "${EXCLUDE[@]}"; do
+		# shellcheck disable=SC2254  # the RHS is meant to be a glob
+		if [[ $n == $pat ]]; then skip=1; break; fi
+	done
+	if [ "$skip" = 1 ]; then
+		skipped=$((skipped + 1))
+		continue
+	fi
 	ln -sf "$f" "/usr/bin/$n"
 	linked=$((linked + 1))
 done
