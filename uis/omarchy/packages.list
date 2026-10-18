@@ -1,0 +1,201 @@
+# Omarchy v4 desktop (Hyprland + the Quickshell shell), ported from
+# omacom/omarchy @ da2db1a2 (quattro, 4.0.0.alpha) to Debian forky/arm64.
+# One package per line; blank lines and lines starting with # are ignored.
+# Files shipped alongside this list live in uis/omarchy/files/.
+#
+# The Arch -> Debian mapping and every deliberate deviation are documented in
+# uis/omarchy/README.md and docs/plan-omarchy.md §4. Packages already supplied by
+# packages/base.list (network-manager, wireless-regdb, alsa-utils, rtkit,
+# dosfstools, bash-completion, less) are not repeated here.
+
+# --- compositor, session, portals ------------------------------------------
+# Hyprland 0.56 reads its configuration from hyprland.lua; v3's hyprland.conf is
+# deprecated. The pinned tree already ships the Lua configuration.
+hyprland
+hyprland-protocols
+hyprland-backgrounds
+# Qt GUI helpers (hyprland-guiutils upstream): the preview/share picker and the
+# config editors.
+hyprland-qtutils
+# The session manager Omarchy starts Hyprland through, so the compositor runs as
+# a systemd user session unit.
+uwsm
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+hyprpicker
+hyprsunset
+
+# --- the shell -------------------------------------------------------------
+# Omarchy v4's desktop shell is QML, not waybar/mako/walker: bar, launcher,
+# notifications, OSD, lock screen and the menus all live in shell/.
+quickshell
+# Quickshell's Qt6 runtime. Debian splits the Arch qt6-* names into libraries
+# plus qml6-module-*; these are the modules the pinned shell imports.
+libqt6qml6
+libqt6quick6
+libqt6multimedia6
+libqt6svg6
+qt6-wayland
+qt6-svg-plugins
+qt6-image-formats-plugins
+qt6-qpa-plugins
+qml6-module-qtquick
+qml6-module-qtquick-controls
+qml6-module-qtquick-layouts
+qml6-module-qtquick-window
+qml6-module-qtquick-templates
+qml6-module-qtquick-effects
+qml6-module-qtquick-shapes
+qml6-module-qtquick-dialogs
+qml6-module-qtquick-particles
+qml6-module-qtquick-localstorage
+qml6-module-qt5compat-graphicaleffects
+qml6-module-qtqml
+qml6-module-qtqml-workerscript
+qml6-module-qtcore
+qml6-module-qtnetwork
+qml6-module-qt-labs-platform
+qml6-module-qt-labs-folderlistmodel
+qml6-module-qt-labs-settings
+qml6-module-qt-labs-qmlmodels
+# A calculator widget in the shell uses Qalculate.
+libqalculate23
+
+# --- login -----------------------------------------------------------------
+# The port keeps the Debian side's greetd + tuigreet instead of upstream's SDDM;
+# the session entry is what picks Hyprland. See docs/plan-omarchy.md §2.
+greetd
+tuigreet
+
+# --- keyboard --------------------------------------------------------------
+# The Chromebook's top row is mapped to action keys by the device tree and never
+# emits F1-F10, so there is no way to switch virtual terminals without a
+# remapper; see uis/omarchy/files/etc/keyd/default.conf and the README.
+keyd
+
+# --- audio -----------------------------------------------------------------
+pipewire
+pipewire-pulse
+# ALSA-only programs (aplay/arecord without -D, emulators, some Java/Steam
+# games) fail with "audio open error: No such file or directory" without it.
+pipewire-alsa
+wireplumber
+# The UCM profiles carry the MT8192 boot sequence; alsa-utils (base.list) runs
+# it and alsa-ucm-conf provides the card definitions.
+alsa-ucm-conf
+# PipeWire's BlueZ SPA plugins, and the bluez daemon they talk to over D-Bus.
+libspa-0.2-bluetooth
+bluez
+pavucontrol
+# pamixer drives the XF86Audio* key bindings.
+pamixer
+
+# --- power / battery -------------------------------------------------------
+upower
+power-profiles-daemon
+# zram swap; Omarchy ships zram-generator on aarch64 and this port already has
+# zram-tools in base.list.
+systemd-zram-generator
+playerctl
+
+# --- network / bluetooth UI ------------------------------------------------
+# Debian renamed network-manager-gnome to network-manager-applet.
+network-manager-applet
+blueman
+
+# --- graphics (panfrost) ---------------------------------------------------
+libgl1-mesa-dri
+mesa-utils
+
+# --- fonts / icons ---------------------------------------------------------
+fonts-dejavu-core
+fonts-noto-core
+fonts-noto-cjk
+fonts-noto-color-emoji
+# The theme's text font; the icon glyphs come from fontconfig fallback.
+fonts-jetbrains-mono
+fonts-nerd-symbols
+# fonts-nerd-symbols is DFSG-stripped: no Font Awesome (U+F000-U+F2FF) and no
+# Material Design Icons (plane 15), which is what the theme's icons are. These
+# two legacy sets supply them, so every glyph resolves without touching config.
+fonts-font-awesome
+fonts-materialdesignicons-legacy
+yaru-theme-icon
+
+# --- terminals -------------------------------------------------------------
+foot
+alacritty
+kitty
+
+# --- desktop applications --------------------------------------------------
+# Chromium is Omarchy's browser; the rest are the base set that resolves on
+# Debian (see docs/plan-omarchy.md §4 for what is substituted or dropped).
+chromium
+nautilus
+python3-nautilus
+gnome-disk-utility
+gnome-sushi
+# Debian's document viewer is papers (evince's successor).
+papers
+imv
+mpv
+mpv-mpris
+ffmpeg
+ffmpegthumbnailer
+imagemagick
+neovim
+gvfs-backends
+udiskie
+libsecret-1-0
+gnome-keyring
+
+# --- CLI / tooling ---------------------------------------------------------
+btop
+fastfetch
+eza
+bat
+fd-find
+ripgrep
+fzf
+lazygit
+jq
+tmux
+zoxide
+gum
+tree-sitter-cli
+# Debian's tldr client.
+tealdeer
+yt-dlp
+inxi
+plocate
+socat
+inotify-tools
+unzip
+whois
+qrencode
+zbar-tools
+tesseract-ocr
+tesseract-ocr-eng
+wl-clipboard
+wtype
+# The Arch/wlroots capture stack, mapped to Debian names: grim/slurp for
+# region capture, swappy for annotation (satty is not packaged) and
+# wf-recorder for video (gpu-screen-recorder/wl-screenrec are not packaged).
+grim
+slurp
+swappy
+wf-recorder
+brightnessctl
+
+# --- xdg / theme integration ------------------------------------------------
+xdg-user-dirs
+xdg-utils
+xdg-terminal-exec
+qt6ct
+nwg-look
+lxqt-qtplugin
+# GObject introspection for the GTK4 and layer-shell pieces the shell's widgets
+# and the desktop integrations use.
+gir1.2-gtk-4.0
+libgtk-layer-shell0
+gir1.2-gtklayershell-0.1
