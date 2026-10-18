@@ -560,7 +560,9 @@ that a kernel update does not leave p1 behind. It backs up what it replaces to
 it sources nothing and changes nothing, and the image also ships it as
 `/usr/local/sbin/check-system.sh` so no checkout is needed to run it. With a checkout it also
 verifies that every package declared in `packages/*.list`, `devices/*/packages.list` and
-`uis/*/packages.list` is installed (`check-system.sh ~/Dev/<repo>`). Run it as the desktop user;
+the **running UI's** `uis/<ui>/packages.list` is installed (`check-system.sh ~/Dev/<repo>`); the
+UI comes from `/etc/debian-aarch64-revision`, so the other desktop's list is never checked against
+this system. Run it as the desktop user;
 from a root shell it re-executes
 itself as that user, and the privileged reads go through `sudo -n`. Every check maps to a bug this
 port has already hit — keyd swallowing `KEY_SLEEP`, greetd's `vt`/user, the UCM boot sequence, ALSA's

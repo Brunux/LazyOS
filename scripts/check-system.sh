@@ -22,7 +22,8 @@
 #
 # With a repository checkout (REPO_DIR, default: the parent of this script) it
 # also verifies that every package declared in packages/*.list,
-# devices/*/packages.list and uis/*/packages.list is installed.
+# devices/*/packages.list and the running UI's uis/<ui>/packages.list is
+# installed.
 #
 # Exit status: 0 when nothing FAILs, 1 otherwise.
 #
@@ -115,11 +116,25 @@ if [ -z "$REPO" ] || [ ! -d "$REPO/packages" ] || [ ! -d "$REPO/uis" ]; then
 	REPO=""
 fi
 
+# Which UI this system was built with. build-rootfs.sh records it in
+# /etc/debian-aarch64-revision, and the UI-specific checks key on it: running the
+# sway checks (or validating uis/sway/packages.list) on an Omarchy image reports
+# the *other* UI's packages as missing, which is noise, not a regression.
+_UI="$(sed -n 's/^ui //p' /etc/debian-aarch64-revision 2>/dev/null)"
+if [ -z "$_UI" ]; then
+	if have Hyprland; then
+		_UI=omarchy
+	elif have sway; then
+		_UI=sway
+	fi
+fi
+
 # sway -C needs a runtime dir; keep one for the whole run.
 RUNTIME="$(mktemp -d)"
 trap 'rm -rf "$RUNTIME"' EXIT
 
 printf '%sdebian-aarch64 system report%s  %s\n' "$C_HEAD" "$C_OFF" "$(date '+%Y-%m-%d %H:%M:%S %Z')"
+[ -n "$_UI" ] && info "UI: $_UI"
 
 # /proc, /sys and dmesg describe the kernel this script runs under. If PID 1 is
 # not systemd it is not the booted Debian image, and everything read from them
@@ -500,8 +515,10 @@ grep -qw mem /sys/power/state 2>/dev/null && ok "/sys/power/state advertises sus
 	fail "no 'mem' in /sys/power/state: the kernel cannot suspend"
 check_svc systemd-logind "systemd-logind is active (its button handling is the polkit-free suspend path)"
 check_svc polkit "polkitd is active (session suspend via loginctl)"
-[ -x "$HOME/.config/bin/sway-suspend" ] && ok "sway-suspend helper is executable" ||
-	warn "~/.config/bin/sway-suspend is missing or not executable"
+if [ "$_UI" = sway ]; then
+	[ -x "$HOME/.config/bin/sway-suspend" ] && ok "sway-suspend helper is executable" ||
+		warn "~/.config/bin/sway-suspend is missing or not executable"
+fi
 _susp="$(asroot journalctl -b --no-pager | grep -c 'PM: suspend entry')"
 [ "${_susp:-0}" -ge 1 ] && ok "$_susp suspend/resume cycle(s) recorded in this boot" ||
 	warn "no suspend recorded in this boot: press the Lock key to test it"
@@ -535,7 +552,7 @@ else
 	fail "/etc/greetd/config.toml is missing"
 fi
 have tuigreet && ok "tuigreet is installed" || warn "tuigreet is not installed"
-if have sway; then
+if [ "$_UI" = sway ] && have sway; then
 	if XDG_RUNTIME_DIR="$RUNTIME" WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 \
 		sway -C -c /etc/sway/config >/dev/null 2>&1; then
 		ok "sway configuration is valid"
@@ -553,14 +570,71 @@ if have sway; then
 		warn "Xwayland is missing: sway logs a startup error and X11 programs cannot run"
 	fi
 fi
-_missing_cmds=""
-for _c in waybar alacritty bemenu swaylock swaynag swaybg brightnessctl grimshot wlsunset wpctl pactl; do
-	have "$_c" || _missing_cmds="$_missing_cmds $_c"
-done
-if [ -z "$_missing_cmds" ]; then
-	ok "every command the sway configuration invokes is installed"
-else
-	warn "commands referenced by the sway configuration are missing:$_missing_cmds"
+case "$_UI" in
+sway)
+	_missing_cmds=""
+	for _c in waybar alacritty bemenu swaylock swaynag swaybg brightnessctl grimshot wlsunset wpctl pactl; do
+		have "$_c" || _missing_cmds="$_missing_cmds $_c"
+	done
+	if [ -z "$_missing_cmds" ]; then
+		ok "every command the sway configuration invokes is installed"
+	else
+		warn "commands referenced by the sway configuration are missing:$_missing_cmds"
+	fi
+	;;
+omarchy)
+	_missing_cmds=""
+	for _c in Hyprland hyprctl quickshell uwsm brightnessctl pamixer wpctl; do
+		have "$_c" || _missing_cmds="$_missing_cmds $_c"
+	done
+	if [ -z "$_missing_cmds" ]; then
+		ok "every command the Omarchy session invokes is installed"
+	else
+		fail "commands the Omarchy session invokes are missing:$_missing_cmds"
+	fi
+	;;
+esac
+
+# ---------------------------------------------------------------------------
+if [ "$_UI" = omarchy ]; then
+section "Omarchy"
+	[ -d /usr/share/omarchy ] && ok "/usr/share/omarchy is present" ||
+		fail "/usr/share/omarchy is missing: the shell and the omarchy-* commands have nothing to run"
+	[ -f /usr/share/wayland-sessions/omarchy.desktop ] &&
+		ok "the omarchy Wayland session entry is installed" ||
+		fail "the omarchy Wayland session entry is missing: tuigreet has no session to pick"
+	grep -qs 'omarchy-session' /etc/greetd/config.toml &&
+		ok "greetd starts the Omarchy session (omarchy-session)" ||
+		warn "greetd does not run omarchy-session: the session menu entry still works"
+	[ -f "$HOME/.config/hypr/hyprland.lua" ] &&
+		ok "~/.config/hypr/hyprland.lua is present" ||
+		fail "~/.config/hypr/hyprland.lua is missing: Hyprland has no user config"
+	_theme="$(head -n1 "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)"
+	[ -n "$_theme" ] && ok "current theme: $_theme" ||
+		warn "no current theme recorded (the theme is applied on first login)"
+	_ncmd="$(find /usr/bin -maxdepth 1 -name 'omarchy-*' 2>/dev/null | wc -l)"
+	[ "$_ncmd" -gt 0 ] && ok "$_ncmd omarchy-* command(s) on PATH" ||
+		fail "no omarchy-* command on PATH: the shell and the key bindings cannot call them"
+	# Hyprland's own view of the config: ask the running compositor when there is
+	# one, otherwise parse it offline. HYPRLAND_INSTANCE_SIGNATURE is pinned when
+	# unset so the offline parse does not trip on Omarchy reading it back.
+	if have hyprctl && hyprctl -j monitors >/dev/null 2>&1; then
+		_cfgerr="$(hyprctl -j configerrors 2>/dev/null)"
+		case "$_cfgerr" in
+			'' | '[]' | 'null') ok "the running Hyprland reports no configuration error" ;;
+			*) fail "Hyprland reports configuration errors: $_cfgerr" ;;
+		esac
+	elif have Hyprland; then
+		_hout="$(OMARCHY_PATH=/usr/share/omarchy \
+			HYPRLAND_INSTANCE_SIGNATURE="${HYPRLAND_INSTANCE_SIGNATURE:-check-system}" \
+			XDG_RUNTIME_DIR="$RUNTIME" Hyprland --verify-config 2>&1 || true)"
+		if grep -qi 'lua error' <<<"$_hout"; then
+			fail "Hyprland reported a Lua configuration error:"
+			grep -i 'lua error' <<<"$_hout" | tail -3 | sed 's/^/          /'
+		else
+			ok "Hyprland parsed the Lua configuration without a Lua error"
+		fi
+	fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -585,7 +659,13 @@ section "Declared packages"
 if [ -n "$REPO" ] && have dpkg-query; then
 	_missing=""
 	_count=0
-	for _list in "$REPO"/packages/*.list "$REPO"/devices/*/packages.list "$REPO"/uis/*/packages.list; do
+	# Only the UI this system booted; the other uis/*/packages.list belongs to a
+	# desktop that is not installed here (see the _UI note above).
+	_ui_lists="$REPO"/uis/*/packages.list
+	if [ -n "$_UI" ] && [ -f "$REPO/uis/$_UI/packages.list" ]; then
+		_ui_lists="$REPO/uis/$_UI/packages.list"
+	fi
+	for _list in "$REPO"/packages/*.list "$REPO"/devices/*/packages.list $_ui_lists; do
 		[ -f "$_list" ] || continue
 		while read -r _pkg; do
 			case "$_pkg" in '' | '#'*) continue ;; esac
