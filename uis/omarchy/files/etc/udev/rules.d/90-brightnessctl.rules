@@ -1,0 +1,11 @@
+# Let the `video` group change the LCD backlight so the unprivileged session
+# can run `brightnessctl`, which is what the XF86MonBrightness{Down,Up} bindings
+# (Omarchy's Hyprland bindings here, etc/sway/config.d/20-brightness.conf in the
+# sway UI) call.
+#
+# Debian's brightnessctl package ships no udev rule and nothing else in the
+# system touches /sys/class/backlight, so the brightness file stays root-only
+# (0644) and `brightnessctl set` fails with "Permission denied" for the session
+# user (who is in the video group). This is the rule upstream brightnessctl
+# installs; Debian dropped it.
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"

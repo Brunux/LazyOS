@@ -78,6 +78,27 @@ AUR/web-app/gaming/AI installers, and helpers that call `pacman`/`yay`) are left
 off PATH rather than shipped broken: that list is the `EXCLUDE` block in
 `setup.sh`, and every other command is linked.
 
+### Device quirks and system files
+
+The Hayato quirks the sway UI already solved are reused here:
+
+- `files/etc/keyd/default.conf` — the Chromebook top-row remap (VTs, F1–F10); the
+  Lock key stays unmapped so systemd-logind still suspends on `KEY_SLEEP`.
+- `files/etc/udev/rules.d/90-brightnessctl.rules` — gives the `video` group write
+  access to the backlight, which `omarchy-brightness-display` calls.
+- `files/etc/udev/rules.d/60-omarchy-io-scheduler.rules`,
+  `files/etc/modprobe.d/omarchy-usb-autosuspend.conf`,
+  `files/etc/NetworkManager/conf.d/omarchy-wifi-powersave.conf` — upstream's.
+
+Omarchy defines its own XKB option (`shift_caps_compose`) in `/etc/xkb`, which
+libxkbcommon reads before the system rules, so `files/etc/xkb/rules/evdev` and
+`files/etc/xkb/symbols/omarchy` are installed, alongside upstream's logind,
+systemd (`nofile`, shutdown), `systemd-oomd`, `sysctl.d`, `plocate` and `zswap`
+drop-ins. The ALSA UCM boot sequence comes from `alsa-utils` (base) and
+`alsa-ucm-conf` (this list), as in the sway UI. Upstream's Arch-only system files
+— mkinitcpio, limine, plymouth, sddm, docker, mise, the `sudoers.d/omarchy-*`
+grants and its `nsswitch.conf` — are deliberately not installed.
+
 ### Hyprland configuration is Lua
 
 Since 0.55 Hyprland reads `hyprland.lua` and `hypr/autostart.lua`,
@@ -153,7 +174,7 @@ and key bindings invoke are all listed there with a comment saying why.
 | F2b seed `~/.config` + link the `bin/` subset (`setup.sh`) | done — Arch-only commands excluded, rest linked |
 | F3 session/login (Hyprland via UWSM under greetd) | wired — greetd is UI-aware, the session entry and env are shipped; **not yet booted** |
 | F4 Quickshell shell | not started |
-| F5 Hayato quirks (keyd, ALSA UCM, backlight, RAM) | not started |
+| F5 Hayato quirks (keyd, ALSA UCM, backlight, RAM) | device files + the system subset installed; **not yet booted** |
 | F6 build + off-device validation | not started |
 | F7 hardware validation + release | not started |
 
