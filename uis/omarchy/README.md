@@ -186,8 +186,28 @@ and key bindings invoke are all listed there with a comment saying why.
 | F3 session/login (Hyprland via UWSM under greetd) | wired — greetd is UI-aware, the session entry and env are shipped; **not yet booted** |
 | F4 Quickshell shell | imports resolve against Debian's quickshell 0.3.2 (shape check, not a boot); `Owe.LockFeed` deferred |
 | F5 Hayato quirks (keyd, ALSA UCM, backlight, RAM) | device files + the system subset installed; **not yet booted** |
-| F6 build + off-device validation | not started |
+| F6 build + off-device validation | done — `UI=omarchy` rootfs builds; see the validation notes below |
 | F7 hardware validation + release | not started |
 
 Nothing here claims to boot yet: the wiring is in place but the port is only real
 once a card boots it (F7).
+
+### What was actually validated off-device
+
+`UI=omarchy scripts/build-rootfs.sh` builds the rootfs and its hook runs:
+
+- the vendored tree lands at `/usr/share/omarchy`, the packages resolve, and
+  `~/.config` is seeded (`hypr/`, `omarchy/`, `uwsm/`, `environment.d/`, …);
+- the hook links **309** commands into `/usr/bin` and leaves the 223 Arch-only
+  ones out (verified inside the built rootfs: `omarchy-theme-set` and
+  `omarchy-launch-shell` are present, `omarchy-pkg-add` and
+  `omarchy-update-available` are absent);
+- `omarchy-theme-set "Tokyo Night"` runs headless and leaves
+  `~/.local/state/omarchy/current/theme.name` = `tokyo-night`;
+- `Hyprland --verify-config` loads `~/.config/hypr/hyprland.lua` and the Omarchy
+  defaults through Lua with no config errors (the one line it reported,
+  `hl.env(... HYPRLAND_INSTANCE_SIGNATURE)`, only fires when the compositor runs
+  outside its own session; the later segfault is the chroot having no `/dev`/DRM).
+
+The compositor, the shell and the hardware paths cannot be judged in a chroot;
+that is F7.
