@@ -60,6 +60,12 @@ disk_layout_mount "$LOOP" "$MNT"
 # The maintainer's state is excluded from the copy, not deleted after it: a
 # deleted file is still in the image's free blocks (scripts/lib-dist.sh).
 log "Copying root filesystem"
+# A leftover mount under the rootfs (e.g. a chroot /proc or /sys someone forgot
+# to unmount) is never wanted: rsync would copy the live host's pseudo-filesystems
+# and fail on their unreadable entries (hit while writing a card). Refuse.
+_stale_mounts="$(findmnt -rn -o TARGET 2>/dev/null | grep -F "$ROOTFS/" || true)"
+[ -z "$_stale_mounts" ] ||
+	die "something is mounted under $ROOTFS ($_stale_mounts); unmount it first"
 EXCLUDES="$WORK_DIR/dist-excludes-$DEVICE.txt"
 dist_write_excludes "$EXCLUDES"
 rsync -aHAX --delete --exclude-from="$EXCLUDES" "$ROOTFS"/ "$MNT"/

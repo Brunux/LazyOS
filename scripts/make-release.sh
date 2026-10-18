@@ -62,6 +62,11 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE"
 # Same exclusion as the image: the profiles must not be copied and then deleted,
 # or their bytes survive in the staging filesystem (scripts/lib-dist.sh).
+# A leftover mount under the rootfs is refused for the same reason it is in
+# make-image.sh: rsync would copy the live host's pseudo-filesystems.
+_stale_mounts="$(findmnt -rn -o TARGET 2>/dev/null | grep -F "$ROOTFS/" || true)"
+[ -z "$_stale_mounts" ] ||
+	die "something is mounted under $ROOTFS ($_stale_mounts); unmount it first"
 EXCLUDES="$WORK_DIR/dist-excludes-$DEVICE.txt"
 dist_write_excludes "$EXCLUDES"
 rsync -aHAX --delete --exclude-from="$EXCLUDES" "$ROOTFS"/ "$STAGE"/
