@@ -15,6 +15,7 @@
 #   .../home/.config/lazyos/wordmark.txt                    fastfetch's logo
 #   .../home/.config/lazyos/screensaver.txt                 the idle screen's art
 #   brand/social-preview.png                                1280x640, the repository's card
+#   site/apple-touch-icon.png                               180x180, the landing page's touch icon
 #
 # The outputs are committed, because build-rootfs.sh stages `git archive HEAD`
 # and a build host without rsvg-convert must still be able to build an image.
@@ -71,6 +72,11 @@ rsvg-convert -w 1366 -h 912 -b '#002b36' -o "$wall" "$brand/wallpaper.svg"
 
 echo "  social      1280x640  brand/social-preview.png"
 rsvg-convert -w 1280 -h 640 -b '#002b36' -o "$brand/social-preview.png" "$brand/social-preview.svg"
+
+# iOS masks the icon itself and shows transparency as black, so the touch icon
+# is the mark on an opaque base03 square.
+echo "  touch icon  180x180   site/apple-touch-icon.png"
+rsvg-convert -w 180 -h 180 -b '#002b36' -o "$here/site/apple-touch-icon.png" "$brand/lazyos.svg"
 
 # The text forms of the mark.  A terminal cannot draw the SVG, so each terminal
 # surface gets the z_ in full and half blocks, which every monospace font lays

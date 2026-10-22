@@ -1,0 +1,8 @@
+# Crawlers only read robots.txt at the root of a host.  On
+# brunux.github.io/LazyOS/ this file is not that root, so it takes effect only
+# if the site moves to its own domain; until then the page's
+# <meta name="robots"> and the sitemap submitted in Search Console do its job.
+User-agent: *
+Allow: /
+
+Sitemap: https://brunux.github.io/LazyOS/sitemap.xml

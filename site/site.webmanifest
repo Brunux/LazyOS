@@ -1,0 +1,13 @@
+{
+  "name": "LazyOS",
+  "short_name": "lazyOS_",
+  "description": "Debian for ARM Chromebooks. Keyboard first. Lazy by design.",
+  "start_url": "./",
+  "display": "browser",
+  "background_color": "#002b36",
+  "theme_color": "#002b36",
+  "icons": [
+    { "src": "brand/lazyos.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "apple-touch-icon.png", "type": "image/png", "sizes": "180x180" }
+  ]
+}
