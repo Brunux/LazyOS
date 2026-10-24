@@ -168,15 +168,17 @@ log "System tuning for this device (see docs/optimization.md)"
 # zram: swap in compressed RAM. systemd-zram-generator reads this file, and two of
 # the three lines are not the package's defaults on purpose.
 #
-# zram-size = ram. The packaged default is min(ram / 2, 4096), i.e. 1.9 GiB on this
-# machine, and that cap is reached while there is still memory free: a captured
-# session sat at 1.4 GB of 1.948 GB (72 %) with ~2.7 GiB of RAM unused, one page
-# away from spilling to an SD card. The cap decides when the *slow* tier starts, so
-# it belongs where RAM actually runs out, not at half of it. Measured on this
-# hardware, swapped pages cost 4.4x less RAM than their size suggests (427 MiB held
-# in 98 MiB, zsmalloc overhead included; 6.9:1 on the bitstream alone, and half the
-# pages are duplicates), so filling `ram` costs ~0.85 GiB of real RAM - and only as
-# the pages appear.
+# zram-size = min(ram * 2 / 3, 4096), i.e. ~2.5 GiB on this machine. It sits between
+# the packaged default min(ram / 2, 4096) (1.9 GiB) and the full-RAM cap, and each
+# of the two ends was rejected for a different reason. Half of RAM is reached while
+# there is still memory free: a captured session sat at 1.4 GB of 1.948 GB (72 %)
+# with ~2.7 GiB of RAM unused, one page from spilling to an SD card. `ram` was
+# shipped first and dropped for a measured latency regression: with vm.swappiness=150
+# the kernel prefers swapping to dropping clean page cache, and a cap that never
+# fills removes the backpressure that eventually forces the free drop-cache path, so
+# the machine swaps out cold pages it used to keep and every re-touch faults them
+# back through an lz4 decompress. The cap is the valve on that, and two thirds of RAM
+# keeps ~double the old headroom while zram stays a burst tier.
 #
 # No zram-resident-limit, deliberately. It reads like the valve for incompressible
 # data, but a limit fails the store with BLK_STS_IOERR (zram_bio_write) and the swap
@@ -194,7 +196,7 @@ log "System tuning for this device (see docs/optimization.md)"
 install -d /etc/systemd
 cat >/etc/systemd/zram-generator.conf <<'EOF'
 [zram0]
-zram-size = ram
+zram-size = min(ram * 2 / 3, 4096)
 compression-algorithm = lz4
 swap-priority = 100
 EOF

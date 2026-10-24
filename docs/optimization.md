@@ -20,7 +20,8 @@ Items are ordered by (effect × safety) / effort.
 11a (sysctl drop-in, written by `rootfs-setup.sh`), 11b (`systemd-zram-generator`
 replaces `zram-tools`; the swap is now a `dev-zram0.swap` unit), 11c
 (`systemd-oomd`), 11d (measured in section 12: `lz4` stays, and the cap moves from
-the packaged `ram / 2` to `ram`; `zstd` remains the alternative to measure), 12
+the packaged `ram / 2` to two thirds of RAM; `zstd` remains the alternative to
+measure), 12
 (`transparent_hugepage=madvise` on the command line),
 13 (kyber udev rule). `check-system.sh` grew a "System tuning" section that fails
 or warns on each of them, because the failure mode here is silent:
@@ -112,7 +113,7 @@ worth more than it costs.
 | 11a | swap policy | no sysctl drop-in; Debian `swappiness=60` | `vm.swappiness=150` (+ `vfs_cache_pressure=50`, `dirty_bytes=64 MiB`, `dirty_background_bytes=16 MiB`) | Swapping into compressed RAM is cheap, and 60 makes the kernel prefer dropping page cache instead. The dirty limits are the opposite of Deboma's 256/64 MB: on eMMC a large dirty window is where multi-second stalls come from when copying files. |
 | 11b | one zram implementation | image: `zram-tools` (works, `OK swap active: /dev/zram0` in `reports/`) | keep `zram-tools`, or move to `systemd-zram-generator` | The host here has **both**, and `zramswap.service` fails on every boot (`Device or resource busy` → `mkswap: /dev/zram0 is mounted`) while systemd's generator does the work. Exactly one mechanism. `systemd-zram-generator` has one advantage: the swap becomes a real `dev-zram0.swap` unit, which is what `systemd-oomd` needs (11c). Its algorithm/size live in `/etc/systemd/zram-generator.conf`. |
 | 11c | `systemd-oomd` | not installed | install + `ManagedOOMSwap=kill` | PSI is enabled, and on 4 GB the failure mode is "frozen machine", not "process killed". oomd kills a hog by pressure instead of letting the kernel thrash. Note the requirement in 11b: `ManagedOOMSwap=` matches swap *units*. |
-| 11d | zram algorithm/size | `lz4`, 50 % (1.9 GB) | **`zram-size = ram`**, keep `lz4` (section 12) | Measured 4.4 : 1 in real RAM, half the pages duplicate, so a `ram` cap costs ~0.85 GiB and stops the card being reached at 1.9 GiB with ~2.7 GiB of RAM free. 0.23 GiB of RAM per GiB of fast tier. `zstd` at the CPU is unearned until someone runs the A/B. |
+| 11d | zram algorithm/size | `lz4`, 50 % (1.9 GB) | **`zram-size = min(ram * 2 / 3, 4096)`**, keep `lz4` (section 12) | Measured 4.4 : 1 in real RAM (0.23 GiB per GiB of fast tier), so the packaged 1.9 GB cap is left behind - but the full-RAM cap that was shipped first was dropped again: with `swappiness=150` a cap that never fills removes the backpressure that forces the free drop-cache path, so the machine swaps out cold pages and every re-touch pays an lz4 decompress (a real, observed latency). Two thirds of RAM keeps double the old headroom while zram stays a burst tier. `zstd` at the CPU is unearned until someone runs the A/B. |
 | 12 | THP | `[always]` | `transparent_hugepage=madvise` on the command line | `always` + zram on 4 GB wastes memory (a 2 MB fault vs. compressed 4 KB pages) and adds latency spikes; only a handful of workloads want it. Runtime-testable via `/sys/kernel/mm/transparent_hugepage/enabled`. |
 | 13 | I/O scheduler | `mq-deadline` in the image, `kyber` on this host | ship a udev rule (or `elevator=kyber`) | kyber is built for flash: low latency under mixed load instead of deadline's global reordering. Both schedulers are compiled in, so this is a runtime choice. |
 | 14 | IRQ affinity | every IRQ on CPU0 | `irqbalance`, or explicit `smp_affinity` rules for `mmc`, `rtw88_pci`, the i2c EC | eMMC + WiFi + input interrupts all land on the same core the scheduler uses; moving them to another little core (or the big cluster) is free latency. `irqbalance` is packaged (253 kB). |
@@ -604,9 +605,9 @@ Nura ran.
 ## 12. zram sizing - item 11d, measured
 
 The image shipped `zram-size = min(ram / 2, 4096)`, which is `systemd-zram-generator`'s own
-default: 1.9 GiB on this 3.7 GiB machine. It looks conservative and points the wrong way, because
-the cap does not budget RAM - it decides **when the slow tier starts**, and the next tier here is a
-microSD at ~2 MB/s of random 4 KiB writes.
+default: 1.9 GiB on this 3.7 GiB machine. The cap decides **when the slow tier starts**, and the
+next tier here is a microSD at ~2 MB/s of random 4 KiB writes, so the cap matters - but both
+extremes are wrong for a different reason, and the value that ships is the middle (section below).
 
 ### What the device does (eMMC install, lz4, `/sys/block/zram0/mm_stat`)
 
@@ -620,15 +621,23 @@ microSD at ~2 MB/s of random 4 KiB writes.
 | `mem_used_max` | 312 MiB, against a 1 902 MiB cap |
 
 Exchange rate: **0.23 GiB of RAM per GiB of fast tier** for the workload this machine runs, 0.44 GiB
-if every page were unique. The captured load in section 1 sat at 1.4 GB of 1.948 GB (72 %), i.e. one
-page away from spilling to the card while ~2.7 GiB of RAM was unused.
+if every page were unique. The captured load in section 1 sat at 1.4 GB of 1.948 GB (72 %) - closer
+to the cap than a 4 GB machine should sit, though it never actually spilled, which matters below.
 
-### What is written now
+### What is written now, and why it is not `ram`
 
-`rootfs-setup.sh` writes `zram-size = ram`, `compression-algorithm = lz4`, `swap-priority = 100`.
-Filling 3.7 GiB costs ~0.85 GiB of RAM on this workload, spent only as pages appear (peak so far:
-312 MiB), and the card at priority 10 is reached when 3.7 GiB of pages are already stored
-compressed - which is what "last resort" should mean.
+`rootfs-setup.sh` writes `zram-size = min(ram * 2 / 3, 4096)`, `compression-algorithm = lz4`,
+`swap-priority = 100`: ~2.5 GiB on this machine, between the packaged 1.9 GiB and the full 3.7 GiB.
+
+The full-RAM cap was shipped first (`zram-size = ram`) and reverted, because it introduced a small
+but real latency the port had not had before. The cost of the *size* was not the problem - filling
+3.7 GiB costs ~0.85 GiB of RAM on this workload, spent only as pages appear (peak so far: 312 MiB).
+The problem was how the kernel behaves once zram never fills: `vm.swappiness=150` tells it to prefer
+swapping over dropping clean page cache, and the full cap removes the backpressure that would
+eventually force the free drop-cache path. With no cap to hit, the machine swaps out cold pages it
+used to keep in RAM, and every re-touch faults one back through an lz4 decompress - the latency.
+Two thirds of RAM keeps roughly double the old headroom while the cap still fills, so the kernel
+falls back to dropping clean cache (free) instead of swapping indefinitely.
 
 ### Why `zram-resident-limit` is not used
 
@@ -678,10 +687,12 @@ being inferred from a timing.
 
 ### How to check it took
 
-`cat /sys/block/zram0/disksize` should be within 10 % of `MemTotal` (the generator rounds to whole
-MiB), and under the load that produced the 1.4 GB reading `orig_data_size` should pass 1 902 MiB
-while the card's used column in `/proc/swaps` stays 0. `check-system.sh` asks both halves - the file
-and the live device - because a machine edited in place keeps the device it created at boot.
+`cat /sys/block/zram0/disksize` should be within 10 % of two thirds of `MemTotal` (the generator
+rounds to whole MiB), and under the load that produced the 1.4 GB reading `orig_data_size` should
+pass 1 902 MiB while the card's used column in `/proc/swaps` stays 0. `check-system.sh` asks both
+halves - the file and the live device - and flags drift in *either* direction: a smaller device
+spills to the card while RAM is free, and a larger one (a machine still booted on the old `ram`
+device) carries the swap latency this section records.
 
 ## 13. What the UI framework costs - ratatui, and why not a ratatui-lite
 
