@@ -142,6 +142,21 @@ instead of a second toast appearing, and the menu that was waiting opens nothing
 The tooltip of a stoppable card ends with "click to stop"; the others show the
 task alone.
 
+## The task screen
+
+A slow action that takes more than a moment gets a **task window** instead of a
+toast. It is part of the same `lazyos` binary the menus are moving to, and it
+keeps the person in the loop: the checklist, the progress bar and the live log
+stay visible until the action ends, and the result is shown in the same window.
+Run `lazyos task attach <id>` to reopen a task after closing it; the state lives
+in `~/.local/state/lazyos/tasks/<id>.json` and the log in
+`~/.local/state/lazyos/tasks/<id>.log`, so reattaching after the action finishes
+still shows what happened. While a task runs, **s** stops it if it is stoppable
+(SIGINT first, SIGTERM after two seconds, and the final state is always
+`Stopped`, never `Failed`); **Esc** or **q** closes the window without cancelling
+the task. The bar's spinner is the same busy state the old menus use, so a click
+on it stops a stoppable task the same way **s** does.
+
 ## Browsing files
 
 `rofi-files` (Alt+Ctrl+F, "Files" in the root menu and the launcher) is a shell
