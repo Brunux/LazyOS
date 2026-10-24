@@ -83,6 +83,27 @@ pub trait Screen {
         let _ = (area, x, y, design);
         None
     }
+
+    /// Keys shown on the bottom band. A screen with no key bar uses the one set
+    /// on [`App`]; this lets a task surface change its actions as its state
+    /// changes. Returning a borrowed slice keeps a frame from allocating just
+    /// to ask what the keys are (`tests/no_alloc.rs`).
+    fn keybar(&self) -> Option<&[KeyHint]> {
+        None
+    }
+
+    /// How often the loop should wake this screen while nothing else happens.
+    /// `None` means event-driven only; a running task wakes at 10 fps for its
+    /// spinner and its stop timeout.
+    fn needs_tick(&self) -> Option<Duration> {
+        None
+    }
+
+    /// Called when the poll timeout expires. The screen may advance a spinner,
+    /// check on a child process, or decide the task has ended.
+    fn tick(&mut self) -> Outcome {
+        Outcome::Continue
+    }
 }
 
 /// How long an opening animation may run.
@@ -240,7 +261,13 @@ impl<'a> App<'a> {
             };
             screen.draw(&mut ctx);
         }
-        draw_keybar(frame.buffer_mut(), keybar, &self.design, &self.keybar);
+        let hints = self
+            .screen
+            .as_ref()
+            .and_then(|s| s.keybar())
+            .filter(|h| !h.is_empty())
+            .unwrap_or(&self.keybar);
+        draw_keybar(frame.buffer_mut(), keybar, &self.design, hints);
         self.motion.apply(frame.buffer_mut(), body);
     }
 
@@ -297,15 +324,21 @@ impl<'a> App<'a> {
         let mut last_event = Instant::now();
         loop {
             terminal.draw(|frame| self.render(frame))?;
+            let screen_tick = self
+                .screen
+                .as_ref()
+                .and_then(|s| s.needs_tick())
+                .unwrap_or(Duration::MAX);
             let timeout = if self.motion.running() {
-                TICK
+                TICK.min(screen_tick)
             } else {
-                match limit {
+                let base = match limit {
                     Some(limit) => limit
                         .saturating_sub(last_event.elapsed())
                         .max(Duration::from_millis(1)),
                     None => Duration::from_secs(3600),
-                }
+                };
+                base.min(screen_tick)
             };
             let outcome = if event::poll(timeout)? {
                 last_event = Instant::now();
@@ -317,7 +350,11 @@ impl<'a> App<'a> {
                 {
                     return Ok(exit::FAILED);
                 }
-                Outcome::Continue
+                if let Some(screen) = self.screen.as_mut() {
+                    screen.tick()
+                } else {
+                    Outcome::Continue
+                }
             };
             if let Outcome::Done(code) = outcome {
                 return Ok(code);

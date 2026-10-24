@@ -17,3 +17,8 @@ unicode-width = "0.2"
 # so only the runtime is enabled - and it shares ratatui-core 0.1.2 with
 # ratatui 0.30, so the buffers are the same type.
 tachyonfx = { version = "0.25.2", default-features = false, features = ["std"] }
+# Task state files and spec files are JSON, and the task surface needs to send
+# signals to the child process it monitors.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+libc = "0.2"

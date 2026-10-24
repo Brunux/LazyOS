@@ -31,11 +31,13 @@
 pub mod app;
 pub mod design;
 pub mod glyphs;
+pub mod task;
 pub mod widgets;
 
 pub use app::{App, BodyCtx, EmptyScreen, FailureScreen, MOTION_MS, Outcome, Screen};
 pub use design::{Border, ColorRole, Density, Design, GLYPHS, Space, TextStyle};
 pub use glyphs::Glyph;
+pub use task::{Step, StepState, Task, TaskState, TaskView};
 pub use widgets::{
     Confirm, ConfirmAction, Header, KeyHint, ListAction, ListState, LogPane, Row, centered,
     draw_badge, draw_card, draw_empty, draw_failure, draw_gauge, draw_header, draw_keybar,
