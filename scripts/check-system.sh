@@ -738,18 +738,19 @@ case "$(systemctl list-units --all --no-legend 'dev-zram0.swap' 2>/dev/null)" in
 	*) warn "zram swap is not a dev-zram0.swap unit: systemd-oomd cannot manage it" ;;
 esac
 
-# The size of the zram device is the one tuning value whose regression is entirely
-# silent: half of RAM still "works", it just sends pages to the card while RAM is
-# free. Both halves are asked - what the generator will do on the next boot, and
-# what this boot actually got, because a machine whose file was edited in place
-# keeps the device it created at boot until it reboots.
+# The size of the zram device is the one tuning value whose regression is silent in
+# either direction: half of RAM still "works" (it sends pages to the card while RAM
+# is free), and full RAM works too (it swaps out cold pages and every re-touch pays
+# an lz4 decompress). Both halves are asked - what the generator will do on the next
+# boot, and what this boot actually got, because a machine whose file was edited in
+# place keeps the device it created at boot until it reboots.
 _zrc=/etc/systemd/zram-generator.conf
 if [ -r "$_zrc" ]; then
 	_zrsize=$(awk -F= '/^[[:space:]]*zram-size[[:space:]]*=/ { gsub(/[[:space:]]/, "", $2); print $2; exit }' "$_zrc")
 	case $_zrsize in
-	ram) ok "zram-size = ram (the cap is RAM, not half of it)" ;;
+	min\(ram\*2/3,4096\)) ok "zram-size = min(ram * 2 / 3, 4096) (a burst tier, not the full-RAM cap)" ;;
 	"") warn "$_zrc sets no zram-size: the packaged min(ram/2, 4096) applies, so the card is reached with RAM still free" ;;
-	*) warn "zram-size = $_zrsize, not ram (a smaller cap spills to the SD card while RAM is still free)" ;;
+	*) warn "zram-size = $_zrsize, not min(ram * 2 / 3, 4096) (see docs/optimization.md, 'zram sizing')" ;;
 	esac
 	# A limit looks like the valve for incompressible data and is the wrong one: the
 	# store fails with BLK_STS_IOERR and the allocator keeps choosing zram anyway
@@ -761,15 +762,21 @@ if [ -r "$_zrc" ]; then
 else
 	warn "no $_zrc: the packaged zram-size default (half of RAM) applies"
 fi
-# What this boot really has: `ram` is MemTotal, so a device within 10 % of it is
-# the configured size (the generator rounds to whole MiB).
+# What this boot really has: `min(ram * 2 / 3, 4096)` is two thirds of MemTotal (or
+# 4096 MiB on a machine with more than 6 GiB), so a device within 10 % of that is
+# the configured size (the generator rounds to whole MiB). A smaller device spills
+# to the card, and a larger one is the full-RAM cap whose latency this port rejected.
 if [ -r /sys/block/zram0/disksize ]; then
-	_zdisk=$(($(cat /sys/block/zram0/disksize) / 1024))
-	_zmem=$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)
-	if [ "$_zdisk" -ge $((_zmem * 9 / 10)) ]; then
-		ok "zram device is $_zdisk MiB against $_zmem kB of RAM"
+	_zdisk=$(($(cat /sys/block/zram0/disksize) / 1024 / 1024))
+	_zmem=$(($(awk '/^MemTotal:/ { print $2 }' /proc/meminfo) / 1024))
+	_zwant=$((_zmem * 2 / 3))
+	[ "$_zwant" -gt 4096 ] && _zwant=4096
+	if [ "$_zdisk" -ge $((_zwant * 11 / 10)) ]; then
+		warn "zram device is $_zdisk MiB, larger than the ~$_zwant MiB cap: a full-RAM device is the swap latency this port rejected (reboot after editing $_zrc)"
+	elif [ "$_zdisk" -ge $((_zwant * 9 / 10)) ]; then
+		ok "zram device is $_zdisk MiB, ~2/3 of $_zmem MiB of RAM"
 	else
-		fail "zram device is $_zdisk MiB but RAM is $_zmem kB: pages go to the card while RAM is free (rebuild, or reboot after editing $_zrc)"
+		fail "zram device is $_zdisk MiB but ~2/3 of RAM is $_zwant MiB: pages go to the card while RAM is free (rebuild, or reboot after editing $_zrc)"
 	fi
 fi
 

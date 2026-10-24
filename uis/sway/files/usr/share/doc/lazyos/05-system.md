@@ -39,16 +39,18 @@ machine's tuning:
 * **1000 Hz** timers, full preemption;
 * transparent huge pages set to `madvise` on the command line.
 
-Memory: `zram` provides a **3.7 GB** compressed swap device - as much as the machine
-has RAM, because the pages it holds are compressed and cost about a quarter of the
-RAM their size suggests (measured here: 427 MB of pages in 98 MB). The size is
-deliberate: the cap is the point where pages move to the *next* tier, and the next
-tier is the SD card, where the same page takes 30-100 times longer. So it fills
-only when the machine needs it, and the card is reached once 3.7 GB are already
-held compressed (zram-generator, `/etc/systemd/zram-generator.conf`, lz4).
-`systemd-oomd` kills a memory hog at 50 % pressure instead of letting the machine
-freeze. `swapon --show`, `zramctl` and `cat /sys/block/zram0/mm_stat` show what is
-in use.
+Memory: `zram` provides a **~2.5 GB** compressed swap device - two thirds of RAM,
+because the pages it holds are compressed and cost about a quarter of the RAM their
+size suggests (measured here: 427 MB of pages in 98 MB). The size is a deliberate
+middle: the packaged half of RAM (1.9 GB) is reached while RAM is still free, and the
+full-RAM cap was shipped once and dropped because a cap that never fills lets the
+kernel (swappiness 150) swap out cold pages it used to keep, and every re-touch pays
+an lz4 decompress - a small but real latency. Two thirds keeps roughly double the old
+headroom while the cap still fills, so zram stays a burst tier and the card is
+reached only after ~2.5 GB are already held compressed (zram-generator,
+`/etc/systemd/zram-generator.conf`, lz4). `systemd-oomd` kills a memory hog at 50 %
+pressure instead of letting the machine freeze. `swapon --show`, `zramctl` and
+`cat /sys/block/zram0/mm_stat` show what is in use.
 
 ## When you leave it alone
 
