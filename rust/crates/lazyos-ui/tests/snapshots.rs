@@ -20,8 +20,9 @@ use std::path::PathBuf;
 use lazyos_ui::widgets::put;
 use lazyos_ui::{
     App, BodyCtx, ColorRole, Confirm, Design, EmptyScreen, FailureScreen, GLYPHS, Glyph, Header,
-    KeyHint, ListState, LogPane, Row, Screen, TextStyle, draw_badge, draw_card, draw_empty,
-    draw_failure, draw_gauge, draw_header, draw_keybar, draw_progress,
+    KeyHint, ListState, LogPane, Row, Screen, StepState, Task, TaskState, TaskView, TextStyle,
+    draw_badge, draw_card, draw_empty, draw_failure, draw_gauge, draw_header, draw_keybar,
+    draw_progress,
 };
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -483,6 +484,136 @@ fn the_app_shell_with_the_empty_state() {
         ])
         .screen(&mut body);
     check_terminal("app-empty", |terminal| {
+        terminal.draw(|frame| app.render(frame)).unwrap();
+    });
+}
+
+struct TaskScreen {
+    view: TaskView,
+}
+
+impl TaskScreen {
+    fn new(task: Task) -> Self {
+        Self {
+            view: TaskView::new(task),
+        }
+    }
+}
+
+impl Screen for TaskScreen {
+    fn draw(&mut self, ctx: &mut BodyCtx) {
+        self.view.draw(ctx);
+    }
+
+    fn keybar(&self) -> Option<&[KeyHint]> {
+        self.view.keybar()
+    }
+}
+
+fn task(title: &str, state: TaskState) -> Task {
+    let mut task = Task::new(title.to_string().replace(' ', "-"), title, "/tmp");
+    task.add_step("prepare");
+    task.add_step("copy files");
+    task.add_step("finish");
+    match state {
+        TaskState::Running => {
+            task.state = TaskState::Running;
+            task.steps[0].state = StepState::Ok;
+            task.steps[1].state = StepState::Running;
+            task.progress = 0.42;
+        }
+        TaskState::Done => {
+            task.state = TaskState::Done;
+            task.steps[0].state = StepState::Ok;
+            task.steps[1].state = StepState::Ok;
+            task.steps[2].state = StepState::Ok;
+            task.progress = 1.0;
+            task.result = Some("Copied 12 files".to_string());
+        }
+        TaskState::Failed => {
+            task.state = TaskState::Failed;
+            task.steps[0].state = StepState::Ok;
+            task.steps[1].state = StepState::Failed;
+            task.error_line = Some("ERROR: disk full".to_string());
+        }
+        TaskState::Stopped => {
+            task.state = TaskState::Stopped;
+            task.steps[0].state = StepState::Ok;
+            task.steps[1].state = StepState::Failed;
+            task.result = Some("Stopped".to_string());
+        }
+        _ => {}
+    }
+    for i in 0..20 {
+        task.log.push(format!("==> line {i:02}"));
+    }
+    task
+}
+
+#[test]
+fn task_queued() {
+    check_terminal("task-queued", |terminal| {
+        let mut screen = TaskScreen::new(task("Copy files", TaskState::Queued));
+        let mut app = App::new(Header::new("LazyOS").subtitle("Copy files"))
+            .design(Design::solarized().with_reduced_motion(true))
+            .screen(&mut screen);
+        terminal.draw(|frame| app.render(frame)).unwrap();
+    });
+}
+
+#[test]
+fn task_running() {
+    check_terminal("task-running", |terminal| {
+        let mut screen = TaskScreen::new(task("Copy files", TaskState::Running));
+        let mut app = App::new(Header::new("LazyOS").subtitle("Copy files"))
+            .design(Design::solarized().with_reduced_motion(true))
+            .screen(&mut screen);
+        terminal.draw(|frame| app.render(frame)).unwrap();
+    });
+}
+
+#[test]
+fn task_running_stoppable() {
+    check_terminal("task-running-stoppable", |terminal| {
+        let mut t = task("Copy files", TaskState::Running);
+        t.set_stoppable(true);
+        let mut screen = TaskScreen::new(t);
+        let mut app = App::new(Header::new("LazyOS").subtitle("Copy files"))
+            .design(Design::solarized().with_reduced_motion(true))
+            .screen(&mut screen);
+        terminal.draw(|frame| app.render(frame)).unwrap();
+    });
+}
+
+#[test]
+fn task_done() {
+    check_terminal("task-done", |terminal| {
+        let mut screen = TaskScreen::new(task("Copy files", TaskState::Done));
+        let mut app = App::new(Header::new("LazyOS").subtitle("Copy files"))
+            .design(Design::solarized().with_reduced_motion(true))
+            .screen(&mut screen);
+        terminal.draw(|frame| app.render(frame)).unwrap();
+    });
+}
+
+#[test]
+fn task_failed() {
+    check_terminal("task-failed", |terminal| {
+        let mut screen = TaskScreen::new(task("Copy files", TaskState::Failed));
+        let mut app = App::new(Header::new("LazyOS").subtitle("Copy files"))
+            .design(Design::solarized().with_reduced_motion(true))
+            .screen(&mut screen);
+        terminal.draw(|frame| app.render(frame)).unwrap();
+    });
+}
+
+#[test]
+fn task_stopped() {
+    check_terminal("task-stopped", |terminal| {
+        let mut screen = TaskScreen::new(task("Copy files", TaskState::Stopped));
+        let mut app = App::new(Header::new("LazyOS").subtitle("Copy files"))
+            .design(Design::solarized().with_reduced_motion(true))
+            .screen(&mut screen);
         terminal.draw(|frame| app.render(frame)).unwrap();
     });
 }
