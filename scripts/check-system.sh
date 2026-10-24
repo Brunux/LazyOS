@@ -2863,7 +2863,7 @@ else
 	warn "LazyOS theme is missing row icons:$_missing_row_icons (those rows lose the icon column)"
 fi
 
-# The GTK3 half of the palette. One window in this image is GTK3 (pcmanfm), and
+# The GTK3 half of the palette. One window in this image is GTK3 (favnyr, the file manager), and
 # without these two files it renders in Adwaita's light grey - a bright rectangle
 # in a session whose every other pixel is base03. Both failures are silent: GTK
 # drops a stylesheet rule it cannot parse with a line on stderr nobody reads, and
@@ -2871,13 +2871,13 @@ fi
 if [ -r "$HOME/.config/gtk-3.0/gtk.css" ]; then
 	ok "GTK3 windows use the solarized palette (gtk-3.0/gtk.css)"
 else
-	warn "$HOME/.config/gtk-3.0/gtk.css is missing: pcmanfm renders in Adwaita's light grey"
+	warn "$HOME/.config/gtk-3.0/gtk.css is missing: favnyr renders in Adwaita's light grey"
 fi
 if grep -qs '^gtk-icon-theme-name=LazyOS' "$HOME/.config/gtk-3.0/settings.ini" &&
 	grep -qs '^gtk-application-prefer-dark-theme=1' "$HOME/.config/gtk-3.0/settings.ini"; then
 	ok "GTK3 windows use the LazyOS icons on a dark base (gtk-3.0/settings.ini)"
 else
-	warn "gtk-3.0/settings.ini does not select LazyOS + dark: pcmanfm looks like a foreign program"
+	warn "gtk-3.0/settings.ini does not select LazyOS + dark: favnyr looks like a foreign program"
 fi
 # The GTK4 half is a different settings store, so the two files above reach
 # nothing here.  `papers` is the one GTK4/libadwaita window in the image, and it
@@ -2897,27 +2897,26 @@ else
 	warn "$HOME/.config/gtk-4.0/gtk.css is missing or empty: papers keeps libadwaita's own colours"
 fi
 
-# The windowed file manager is pcmanfm (the Files menu stays rofi-files, and
+# The windowed file manager is favnyr (replaced pcmanfm with Brunux/Favnyr-aarm64 v0.3.6 binary at /usr/bin/favnyr);
 # Alt+Search finds files). What fails here does so silently: without its config
 # the terminal command is x-terminal-emulator, which this image does not have, so
 # "Open Terminal Here" does nothing; without the association a double click on a
 # photo starts the browser (280 MB) or nothing; and libfm's own loader is the only
 # thumbnail decoder, so a lost setting is invisible until a directory looks empty.
-if have pcmanfm; then
-	ok "file manager installed (pcmanfm $(dpkg-query -W -f='${Version}' pcmanfm 2>/dev/null))"
+if have favnyr; then
+	ok "file manager installed (favnyr $(/usr/bin/favnyr --version 2>/dev/null || echo installed))"
 else
-	fail "pcmanfm is missing: the Files (window) entry and 'Open containing folder' do nothing"
+	fail "favnyr is missing: the Files (window) entry and 'Open containing folder' do nothing"
 fi
 # The window has a key of its own (Alt+Ctrl+Shift+F, the Shift variant of the
 # Files menu's Alt+Ctrl+F): without the binding the window is only reachable
 # from the launcher, which reads as "the shortcut stopped working".
-if grep -rqs 'Ctrl+Shift+f exec .*pcmanfm' /etc/sway/config.d/; then
-	ok "Alt+Ctrl+Shift+F opens the file manager (pcmanfm)"
+if grep -rqs 'Ctrl+Shift+f exec .*favnyr' /etc/sway/config.d/; then
+	ok "Alt+Ctrl+Shift+F opens the file manager (favnyr)"
 else
-	fail "no 'Ctrl+Shift+f exec ...pcmanfm' binding in /etc/sway/config.d/: Alt+Ctrl+Shift+F does nothing"
+	fail "no 'Ctrl+Shift+f exec ...favnyr' binding in /etc/sway/config.d/: Alt+Ctrl+Shift+F does nothing"
 fi
-# Mounting a USB stick needs udisks2: this session has no privilege for mount(8),
-# and both consumers - pcmanfm's Devices pane and rofi-places' "Mount" rows - go
+# Mounting removable media uses udisks2; both the file manager (favnyr) and rofi-places
 # through /usr/bin/udisksctl to udisksd on the system bus. The check is the client
 # talking to the daemon (udisksctl status activates the D-Bus service), because
 # the package can be installed with the service missing from the bus.
@@ -3015,19 +3014,19 @@ if grep -qs 'Auto-mount USB drives' "$HOME/.config/bin/rofi-quick"; then
 else
 	fail "rofi-quick lost the 'Auto-mount USB drives' row: the switch is unreachable"
 fi
-# pcmanfm's Unmount runs `eject`, which is not a dependency of udisks2 or gvfs:
+# favnyr's Unmount (if supported) runs through eject, not udisksctl.
 # without it the action answers `Failed to execute child process "eject"` and the
 # stick stays mounted.
 if have eject; then
-	ok "pcmanfm can unmount a stick (eject)"
+	ok "eject is available for favnyr's Unmount"
 else
-	fail "eject is missing: pcmanfm's Unmount fails with 'Failed to execute child process \"eject\"'"
+	fail "eject is missing: favnyr's Unmount may fail with missing child process"
 fi
 _pcm_dirs=${XDG_CONFIG_DIRS:-/etc/xdg}
-_pcm_conf=${_pcm_dirs%%:*}/pcmanfm/default/pcmanfm.conf
-[ -r "$_pcm_conf" ] || _pcm_conf=/etc/xdg/pcmanfm/default/pcmanfm.conf
+_pcm_conf=${_pcm_dirs%%:*}/favnyr/default/favnyr.conf
+[ -r "$_pcm_conf" ] || _pcm_conf=/etc/xdg/favnyr/default/favnyr.conf
 if grep -qs '^terminal=foot' "$_pcm_conf"; then
-	ok "pcmanfm opens a terminal with foot (terminal=foot)"
+	ok "favnyr opens a terminal with foot (terminal=foot in favnyr config)"
 else
 	warn "no terminal=foot in $_pcm_conf: 'Open Terminal Here' (F4) starts nothing"
 fi
@@ -3045,12 +3044,12 @@ done
 if [ -z "$_missing" ]; then
 	ok "the LazyOS theme carries every icon the file manager asks for"
 else
-	warn "the LazyOS theme has no icon for:$_missing (holes in pcmanfm's sidebar and icon view)"
+	warn "the LazyOS theme has no icon for:$_missing (holes in favnyr's sidebar and icon view)"
 fi
 if [ -x "$HOME/.config/bin/lazyos-view" ]; then
 	ok "open-with handler installed (lazyos-view: bat, imv, papers, mpv, firefox-esr)"
 else
-	fail "bin/lazyos-view is missing or not executable: a double click in pcmanfm opens nothing"
+	fail "bin/lazyos-view is missing or not executable: a double click in favnyr opens nothing"
 fi
 # The launcher entry is a shadow of the package's (same file name, so it replaces
 # Debian's "PCMan File Manager"): without it the launcher shows "Files" (the
@@ -3058,7 +3057,7 @@ fi
 if grep -qs '^Name=Files (window)' "$HOME/.local/share/applications/pcmanfm.desktop"; then
 	ok "the launcher names the window 'Files (window)'"
 else
-	warn "$HOME/.local/share/applications/pcmanfm.desktop is missing: the launcher shows 'PCMan File Manager' next to 'Files'"
+	warn "$HOME/.local/share/applications/pcmanfm.desktop is missing or has wrong name: the launcher shows the wrong file manager name"
 fi
 # `gio mime` resolves the association exactly like the application does, and it
 # is also a test of the .desktop entry itself: GIO drops an entry whose Exec
@@ -3102,10 +3101,10 @@ else
 	warn "application/pdf defaults to '${_mime_pdf:-(nothing)}', not org.gnome.Papers.desktop: a document opens in the browser"
 fi
 _dir=$(_mime_default inode/directory)
-if [ "$_dir" = pcmanfm.desktop ]; then
-	ok "'Open containing folder' opens pcmanfm (inode/directory)"
+if [ "$_dir" = "pcmanfm.desktop" ]; then
+	ok "'Open containing folder' opens favnyr via pcmanfm.desktop shadow entry (inode/directory)"
 else
-	warn "inode/directory defaults to '${_dir:-(nothing)}', not pcmanfm.desktop: 'Open containing folder' does nothing"
+	warn "inode/directory defaults to '${_dir:-(nothing)}', not pcmanfm.desktop (favnyr shadow): 'Open containing folder' does nothing"
 fi
 
 # Dictation: the shortcut records with parecord and transcribes with whisper-cli.

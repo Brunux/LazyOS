@@ -153,7 +153,8 @@ exfatprogs
 # click resolves through /etc/xdg/mimeapps.list -> ~/.config/bin/lazyos-view, so
 # it opens what rofi-files opens; /etc/xdg/pcmanfm/default/pcmanfm.conf sets
 # terminal=foot and bounds a thumbnail decode at 4 MB.
-pcmanfm
+# Replaced by favnyr (Brunux/Favnyr-aarm64 v0.3.6): binary copied to /usr/bin/favnyr.
+# gvfs stays for trash/volume; libglib2.0-bin stays for gio/mime resolution.
 # gvfs is what gives pcmanfm a working Trash (gvfsd-trash) and a local volume
 # monitor: 431 kB, plus gvfs-daemons and gvfs-libs. gvfs-backends is deliberately
 # not here - it is where samba-libs (31 MB) and the mtp/gphoto/cdio device

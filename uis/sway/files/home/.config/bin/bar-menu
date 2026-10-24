@@ -45,7 +45,7 @@ while :; do
 	{
 		ui_row "$UI_I_TERM" 'Terminal' 'foot' terminal
 		ui_row "$UI_I_FILES" 'Files' 'browse the filesystem' files
-		ui_row "$UI_I_WINDOW" 'Files (window)' 'pcmanfm: folders, drag and drop, trash' files-window
+		ui_row "$UI_I_WINDOW" 'Files (window)' 'favnyr: folders, drag and drop, trash' files-window
 		ui_row "$UI_I_SEARCH" 'Search inside files' 'the text in them, with ripgrep' grep
 		ui_row "$UI_I_DISK" 'Places' 'home, disks, the configuration' places
 		ui_row "$UI_I_CAMERA" 'Capture' 'screenshot, OCR, QR, recording' capture
@@ -121,7 +121,8 @@ while :; do
 	# The windowed file manager: the same directory, with a mouse. It is a
 	# second row and not a replacement because the list is what the Search key
 	# and Alt+Ctrl+F open, and it costs one process with no window.
-	files-window) exec pcmanfm "$HOME" ;;
+	# Replaced pcmanfm with favnyr (Brunux/Favnyr-aarm64 v0.3.6).
+	files-window) exec favnyr "$HOME" ;;
 	# The text inside the files, as opposed to their names: rofi-files --search
 	# is the other half of the same question.
 	grep) exec "$dir/rofi-grep" ;;
