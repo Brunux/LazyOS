@@ -19,6 +19,7 @@
 pub mod command;
 pub mod host;
 pub mod paths;
+pub mod task_cmd;
 pub mod term;
 mod theme;
 pub mod version;
@@ -253,6 +254,7 @@ fn execute(
     match resolved.spec.path {
         "menu" => menu(resolved, terminal, design, "the session menu", "spec 007"),
         "menu files" => menu(resolved, terminal, design, "the file browser", "spec 009"),
+        "task attach" => task_cmd::attach(resolved, terminal, design),
         other => Err(Failure::new(
             format!("`{other}` is in the table but has no implementation"),
             "this is a bug: the command table and this match disagree",

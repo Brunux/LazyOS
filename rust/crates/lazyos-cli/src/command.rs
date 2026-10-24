@@ -111,6 +111,14 @@ pub const COMMANDS: &[CommandSpec] = &[
         symlinks: &["rofi-files"],
         installed: &[],
     },
+    CommandSpec {
+        // The task surface: reattach to a slow action that outlives a toast.
+        path: "task attach",
+        summary: "reattach to a running or finished task (spec 005)",
+        shape: Shape::Task,
+        symlinks: &["lazyos-task"],
+        installed: &["lazyos-task"],
+    },
 ];
 
 /// A command the table resolved, with the arguments that belong to it.
