@@ -10,8 +10,9 @@
 # A user's ~/.config/mimeapps.list is read first and overrides everything here,
 # and `xdg-mime default` writes there, so nothing in the image is locked in.
 #
-# Deliberately absent: inode/directory is pcmanfm, so "Open containing folder"
-# and `xdg-open <dir>` land in a window (rofi-files is a key, not a handler);
+# Deliberately absent: inode/directory is handled by favnyr (replaced pcmanfm),
+# through the shadowed desktop entry (~/.local/share/applications/pcmanfm.desktop -> Exec=favnyr).
+# rofi-files is the keyboard file list, not the directory handler.
 # http/https stay with Firefox, which is the browser the shim already calls.
 
 [Default Applications]
