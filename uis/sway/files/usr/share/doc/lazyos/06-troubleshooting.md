@@ -523,6 +523,17 @@ terminal's own business (a click starts a text selection). `check-system.sh`
 FAILs when the escape is gone. A touchscreen tap counts, because the terminal
 turns it into a left click.
 
+**The desktop pointer keeps disappearing after the saver.** Hiding the pointer
+while the wordmark is up is a session-wide seat setting, not a property of the
+window: `swaymsg seat - hide_cursor 1` tells sway to hide the cursor after the
+pointer stops moving (any value under 100 is clamped to **100 ms**, which is why
+it vanishes almost at once), and that stays on the seat after the idle screen
+closes. The `EXIT` trap in `lazyos-screensaver` therefore puts the previous
+value back on the way out - read from the merged config, because sway offers no
+IPC read for it - and `check-system.sh` FAILs when the restore is gone. The
+symptom is exactly "the desktop comes back, then the pointer vanishes as soon as
+the mouse rests."
+
 **The chain stopped at the idle screen.** `swayidle` runs with `-w`, which makes
 it wait for each timed command to finish before it handles anything else - that
 is what holds the machine awake until the lock is drawn, so it cannot simply be

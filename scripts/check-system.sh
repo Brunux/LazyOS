@@ -1198,6 +1198,27 @@ if [ -x "$_saver_bin" ]; then
 	esac
 fi
 
+# Hiding the pointer while the idle screen is up is a session-wide seat setting,
+# not a property of the window: sway offers no IPC read for it (get_seats
+# reports only name, capabilities, focus and devices), so the value in effect
+# before the saver is recovered from the merged config and the EXIT trap puts it
+# back.  Without the restore, the seat keeps hiding the pointer after foot
+# closes - the desktop pointer vanishing after every movement is the report this
+# port got ("the mouse pointer disappears quickly").  Note sway clamps any
+# non-zero timeout under 100 up to 100 ms, so `hide_cursor 1` is really 100.
+if [ -x "$_saver_bin" ]; then
+	_saver_cur=""
+	grep -q 'hide_cursor 1' "$_saver_bin" || _saver_cur="$_saver_cur no-hide"
+	grep -q 'prev_hide_cursor=' "$_saver_bin" || _saver_cur="$_saver_cur no-capture"
+	grep -qF 'hide_cursor "$prev_hide_cursor"' "$_saver_bin" || _saver_cur="$_saver_cur no-restore"
+	case $_saver_cur in
+	'') ok "idle screen restores the pointer on exit (captures the prior hide_cursor and puts it back)" ;;
+	*no-restore*)
+		fail "idle screen hides the seat cursor and never resets it: the desktop pointer disappears after the saver" ;;
+	*) warn "idle screen pointer-hide/restore drifted (capture or restore line changed)" ;;
+	esac
+fi
+
 # The 150 s command has to return at once, or the rest of the chain never runs.
 # swayidle runs it with `-w`, which blocks its whole event loop until the command
 # exits (main.c, cmd_exec: waitpid), and a saver held in the foreground would

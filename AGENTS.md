@@ -2189,6 +2189,15 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   touchscreen tap counts, because foot maps a tap to a left click. Verified on this machine with a
   throwaway uinput pointer (a device with `REL_X`/`REL_Y` and `BTN_LEFT`, created and destroyed
   around the test): the real idle screen, started by the launcher, ended on the first motion event.
+  A sixth trap is the **sway pointer itself**: hiding it while the wordmark is up is done with
+  `swaymsg seat - hide_cursor 1`, which is a session-wide seat setting, not a property of the window
+  - and sway offers no IPC read for it (`get_seats` reports only name, capabilities, focus and
+  devices), so the `EXIT` trap recovers the previous value from the merged config
+  (`swaymsg -t get_config`) and puts it back on the way out. Without that restore the seat keeps
+  hiding the pointer after foot closes, and `hide_cursor 1` is clamped to **100 ms** (sway raises
+  any non-zero timeout under 100 to 100), so the desktop pointer vanishes a tenth of a second after
+  every movement - the report this port got ("after the screensaver stops, the mouse pointer
+  disappears quickly"). `check-system.sh` FAILs when the capture or the restore line goes.
   **The lock is `~/.config/bin/sway-lock`, and its reason is the readiness line.** The idle timer,
   `Alt+Ctrl+L`, the Lock key and the two suspend shortcuts all call it instead of `swaylock`
   directly: it passes `-R, --ready-fd` (swaylock's own handshake, written once the compositor

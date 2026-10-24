@@ -97,7 +97,20 @@ static_frame() {
 
 run() {
 	[ -t 0 ] || exit 1
-	# Nothing is going to move for a while; let sway hide the pointer.
+	# Nothing is going to move for a while; let sway hide the pointer.  sway
+	# keeps `hide_cursor` as a session-wide seat setting and has no IPC read for
+	# it (get_seats reports only name, capabilities, focus and devices), so the
+	# value in effect before this runs is recovered from the merged config and
+	# put back on the way out.  Two things the first attempt got wrong: the
+	# value was never restored, so the seat kept hiding the pointer after the
+	# window closed; and `hide_cursor 1` is really 100 - sway clamps any timeout
+	# under 100 and non-zero up to 100 ms, which is why "the desktop comes back
+	# and the pointer disappears quickly".
+	prev_hide_cursor=$(swaymsg -t get_config 2>/dev/null \
+		| grep -oE 'hide_cursor[[:space:]]+[0-9]+' \
+		| grep -oE '[0-9]+$' \
+		| tail -n 1)
+	prev_hide_cursor=${prev_hide_cursor:-0}
 	swaymsg seat - hide_cursor 1 >/dev/null 2>&1 || true
 
 	# Terminals allocate an 80x24 pty and only resize it once the compositor has
@@ -130,6 +143,11 @@ run() {
 	# leaves the cursor hidden after it.
 	restore_terminal() {
 		printf '\033[?1006l\033[?1003l\033[?25h'
+		# Put the seat's hide_cursor timeout back to what it was before the
+		# window hid it (0 unless a config set one).  Without this the seat
+		# keeps hiding the pointer after foot closes, because the setting is
+		# session-wide, not a property of the window.
+		swaymsg seat - hide_cursor "$prev_hide_cursor" >/dev/null 2>&1 || true
 	}
 	trap restore_terminal EXIT
 	trap 'exit 0' INT TERM HUP
