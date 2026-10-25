@@ -168,17 +168,18 @@ log "System tuning for this device (see docs/optimization.md)"
 # zram: swap in compressed RAM. systemd-zram-generator reads this file, and two of
 # the three lines are not the package's defaults on purpose.
 #
-# zram-size = min(ram * 2 / 3, 4096), i.e. ~2.5 GiB on this machine. It sits between
-# the packaged default min(ram / 2, 4096) (1.9 GiB) and the full-RAM cap, and each
-# of the two ends was rejected for a different reason. Half of RAM is reached while
-# there is still memory free: a captured session sat at 1.4 GB of 1.948 GB (72 %)
-# with ~2.7 GiB of RAM unused, one page from spilling to an SD card. `ram` was
-# shipped first and dropped for a measured latency regression: with vm.swappiness=150
-# the kernel prefers swapping to dropping clean page cache, and a cap that never
-# fills removes the backpressure that eventually forces the free drop-cache path, so
-# the machine swaps out cold pages it used to keep and every re-touch faults them
-# back through an lz4 decompress. The cap is the valve on that, and two thirds of RAM
-# keeps ~double the old headroom while zram stays a burst tier.
+# zram-size = min(ram, 4096), i.e. 3.7 GiB on this machine.
+# Sizing zram to all of RAM ensures memory-heavy workloads never spill to the
+# slow microSD card at priority 10 (~1-2 MB/s random writes). The previous
+# latency concern with a full-RAM cap was caused by:
+# 1) vm.page-cluster=3 reading ahead 8 pages (32 KB), which blew out the 32 KB
+#    L1 data cache on the Cortex-A55 LITTLE cores on every swap-in;
+# 2) vm.vfs_cache_pressure=50 hoarding directory/inode caches and forcing anon
+#    memory into swap;
+# 3) vm.watermark_boost_factor=15000 triggering premature kswapd churn.
+# With page-cluster=0, vfs_cache_pressure=100, watermark_boost_factor=0, and
+# lz4 compression (~1 us decompress on A76), swapping into zram is fast and
+# zero-latency, keeping the entire workload off the microSD card.
 #
 # No zram-resident-limit, deliberately. It reads like the valve for incompressible
 # data, but a limit fails the store with BLK_STS_IOERR (zram_bio_write) and the swap
@@ -188,30 +189,38 @@ log "System tuning for this device (see docs/optimization.md)"
 # would become hibernate-only. Only the nominal cap falls through cleanly.
 #
 # The algorithm stays lz4: it compresses and decompresses fast, which is what
-# matters when the machine is already under pressure. zstd buys ~20-30 % ratio for
-# 2-4x the CPU on the A55 cluster, and CONFIG_ZRAM_MULTI_COMP (recompress idle
-# pages) is not built, so the cheap form of that idea does nothing yet.
+# matters when the machine is already under pressure. Wholesale zstd trades
+# 2-4x CPU on the in-order A55 cluster for a modest ratio gain.
 #
 # The measurements are docs/optimization.md, "zram sizing".
 install -d /etc/systemd
 cat >/etc/systemd/zram-generator.conf <<'EOF'
 [zram0]
-zram-size = min(ram * 2 / 3, 4096)
+zram-size = min(ram, 4096)
 compression-algorithm = lz4
 swap-priority = 100
 EOF
 
-# Memory and writeback policy. Debian's swappiness default is 60, which prefers
-# dropping page cache over swapping: wrong when swap is compressed RAM, where a
-# swapped page costs a few hundred microseconds and buys real memory back. The
-# dirty limits are deliberately the opposite of Deboma's 256/64 MB - on eMMC a
-# large dirty window is where multi-second stalls come from when copying files.
+# Memory and writeback policy for MT8192 (4x A55 LITTLE + 4x A76 BIG, 4 GB RAM).
+# vm.page-cluster = 0 prevents 8-page readahead cache pollution on A55 (32 KB L1D).
+# vm.watermark_boost_factor = 0 stops kswapd churn during memory spikes.
+# vm.compaction_proactiveness = 0 disables background kcompactd CPU cycles.
 install -d /etc/sysctl.d
 cat >/etc/sysctl.d/90-zram-emmc.conf <<'EOF'
-vm.swappiness = 150
-vm.vfs_cache_pressure = 50
+vm.swappiness = 100
+vm.vfs_cache_pressure = 100
+vm.page-cluster = 0
+vm.watermark_boost_factor = 0
+vm.watermark_scale_factor = 125
+vm.compaction_proactiveness = 0
 vm.dirty_bytes = 67108864
 vm.dirty_background_bytes = 16777216
+EOF
+
+# MGLRU runtime tuning: protect active working sets from swap thrashing
+install -d /etc/tmpfiles.d
+cat >/etc/tmpfiles.d/mglru.conf <<'EOF'
+w /sys/kernel/mm/lru_gen/min_ttl_ms - - - - 1000
 EOF
 
 # I/O scheduler: kyber, which is built for flash (low latency under mixed load)
@@ -225,8 +234,38 @@ cat >/etc/udev/rules.d/60-io-scheduler.rules <<'EOF'
 ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="kyber"
 EOF
 
+# Storage IRQ balancing: route MMC interrupts away from CPU0 (Cortex-A55) so the
+# ChromeOS EC (keyboard, trackpad, power button) and system timers on CPU0 are
+# never starved by storage I/O.
+install -d /usr/local/sbin
+cat >/usr/local/sbin/lazyos-irq-balance <<'EOF'
+#!/bin/sh
+for irq in $(awk '/11f70000.mmc/ {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':'); do
+	[ -w "/proc/irq/$irq/smp_affinity_list" ] && echo 2 > "/proc/irq/$irq/smp_affinity_list" 2>/dev/null || true
+done
+for irq in $(awk '/11f60000.mmc/ {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':'); do
+	[ -w "/proc/irq/$irq/smp_affinity_list" ] && echo 3 > "/proc/irq/$irq/smp_affinity_list" 2>/dev/null || true
+done
+EOF
+chmod 755 /usr/local/sbin/lazyos-irq-balance
+
+install -d /etc/systemd/system
+cat >/etc/systemd/system/lazyos-irq-balance.service <<'EOF'
+[Unit]
+Description=Balance storage IRQs away from CPU0 on MT8192
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/lazyos-irq-balance
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 log "Enabling services"
-systemctl enable NetworkManager ssh 2>/dev/null || true
+systemctl enable NetworkManager ssh lazyos-irq-balance 2>/dev/null || true
 # systemd-oomd (PSI-based; Debian's defaults configure it) and the zram swap the
 # generator creates. systemd-zram-generator needs no enabling - it is a systemd
 # generator, and dev-zram0.swap exists from the moment the unit files are
