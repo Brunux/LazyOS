@@ -32,7 +32,7 @@
 "popup" = "\uf120"             # f120 UI_I_TERM
 
 "firefox" = "\uf0ac"           # f0ac UI_I_GLOBE   (firefox-esr too)
-"pcmanfm" = "\uf07b"           # f07b UI_I_FILES
+"favnyr" = "\uf07b"            # f07b UI_I_FILES   (the windowed file manager)
 "papers" = "\uf15c"            # f15c UI_I_FILE    (a document: PDF, DjVu, comic)
 "imv" = "\uf03e"               # f03e UI_I_IMAGE
 "mpv" = "\uf03d"               # f03d UI_I_VIDEO
