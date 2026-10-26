@@ -1,10 +1,13 @@
 /* Solarized Dark, the GTK3 half of the palette.
  *
- * One palette, four surfaces: foot draws the terminal in it, waybar and rofi
+ * One palette, five surfaces: foot draws the terminal in it, waybar and rofi
  * paint their own layer-shell surfaces from their own files, and this file is
- * the one GTK3 window in the image - pcmanfm, the windowed file manager. With
- * nothing here it renders in Adwaita's light grey, a bright rectangle in a
- * session whose every other pixel is base03.
+ * the GTK3 half. The GTK3 *window* the image ships is **guvcview** (the camera);
+ * the file manager used to be one and is now favnyr, a Slint binary that links no
+ * GTK, so it takes only the icon theme name from `settings.ini` next to this
+ * file. Waybar is GTK3 as well and takes the font and the dark preference from
+ * it, and a program installed later reads this stylesheet as its user theme
+ * instead of arriving in Adwaita's light grey inside a base03 session.
  *
  * Adwaita-dark (settings.ini) is the base: it brings the layout, the paddings
  * and the widget structure that are not worth reimplementing. This file then
@@ -73,8 +76,9 @@ placessidebar row:selected {
 }
 
 /* Menus: the menu bar, the context menu of a file, and combobox popovers.
-   pcmanfm is driven from these - rename, copy, move to trash, open with - so
-   they are the part of it a person sees most. */
+   These are the widget classes a GTK3 file manager draws its actions with -
+   rename, copy, move to trash, open with - so they are the part a person sees
+   most where a GTK3 program is involved. */
 menubar,
 .menubar,
 menu,
@@ -166,8 +170,8 @@ entry:disabled {
 	color: @base01;
 }
 
-/* Dialogs and the headerbars of the ones pcmanfm opens (Properties, Preferences,
-   the rename prompt). */
+/* Dialogs and the headerbars of the ones a GTK3 program opens (Properties,
+   Preferences, the rename prompt). */
 headerbar,
 .titlebar {
 	background-image: none;
@@ -199,7 +203,7 @@ scrollbar slider:hover {
 	background-color: @base00;
 }
 
-/* Tabs, since pcmanfm opens one per directory when asked. */
+/* Tabs, since a GTK3 file manager opens one per directory when asked. */
 notebook > header {
 	background-color: @base03;
 	border-color: @base02;

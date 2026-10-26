@@ -16,7 +16,7 @@ read. This page is the tour.
 |---|---|
 | Search key | launcher: every application, narrowed by typing (the same menu as Alt+D) |
 | Alt+Search | file search: every file under your home, narrowed by typing (Enter opens it, Enter on a folder browses there) |
-| Alt+Ctrl+Shift+F | the file manager in a window (pcmanfm): drag and drop, several files at once, rename, the trash |
+| Alt+Ctrl+Shift+F | the file manager in a window (favnyr): drag and drop, several files at once, rename, the trash |
 | Alt+D | launcher: applications (the Search key opens the same menu) |
 | Alt+Space | the root menu (the bar's menu button, on the keyboard) |
 | Alt+Tab | window switcher |
@@ -75,7 +75,7 @@ tree, and a list you scroll. Search+Shift *filters everything*, uncapped,
 while the walk is still running, and shows you the file before you open it.
 Neither stays resident: one process while its window is open.
 
-**Alt+Ctrl+Shift+F opens the file manager in a window** (**pcmanfm**), the Shift
+**Alt+Ctrl+Shift+F opens the file manager in a window** (**favnyr**), the Shift
 variant of the Files key (`Alt+Ctrl+F` above) and the same window the root menu
 (**Alt+Space**) and the launcher call **Files (window)**. It is what a list
 cannot do - drag a file onto a folder, select several, rename in place, send to
@@ -313,7 +313,7 @@ wherever sway does not already own the key.
 | browser | no key (its launcher) | **Alt+Shift+Return** (firefox-esr) |
 | screenshot | Super+Shift+S, Print | Alt+Shift+S, Alt+Shift+F, Alt+Ctrl+S |
 | capture menu (screenshot, OCR, QR, recording) | Super+Ctrl+C | **Alt+Ctrl+C** |
-| files | Super+Shift+F opens the file manager | Alt+Search: `rofi-files --search` (a list); **Alt+Ctrl+Shift+F**: pcmanfm, the same files in a window; **Search+Shift**: `lazyos-find`, the same files in a terminal; **Alt+Ctrl+F**: browse a directory |
+| files | Super+Shift+F opens the file manager | Alt+Search: `rofi-files --search` (a list); **Alt+Ctrl+Shift+F**: favnyr, the same files in a window; **Search+Shift**: `lazyos-find`, the same files in a terminal; **Alt+Ctrl+F**: browse a directory |
 | fullscreen | Super+F | Alt+F |
 | volume, brightness, media keys | XF86 keys | the same keys |
 | workspaces | Super+Tab cycles | Alt+1..0 and three-finger swipe |

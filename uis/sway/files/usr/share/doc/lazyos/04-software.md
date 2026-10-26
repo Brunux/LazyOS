@@ -191,7 +191,7 @@ EPUB, a `.deb`, or anything whose own viewer is missing.
   below). A **URL** is the browser's job, which is what `xdg-open` below is
   about.
 * `xdg-open` exists (`/usr/local/bin/xdg-open`, two dozen lines): a URL goes to
-  Firefox, and a path goes to the same rule table a double click in pcmanfm uses
+  Firefox, and a path goes to the same rule table a double click in favnyr uses
   (`lazyos-view`), so a file opened from a script lands where it would land from
   the desktop. That is what foot's ctrl+click and the command-line tools that
   print a URL call - there is no desktop portal in this image.
@@ -369,7 +369,7 @@ hook should not rearrange the desktop. Nothing is resident, and
 
 ## Files in a window
 
-**Alt+Ctrl+Shift+F** opens **pcmanfm**: the files **Alt+Search** and **Alt+Ctrl+F**
+**Alt+Ctrl+Shift+F** opens **favnyr**: the files **Alt+Search** and **Alt+Ctrl+F**
 list, with a mouse. It is a second entry and not a replacement, because the two
 answer different questions - a list is one keystroke and no window, a window is
 what drag and drop, several files at once, renaming in place and the trash need.
@@ -379,36 +379,38 @@ one: tile it, move it to another workspace, close it with **Alt+Q**.
 
 * **A double click opens what the Files menu opens.** `/etc/xdg/mimeapps.list`
   decides, and it names the same programs the list does: a document (PDF, DjVu, a
-  comic) goes to `papers`, a directory to pcmanfm, a page or a `.deb` to Firefox,
+  comic) goes to `papers`, a directory to favnyr, a page or a `.deb` to Firefox,
   and text, pictures and video to `org.lazyos.view.desktop` ->
   `~/.config/bin/lazyos-view`, which is the rule table `rofi-files` follows (text
   in `bat`, a picture in `imv` - sixels in a foot window when imv cannot start - a
   video in `mpv`, an EPUB in Firefox; the list reads an HTML file as text where a
   double click opens the page). There is no desktop portal in this image, so those
-  entries *are* the "open with" mechanism - for pcmanfm, for `gio open` and for
+  entries *are* the "open with" mechanism - for favnyr, for `gio open` and for
   any application that asks to open something.
-* **A terminal from inside it is foot** (`F4`, "Open Terminal Here"): the shipped
-  configuration names `foot`, because pcmanfm's default `x-terminal-emulator`
-  is not installed here and the menu entry would do nothing.
-* **Thumbnails are pictures only.** libfm decodes them itself with gdk-pixbuf and
-  ignores the freedesktop `.thumbnailer` files `poppler-utils` ships, so a PDF or
-  a video keeps its mimetype icon in the icon view - the Files list still draws a
-  real thumbnail for both. A file over 4 MB shows its icon instead of a decode:
-  a 24 MP photo costs ~83 MB of memory for a 128 px thumbnail, and this is a 4 GB
-  machine.
+* **A terminal from inside it is foot** (`Shift+F4`, "Open terminal here"): the
+  window runs `$TERMINAL` and then a built-in list of emulators that does not
+  include foot, so the image exports `TERMINAL=foot` in `/etc/environment` -
+  `pam_env` reads that file for a session started by the compositor, where
+  `/etc/profile.d` is never read. Without it the menu item answers *no terminal
+  detected* and starts nothing.
+* **A disk it cannot unmount says why.** The removal action goes through
+  `udisksctl`, and when udisks refuses because something is using the mount, the
+  window asks `fuser` which process it is and names it (*In use by: …*). Both
+  come from packages the image installs (`udisks2`, `psmisc`), so the message
+  arrives with the answer instead of only with the refusal.
 * **The trash works** (`gvfs` provides `gvfsd-trash`), so a deleted file lands in
   `~/.local/share/Trash` and can be restored. SMB and phone mounts do not,
   because `gvfs-backends` (31 MB of `samba-libs`) is deliberately not installed
   and the Network places are off; a USB stick appears in the sidebar once
-  `udisks2` mounts it, and `autorun` is off so a card never runs its own
-  contents.
-* **Its colours are the session's.** `~/.config/gtk-3.0/settings.ini` loads
-  Adwaita dark with the **LazyOS** icons on JetBrains Mono 10, and `gtk.css` next
-  to it repaints the surfaces in the solarized palette: base03 windows, base1
-  text, the cyan selection the menus use, and no animations of its own (swayfx
-  already animates the window). It is the only window whose look comes from the
-  GTK theme (waybar is GTK3 too but paints the bar from its own stylesheet), which
-  is why the two files exist rather than a whole GTK theme package.
+  `udisks2` mounts it.
+* **Its colours are the session's, and not through GTK.** favnyr is one Slint
+  binary that draws its own widgets - it links no GTK - so the window follows the
+  palette by itself, and what it takes from the GTK files is the **icon theme**:
+  it reads `gtk-icon-theme-name=` from `~/.config/gtk-3.0/settings.ini` and asks
+  that theme for the folder, trash and drive names it draws, which is why the
+  **LazyOS** theme carries them (`scripts/make-icons.sh`'s fourth table). The
+  `gtk-3.0/gtk.css` next to it paints GTK3 programs instead - the camera window
+  (`guvcview`), waybar, and anything a person installs later.
 * **The document reader gets the same palette, from a different pair of files.**
   `papers` is GTK4/libadwaita, which does not read `gtk-3.0/` at all: it asks the
   *settings portal* for the desktop's colour scheme, and this image runs no
@@ -428,7 +430,7 @@ one: tile it, move it to another workspace, close it with **Alt+Q**.
 
 A USB stick **mounts itself when you plug it in**: a notification says *label
 mounted at /run/media/<you>/<label>*, and it is then a row in **Places** (the
-root menu, Alt+Space, and the Places entry in the launcher) and in pcmanfm's
+root menu, Alt+Space, and the Places entry in the launcher) and in favnyr's
 sidebar. **Alt+1** on a mounted disk in Places unmounts it; eject before pulling
 the stick out - a filesystem that is still mounted when it disappears is how one
 gets corrupted. An SD card in the internal slot is a **Mount** row instead; the
@@ -467,14 +469,14 @@ list below says why.
 * Mounting is **udisks2**'s job, because an ordinary session cannot mount
   anything itself (that is a root operation). It is D-Bus activated: nothing of
   it runs until a mount is asked for, and nothing stays afterwards.
-* The same disks are in pcmanfm's sidebar (**Alt+Ctrl+Shift+F**), and a stick shows
+* The same disks are in favnyr's sidebar (**Alt+Ctrl+Shift+F**), and a stick shows
   up there as soon as it is mounted.
-* **Unmounting from pcmanfm needs `eject`.** The window's Unmount action runs
-  `eject`, not `udisksctl`, and the package is not a dependency of udisks2 or
-  gvfs: without it the action fails with `Failed to execute child process
-  "eject" (No such file or directory)` and the stick stays mounted. `eject` is
-  in `uis/sway/packages.list`; the Places menu unmounts through `udisksctl` and
-  does not need it, which is why the failure only showed up in the window.
+* **Unmounting from the window goes through `udisksctl`, like the Places menu.**
+  When udisks refuses because something still has the disk open, favnyr runs
+  `fuser -m` to find out what and says so (*In use by: python3, mousepad*) - so
+  `psmisc` is in `uis/sway/packages.list` and the refusal arrives with a reason.
+  `eject` is not involved: it was pcmanfm's dependency and no program in this
+  image execs it any more.
 * `vfat`, `exFAT` and `NTFS` all work - the kernel has those drivers - so a
   stick from a camera or from Windows needs no extra package.
 * **Auxiliary swap** is the row above it: it takes a card that is not a system card
@@ -539,7 +541,7 @@ run from a shell or over ssh. It writes
   `.bash_aliases`, `.profile`, `.bash_logout`), `.gitconfig`, the configuration
   of the tools this image ships (`foot`, `kitty`, `nvim`, `vim`,
   `starship.toml`, `glow`, `sway` drop-ins, `mako`, `rofi`, `gtk-3.0`,
-  `gtk-4.0`, `lazyos`, `pcmanfm`, `mpv`, `yt-dlp`, `go`, `pip`, `cargo`,
+  `gtk-4.0`, `lazyos`, `favnyr`, `mpv`, `yt-dlp`, `go`, `pip`, `cargo`,
   `rustup`, `mimeapps.list`, `user-dirs.dirs`), `~/.local/bin`, the user's own
   applications, and the **agents**: the account directories of the Agents menu
   (`~/.local/share/lazyos/agents`, sign-ins included), OpenCode's configuration

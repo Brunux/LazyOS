@@ -3,7 +3,7 @@
 #
 # This is the handler the *desktop* needs, not the one the menu needs: there is
 # no xdg-desktop-portal in this image, so an application that asks "open this
-# for me" (pcmanfm's double click, "Open With" in any GIO program, `gio open`)
+# for me" (favnyr's double click, "Open With" in any GIO program, `gio open`)
 # resolves it through /etc/xdg/mimeapps.list, which points the types below at
 # org.lazyos.view.desktop -> this script. rofi-files keeps its own copy of the
 # same rules on purpose: it is the tested path and does not start a process to

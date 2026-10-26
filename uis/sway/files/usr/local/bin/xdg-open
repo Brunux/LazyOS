@@ -8,7 +8,7 @@
 #
 # The browser is the answer to the URL half: a URL goes to it as it is. A path
 # is "open this file", which is the question ~/.config/bin/lazyos-view already
-# answers for a double click in pcmanfm - imv for a picture, papers for a
+# answers for a double click in favnyr - imv for a picture, papers for a
 # document, mpv for a video, bat for text - so the shell and the desktop cannot
 # disagree, and the browser stays the fallback (and the answer for a user with
 # no session bin directory, e.g. root). A path handed to the browser becomes a

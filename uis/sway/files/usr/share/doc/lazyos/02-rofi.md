@@ -239,7 +239,7 @@ desktop. That is what foot's ctrl+click and the CLI tools that print a URL call.
 It is the same trade as everything else here: 16 MB while open, nothing
 afterwards.
 
-**Alt+Ctrl+Shift+F: the same files in a window.** `pcmanfm` (the root menu's **Files
+**Alt+Ctrl+Shift+F: the same files in a window.** `favnyr` (the root menu's **Files
 (window)** row, `Files (window)` in the launcher) is a real file manager for the
 things a list cannot do - drag a file onto a folder, select several, rename in
 place, send to the trash - and it opens a file with exactly the rules above: a
@@ -332,7 +332,7 @@ image. An image is listed by what `cliphist` knows about it (`[[ binary data 640
 png 640x480 ]]`) rather than by a thumbnail, because a rofi row is one line of
 text. **Save the newest image** decodes it into `~/Pictures/clipboard/` with the
 extension its MIME type implies and hands it to `xdg-open`, which is the same
-`lazyos-view` a double click in pcmanfm uses — so a picture opens in **imv**, not
+`lazyos-view` a double click in favnyr uses — so a picture opens in **imv**, not
 in a browser tab; the decoded file is what survives, and the entry itself stays
 in the history until deleted or cleared.
 

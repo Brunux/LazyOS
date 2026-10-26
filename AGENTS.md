@@ -873,7 +873,7 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   **`Alt+Search` is the file search** (`rofi-files --search`: one bounded `fd` run over `$HOME`).
   The two were the other way around for a while, and this is the maintainer asking for the
   magnifier to show all apps again: the file list moved one chord over to `Alt+Search`, the
-  terminal filter went back to `Search+Shift`, and the windowed manager (pcmanfm) took
+  terminal filter went back to `Search+Shift`, and the windowed manager (favnyr) took
   `Alt+Ctrl+Shift+F`, the Shift variant of the Files key. The Search-key bindings
   live in `~/.config/sway/config`, not in `19-launcher.conf` (which documents the launcher
   alone), and both release bindings are `--release --no-repeat` because the top row doubles as
@@ -1076,39 +1076,46 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   `mpris.so` plugin, `ffmpeg`, `pdftocairo` or `chafa` is missing, and warns when the thumbnail
   cache is unwritable or `rofi-files` stops passing `-show-icons`/`thumbnail://` - a dropped flag
   makes the list silently text-only.
-- **Files exists twice on purpose: `rofi-files` is the list and `pcmanfm` is the window.** The
+- **Files exists twice on purpose: `rofi-files` is the list and `favnyr` is the window.** The
   file list (`Alt+Search`) and `Alt+Ctrl+F` open the list (one process, no window);
-  **`Alt+Ctrl+Shift+F`** opens pcmanfm, and the launcher and the root menu carry both rows - **Files**
-  and **Files (window)**
-  (`pcmanfm.desktop` is shadowed by a user-level copy with that name, so the launcher says what it
-  opens). nautilus was measured and rejected (`docs/omarchy-gap.md` §1: 504 packages, GTK4 +
-  libadwaita + 38 MB of ICU + GStreamer + 31 MB of `samba-libs`, a `localsearch` indexer crawling
-  `$HOME`, glycin); pcmanfm is 229 packages and 4.9 MB on the GTK3 the image already has, `gvfs`
-  adds the trash (`gvfsd-trash`) and the volume monitor, and `gvfs-backends` is deliberately out
-  (that is where `samba-libs` and the mtp/gphoto backends come from), so the Network places are
-  off. It ships `etc/xdg/pcmanfm/default/pcmanfm.conf`: **`terminal=foot` under `[config]`**,
-  which is where libfm reads it - not `[ui]`, where the Preferences dialog makes it look like it
-  belongs - because the packaged default `x-terminal-emulator` does not exist here and F4/"Open
-  Terminal Here" would silently do nothing; `bm_open_method=0` (ask GIO, which is how the
-  association below is reached), `use_trash=1`, `thumbnail_max=4096` **kilobytes** (libfm decodes
-  on the UI thread with gdk-pixbuf and ignores `.thumbnailer` files, so thumbnails are images
-  only, and a 24 MP JPEG costs ~83 MB for a 128 px thumbnail), `autorun=0`, a 900x600 window.
-- **A double click in pcmanfm resolves through `/etc/xdg/mimeapps.list` ->
+  **`Alt+Ctrl+Shift+F`** opens favnyr, and the launcher and the root menu carry both rows - **Files**
+  and **Files (window)**. favnyr is one statically linked Slint binary (Brunux/Favnyr-aarm64
+  v0.3.6, 36 MB at `/usr/bin/favnyr`), committed in `uis/sway/files/usr/bin/` rather than
+  installed from a package: it links no GTK and no libgio, so it is not in `uis/sway/packages.list`
+  and no dependency pulls it in. `gvfs` still adds the trash (`gvfsd-trash`) and the volume
+  monitor, and `gvfs-backends` is deliberately out (that is where `samba-libs` and the
+  mtp/gphoto backends come from), so the Network places are off. **It has no `terminal=`
+  setting**: "Open terminal here" runs `$TERMINAL` and then a list of known emulators (kgx,
+  konsole, gnome-terminal, kitty, alacritty, wezterm, xfce4-terminal, lxterminal, tilix, xterm)
+  that does **not** include foot, so the image ships `TERMINAL=foot` in `/etc/environment` - the
+  file `pam_env` reads, in greetd's session stack and in sudo's - because a window started by the
+  compositor inherits the PAM environment and not a login shell's `profile.d`. Without it the menu
+  item answers "no terminal detected ($TERMINAL or known candidates)" and starts nothing.
+  **The report must never run it to ask its version**: `favnyr --version` parses the flag as a
+  startup location ("WARN favnyr: invalid startup location location=--version") and then opens its
+  Slint event loop, so `check-system.sh` stopped on that line and every check after it - the whole
+  framework section included - never ran. `--help` opens the window too. Presence and the exec bit
+  are what the report asks.
+- **A double click in favnyr resolves through `/etc/xdg/mimeapps.list` ->
   `org.lazyos.view.desktop` -> `~/.config/bin/lazyos-view`**, which applies exactly the rules
   `rofi-files` applies (text in `bat`; a document - PDF, DjVu, a comic - in `papers`; a picture
   in `imv` with `chafa`'s sixels as the fallback when imv gets no EGL context; a video in `mpv`;
   and an HTML page, an EPUB or a `.deb` in `firefox-esr`), so a file opens the same way from the
   list and from the window - with one deliberate exception, an HTML file, which the list reads as
   text in `bat` and a double click takes to the browser, because that is what a page is.
-  `inode/directory` stays `pcmanfm.desktop`. There is no `xdg-desktop-portal` in the image, so this pair *is* the
-  open-with mechanism for every GIO program. **GIO silently drops a `.desktop` whose `Exec`
+  `inode/directory` stays `pcmanfm.desktop`, which is now a **name** and not a program: the
+  system entry is shadowed by `~/.local/share/applications/pcmanfm.desktop` whose `Exec` is
+  `favnyr`, so a GIO program that asks for the directory handler starts the window, and the
+  launcher row it draws is called *Files (window)*. There is no `xdg-desktop-portal` in the image,
+  so this pair *is* the open-with mechanism for every GIO program. **GIO silently drops a
+  `.desktop` whose `Exec`
   program does not exist**: with `lazyos-view` not executable (or absent) `gio mime image/png`
   answers "no default application" instead of an error, which looks like a broken association -
   so the `check-system.sh` line is both the association test and the mode test
   (`LC_ALL=C gio mime image/png` must say `Default application: org.lazyos.view.desktop`, and
   `gio mime inode/directory` must say `pcmanfm.desktop`). That CLI is **`libglib2.0-bin`**
-  (0.9 MB, no daemon) and it is in `uis/sway/packages.list` for exactly this: `pcmanfm` and
-  `gvfs` link libgio but ship no `/usr/bin/gio`, and without it the check can only read
+  (0.9 MB, no daemon) and it is in `uis/sway/packages.list` for exactly this: `gvfs` links libgio
+  but ships no `/usr/bin/gio`, and without it the check can only read
   `mimeapps.list` - it would pass while GIO refused the entry. No `mimeinfo.cache` regeneration is
   needed for that to resolve (verified), and a user `~/.config/mimeapps.list` overrides the
   system file, so nothing is locked in.
@@ -1277,7 +1284,7 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   `06-troubleshooting.md` § *The external monitor shows no signal*.
 - **Removable media is `udisks2`, and mounting it is a row in Places.** An unprivileged session
   cannot `mount(8)` anything - that is a root operation - so a USB stick used to be unusable:
-  no mount point, no `udisksctl`, and pcmanfm's Devices pane had nothing to talk to.
+  no mount point, no `udisksctl`, and the file manager's device list had nothing to talk to.
   `uis/sway/packages.list` carries **`udisks2`** (D-Bus activated on the system bus, so nothing
   runs until something asks and nothing stays resident) and `rofi-places` grew two row kinds:
   `disk:` for every mounted real filesystem (`findmnt`, minus `/` and `/boot`), and `mount:` for
@@ -1518,15 +1525,18 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   `settings.ini` (`Adwaita-dark`, `gtk-application-prefer-dark-theme=1`, `LazyOS`,
   `JetBrains Mono 10`, animations off) and `gtk.css`, which repaints the surfaces with explicit
   selectors of the same specificity Adwaita uses and is parsed after it. The fills are **opaque**
-  base03 - a translucent window shows the wallpaper through its own text - and pcmanfm is the
-  only GTK3 *window* whose look comes from the GTK theme (waybar is GTK3 too but paints the bar
-  from its own stylesheet, foot is pixman and rofi draws its own surfaces), so
-  this is a stylesheet, not a theme package. Adwaita 51 ships no full-colour `folder`,
+  base03 - a translucent window shows the wallpaper through its own text. The GTK3 *window* the
+  image ships is **guvcview** (the camera), and waybar is GTK3 as well but paints the bar from its
+  own stylesheet; foot is pixman and rofi draws its own surfaces. The file manager used to be the
+  other GTK3 window and is now `favnyr`, one Slint binary that links no GTK - but it still **reads
+  this file**, because it takes its icon theme from `gtk-icon-theme-name=`, so the pair is a
+  stylesheet plus an icon-theme pointer rather than a theme package. Adwaita 51 ships no
+  full-colour `folder`,
   `user-home` or `drive-harddisk` at all, which is why `scripts/make-icons.sh` grew a **fourth
   table** (50 names: the places, the actions and the mimetypes the sidebar and the icon view ask
   for by name; the theme is 225 files in each of `48x48/apps` and `scalable/apps` - 224 from
   `make-icons.sh`, plus the mark from `make-brand.sh`), and `check-system.sh`
-  asks the theme for the names pcmanfm draws instead of trusting the picture.
+  asks the theme for the names favnyr draws instead of trusting the picture.
   **GTK4 is a different settings store and a different pair of files**, which is why `papers` - the
   one GTK4/libadwaita window in the image - opened white: libadwaita asks the settings portal for
   the desktop colour scheme, this image runs no Settings portal (`busctl --user` lists only the wlr
@@ -1562,7 +1572,7 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
 - **`Search+Shift` is the same question in a terminal** (`~/.config/bin/lazyos-find`): `fd`
   streams the whole tree under `$HOME` into **fzf**, the fruit of typing narrows it while the walk is
   still running, the right 55 % is a preview pane, and Enter hands the choice to **`lazyos-view`**
-  - the same opener a double click in pcmanfm uses - so the list, the window and the key never
+  - the same opener a double click in favnyr uses - so the list, the window and the key never
   disagree about where a file goes. The two searches are deliberately different questions:
   `rofi-files --search` is **bounded** (500 rows, sorted newest, icons and thumbnails, up in a
   menu), which is what a file whose name you half-remember wants; this one is **uncapped** with a
@@ -1965,10 +1975,13 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   Menu`, `Icon=lazyos`) runs `~/.config/bin/bar-menu`, so the list Alt+Space opens is
   reachable by typing. Its `Exec` is a `$HOME` script, so `check-system.sh` asks for the
   script's executable bit, not only the `.desktop` file.
-- **pcmanfm unmounts through `eject`, not `udisksctl`.** `udisks2` and `gvfs` do not
-  depend on it; without the package the Unmount action fails with `Failed to execute
-  child process "eject"` while the stick stays mounted. `rofi-places` unmounts through
-  `udisksctl` and never needed it, which is why only the window showed the gap.
+- **favnyr unmounts through `udisksctl`, and `fuser` is what names the blocker.** The
+  removal action is the same tool `rofi-places` calls, so the two cannot disagree about a
+  disk; when udisks refuses because something holds the mount, the window runs
+  `fuser -m <mountpoint>` to fill its *In use by: …* sentence, which is why `psmisc` is in
+  `uis/sway/packages.list` and `check-system.sh` FAILs without it. **`eject` is no longer a
+  dependency**: it was the GTK3 file manager's, which exec'd it by name, and no program in
+  this image does any more - the package left the list with the manager.
 - **The reminder When menu carries its own help row.** "How do I fill these in?" answers
   in a notification and `continue`s, so the menu reopens with the title and note still
   known (they live outside the loop); the date/time prompts also name their formats

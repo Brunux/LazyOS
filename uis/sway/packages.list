@@ -110,9 +110,9 @@ papers
 # a black rectangle and a face in a dim room) and keeps a photo or a clip.
 # 514 kB plus libguvcview (496 kB), libportaudio2 (216 kB, so a clip can carry
 # the microphone), libwebcam0 (84 kB, the UVC control names) and libgsl (3.3 MB,
-# its image filters) - and no new toolkit: it is GTK3, which waybar, rofi and
-# pcmanfm already pull in, so it inherits the solarized gtk-3.0/gtk.css instead
-# of looking like a foreign program. The camera itself needs no package: a USB
+# its image filters) - and no new toolkit: it is GTK3, which waybar already
+# pulls in, so it inherits the solarized gtk-3.0/gtk.css instead of looking like a
+# foreign program. The camera itself needs no package: a USB
 # UVC camera is driven by uvcvideo, a module of this kernel, and udev creates
 # /dev/video0 when the device (the internal one sits on the hub at 1-1.4) is on
 # the bus. ~/.config/bin/lazyos-camera is the wrapper that finds that node by
@@ -122,43 +122,49 @@ guvcview
 # possible at all: udisks2 3.2 MB plus libblockdev (eight modules) and
 # libcryptsetup/libnvme, providing /usr/bin/udisksctl and the
 # org.freedesktop.UDisks2 service on the system bus. It is D-Bus activated -
-# nothing runs until something asks - and it is what pcmanfm's Devices pane and
-# gvfs' volume monitor talk to; rofi-places calls udisksctl to mount and unmount.
+# nothing runs until something asks - and it is what the file manager's device
+# list and gvfs' volume monitor talk to; rofi-places calls udisksctl to mount and unmount.
 # udiskie is deliberately NOT installed: it is a resident Python daemon
 # (python3-gi + gir1.2-gtk-3.0 + python3-docopt/python3-yaml, none of them here)
 # whose remaining job would be a tray icon this bar does not have. On-demand
 # udisksctl in rofi-places is the same result with no daemon.
 udisks2
-# pcmanfm's "Unmount" runs `eject`, and the package is not part of udisks2 or
-# gvfs: without it the menu item fails with `Failed to execute child process
-# "eject" (No such file or directory)` while the stick stays mounted. util-linux's
-# eject (62 kB, 190 kB installed) provides /usr/bin/eject, which is the name
-# pcmanfm execs; rofi-places unmounts through udisksctl and does not need it.
-eject
+# favnyr's removal action does not run `eject`: it unmounts through
+# `udisksctl` (the same tool rofi-places uses) and, when udisks refuses because
+# something holds the mount, runs `fuser -m <mountpoint>` to name what does -
+# its own string table carries `unmount`, `udisksctl`, `power-off`,
+# `--no-user-interaction`, `fuser`, `-m`, and its locale says
+# `eject_blocked_by_processes = "In use by: {processes}"`. Without psmisc that
+# sentence loses its list, which is the one detail that makes a refused unmount
+# fixable. util-linux's `eject` used to be here for pcmanfm and nothing reads it
+# any more.
+psmisc
 # exfatprogs (700 kB, libblkid only) provides mkfs.exfat and fsck.exfat.
 # mkfs.exfat is what Format a disk writes, because exFAT has no 4 GB file limit
 # and Windows, macOS and Linux all read it; fsck.exfat is what udisks runs on a
 # stick before mounting it. dosfstools stays in packages/base.list for the vfat
 # sticks udisks also mounts.
 exfatprogs
-# The file manager, for the mouse: drag and drop, multi-select, rename and trash
-# in place are what rofi-files does not do (it is a list and a key). pcmanfm is
-# GTK3 - which waybar and rofi already pull in - so this costs 4.9 MB of pcmanfm
-# plus libfm and no new toolkit at all; GTK4's nautilus is the same job for a
-# 504-package closure, 38 MB of ICU, 31 MB of samba-libs and a localsearch
-# indexer that crawls $HOME (docs/omarchy-gap.md has both measurements). Three
-# things it does not do, all of them documented at the setting: thumbnails are
-# images only (libfm's own gdk-pixbuf loader, it ignores .thumbnailer files),
-# the Devices pane needs udisks2, and it has no desktop mode on Wayland. A double
-# click resolves through /etc/xdg/mimeapps.list -> ~/.config/bin/lazyos-view, so
-# it opens what rofi-files opens; /etc/xdg/pcmanfm/default/pcmanfm.conf sets
-# terminal=foot and bounds a thumbnail decode at 4 MB.
-# Replaced by favnyr (Brunux/Favnyr-aarm64 v0.3.6): binary copied to /usr/bin/favnyr.
-# gvfs stays for trash/volume; libglib2.0-bin stays for gio/mime resolution.
-# gvfs is what gives pcmanfm a working Trash (gvfsd-trash) and a local volume
+# The file manager is **not a package**: `favnyr` (Brunux/Favnyr-aarm64 v0.3.6,
+# 36 MB) is committed at `uis/sway/files/usr/bin/favnyr`, one Slint binary that
+# links no GTK and no libgio, so nothing here pulls it in and nothing can
+# upgrade it behind the image's back. What stays in this list is what it talks
+# to: `gvfs` for the trash and the volume monitor, `libglib2.0-bin` for `gio`'s
+# answer to "what opens this file", `udisks2` above for mounting, and `psmisc`
+# for naming what holds a disk. Its own settings are `~/.config/favnyr/*.toml`
+# (config, openers, favourites, workspace), it takes its icon theme from
+# `gtk-3.0/settings.ini`, and `TERMINAL=foot` in `/etc/environment` is what
+# makes "Open terminal here" start a terminal, because its fallback list of
+# emulators has no foot in it. A double click resolves through
+# /etc/xdg/mimeapps.list -> ~/.config/bin/lazyos-view, so it opens what
+# rofi-files opens. Why not a GTK file manager: nautilus is a 504-package
+# closure, 38 MB of ICU, 31 MB of samba-libs and a localsearch indexer that
+# crawls $HOME, and the GTK3 one this image used shipped its own 229 packages
+# for a 4.9 MB window (docs/omarchy-gap.md has both measurements).
+# gvfs is what gives the window a working Trash (gvfsd-trash) and a local volume
 # monitor: 431 kB, plus gvfs-daemons and gvfs-libs. gvfs-backends is deliberately
 # not here - it is where samba-libs (31 MB) and the mtp/gphoto/cdio device
-# backends come from, and pcmanfm.conf turns the Network places off instead.
+# backends come from, so the Network places are simply absent.
 gvfs
 # `gio` is libglib2.0-bin's CLI, and it is what answers "what opens this file"
 # the way the application itself answers it - `gio mime` also proves the

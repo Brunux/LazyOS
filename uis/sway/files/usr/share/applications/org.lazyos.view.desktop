@@ -5,7 +5,7 @@ Comment=Text in bat, images with chafa, video in mpv, the rest in Firefox - the 
 Exec=/home/brunux/.config/bin/lazyos-view %U
 Icon=system-file-manager
 # The handler, not a menu entry: /etc/xdg/mimeapps.list makes it the default for
-# the types below, so pcmanfm's double click and `gio open` reach the same
+# the types below, so favnyr's double click and `gio open` reach the same
 # programs rofi-files uses. It stays out of the launcher because nobody starts a
 # file by name.
 NoDisplay=true
