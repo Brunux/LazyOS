@@ -840,3 +840,33 @@ image.
 frame budget is checked by the design-system test (spec 002), which fails when a tick is above the
 measured ceiling; the PSS numbers are re-taken with the method in section 8 whenever a new window
 carries pictures.
+
+## 14. What a card costs - a notification without a bus client (spec 006)
+
+A card is the one vocabulary the toast and the window share (`lazyos_ui::card`). Sending it is the
+only part of that which could have needed a dependency: the session bus. Two ways were built and
+measured on this device (aarch64, release builds, `rustc` 1.97.1, a fresh target directory each).
+
+| | baseline (`lazyos-cli` before spec 006) | `zbus` client in the binary | `notify-send` (shipped) |
+|---|---|---|---|
+| clean `cargo build --release -p lazyos-cli` | 1 m 06 s | 2 m 46 s (16 m 54 s CPU) | 1 m 03 s (6 m 30 s CPU) |
+| `Cargo.lock` packages | 264 | 306 (**+42**) | 264 (unchanged) |
+| release binary | 1,661,336 B | 4,305,592 B (**+2.64 MB**) | 1,742,728 B (**+81 KB**, the card and `lazyos notify`) |
+| one card | not measured | not measured | 20-34 ms (six runs, idle), a process per card |
+
+`zbus` 5.16 with the default `async-io` executor and no `tokio` was the first choice, because it
+gives typed hints and the id without a process. It was built and works (the bus witness passed on
+it), and it was not adopted: 42 crates, a proc-macro stack and 2.6 MB for a call the image already
+makes through `notify-send` in every shell menu. A 159 % growth of the binary to send an OSD
+card is the same trade the codec measurement in §13 refused. `notify-rust` is the same bus client behind a second feature matrix, so it was not built.
+
+The shipped path is `notify-send` with an argument vector (no shell), `-p` for mako's id and
+`--` before the text. Its cost is one short process per card: 20-34 ms of wall time on this
+machine when the bus refuses at once, which is the same cost the shell's OSD already pays per key
+press. The argument vector is pinned by unit tests (`card::send`), a stub `notify-send` records what
+the CLI asks for (`tests/notify.rs`), and the real program runs against a private bus with a
+monitor watching (`the_card_is_addressed_to_the_notification_service_on_the_session_bus`).
+
+**How to check it took:** `cargo build --release -p lazyos-cli` in an empty `CARGO_TARGET_DIR`, then
+`ls -l target/release/lazyos`, and `grep -c '^name' rust/Cargo.lock` against the committed count.
+A change that adds a crate for the send path shows up in the lock before it shows up in the binary.
