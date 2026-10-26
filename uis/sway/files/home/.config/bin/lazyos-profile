@@ -87,7 +87,14 @@ ENTRIES='
 .codex
 .gemini
 .copilot
-.config/pcmanfm
+# The file manager. Its settings live in ~/.config/favnyr/config.toml, and the
+# two files a person actually curates - favourites.toml and workspace.toml (the
+# saved tab sets) - live under XDG_DATA_HOME, which is why both roots are here.
+# `.config/pcmanfm` used to be listed: the manager was replaced by favnyr, which
+# writes neither path, so the entry travelled as a directory that does not exist
+# and a restored profile came back with no file-manager settings at all.
+.config/favnyr
+.local/share/favnyr
 .config/mozilla
 .mozilla
 .config/mpv

@@ -1777,6 +1777,24 @@ if [ -x "$HOME/.config/bin/lazyos-profile" ]; then
 	else
 		fail "bin/lazyos-profile export --dry-run no longer names ~/.ssh and ~/.gnupg: the keys would stop travelling"
 	fi
+	# The file manager's settings are the entry that went stale once already: the
+	# manager was replaced by favnyr and the list kept naming ~/.config/pcmanfm,
+	# a directory that does not exist, so an export omitted the file manager in
+	# silence and a restore came back to a default window.  Its two roots are
+	# asked separately because they hold different things (the configuration and
+	# the curated favourites/workspaces). The test reads the script, like the
+	# agents' below, because the dry run indents every path.
+	_dev_fm=ok
+	for _p in .config/favnyr .local/share/favnyr; do
+		grep -qsxF -- "$_p" "$HOME/.config/bin/lazyos-profile" || _dev_fm=
+	done
+	if [ -n "$_dev_fm" ]; then
+		ok "the profile export includes the file manager (favnyr settings and workspaces)"
+	else
+		fail "bin/lazyos-profile no longer exports ~/.config/favnyr or ~/.local/share/favnyr: a restored profile has a default file manager"
+	fi
+	grep -qsxF -- '.config/pcmanfm' "$HOME/.config/bin/lazyos-profile" &&
+		fail "bin/lazyos-profile still lists ~/.config/pcmanfm, which favnyr never writes: the entry travels and saves nothing"
 	# The agents are half of what "the account" means now: the menu's account
 	# directories and the CLIs' own homes. The inclusion test is a whole-line
 	# fixed-string match, because the exclusions below it also name the path and a
@@ -2891,21 +2909,24 @@ else
 	warn "LazyOS theme is missing row icons:$_missing_row_icons (those rows lose the icon column)"
 fi
 
-# The GTK3 half of the palette. One window in this image is GTK3 (favnyr, the file manager), and
-# without these two files it renders in Adwaita's light grey - a bright rectangle
-# in a session whose every other pixel is base03. Both failures are silent: GTK
-# drops a stylesheet rule it cannot parse with a line on stderr nobody reads, and
-# an icon name the theme does not carry draws nothing at all.
+# The GTK3 half of the palette. The GTK3 window this image ships is guvcview (the
+# camera) and waybar is GTK3 as well; the file manager used to be the third one and
+# is now favnyr, a Slint binary that links no GTK. The files still reach it: **favnyr
+# reads the icon theme name out of settings.ini** (it parses
+# `gtk-3.0/settings.ini` for `gtk-icon-theme-name=`). Without them a GTK3 window
+# arrives in Adwaita's light grey and favnyr falls back to Adwaita's icons. Both
+# failures are silent: GTK drops a stylesheet rule it cannot parse with a line on
+# stderr nobody reads, and an icon name the theme does not carry draws nothing.
 if [ -r "$HOME/.config/gtk-3.0/gtk.css" ]; then
-	ok "GTK3 windows use the solarized palette (gtk-3.0/gtk.css)"
+	ok "GTK3 programs use the solarized palette (gtk-3.0/gtk.css)"
 else
-	warn "$HOME/.config/gtk-3.0/gtk.css is missing: favnyr renders in Adwaita's light grey"
+	warn "$HOME/.config/gtk-3.0/gtk.css is missing: a GTK3 window arrives in Adwaita's light grey"
 fi
 if grep -qs '^gtk-icon-theme-name=LazyOS' "$HOME/.config/gtk-3.0/settings.ini" &&
 	grep -qs '^gtk-application-prefer-dark-theme=1' "$HOME/.config/gtk-3.0/settings.ini"; then
-	ok "GTK3 windows use the LazyOS icons on a dark base (gtk-3.0/settings.ini)"
+	ok "GTK3 settings name the LazyOS icons and a dark base (favnyr reads them too)"
 else
-	warn "gtk-3.0/settings.ini does not select LazyOS + dark: favnyr looks like a foreign program"
+	warn "gtk-3.0/settings.ini does not select LazyOS + dark: favnyr's icon names do not resolve and GTK3 windows look foreign"
 fi
 # The GTK4 half is a different settings store, so the two files above reach
 # nothing here.  `papers` is the one GTK4/libadwaita window in the image, and it
@@ -3048,13 +3069,16 @@ if grep -qs 'Auto-mount USB drives' "$HOME/.config/bin/rofi-quick"; then
 else
 	fail "rofi-quick lost the 'Auto-mount USB drives' row: the switch is unreachable"
 fi
-# favnyr's Unmount (if supported) runs through eject, not udisksctl.
-# without it the action answers `Failed to execute child process "eject"` and the
-# stick stays mounted.
-if have eject; then
-	ok "eject is available for favnyr's Unmount"
+# favnyr's removal action unmounts through udisksctl and, when udisks answers
+# that something holds the mount, runs `fuser -m <mountpoint>` to fill its
+# "In use by: {processes}" sentence. udisksctl is asked for by the auto-mount
+# block above; fuser is psmisc, and without it the sentence loses the only
+# detail that makes a refused unmount fixable. `eject` is not in the picture:
+# no program in this image execs it any more.
+if have fuser; then
+	ok "fuser is available, so a refused unmount names the process holding the disk"
 else
-	fail "eject is missing: favnyr's Unmount may fail with missing child process"
+	fail "fuser is missing (psmisc): favnyr says 'Removal failed' with no reason when a stick is in use"
 fi
 _xdg_dirs=${XDG_CONFIG_DIRS:-/etc/xdg}
 # favnyr has no `terminal=` setting to read: it runs $TERMINAL and then a list of
