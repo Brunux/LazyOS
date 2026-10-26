@@ -102,6 +102,16 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // A card from the command line (spec 006). It writes nothing and opens
+        // no window: the notification daemon shows it, so it runs where it was
+        // called, like `theme`.
+        path: "notify",
+        summary: "send a notification card: send, say, progress (spec 006)",
+        shape: Shape::Direct,
+        symlinks: &[],
+        installed: &[],
+    },
+    CommandSpec {
         // The file browser (`rofi-files` today). Its own spec ports the
         // surface; until then both paths show the same empty state, which is
         // what keeps "one handler" true from the first commit.

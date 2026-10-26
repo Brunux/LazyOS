@@ -18,6 +18,7 @@
 
 pub mod command;
 pub mod host;
+mod notify;
 pub mod paths;
 pub mod task_cmd;
 pub mod term;
@@ -148,6 +149,10 @@ fn global(args: &[String]) -> Option<i32> {
                 out,
                 "  --symlinks      the names the session calls this binary by"
             );
+            let _ = writeln!(
+                out,
+                "  --icon-names    the theme pictures a card can ask for, one per line"
+            );
             Some(EXIT_OK)
         }
         // The codepoints the widgets draw, so `check-system.sh` can ask a font
@@ -191,6 +196,17 @@ fn global(args: &[String]) -> Option<i32> {
             }
             Some(EXIT_OK)
         }
+        // The theme names a card can ask for (spec 006). `check-system.sh` asks
+        // the installed LazyOS theme for each one: a name the binary draws and
+        // the theme lacks is a notification that logs nothing and draws nothing.
+        "--icon-names" => {
+            let mut out = io::stdout();
+            let names: std::collections::BTreeSet<&str> = lazyos_ui::card::names().collect();
+            for name in names {
+                let _ = writeln!(out, "{name}");
+            }
+            Some(EXIT_OK)
+        }
         // Machine-readable, for the witness: the links the installer creates
         // today, from the same table `--help` prints.
         "--symlinks" => {
@@ -217,6 +233,7 @@ fn print_commands(out: &mut impl Write) {
 fn run_direct(resolved: &Resolved) -> i32 {
     match resolved.spec.path {
         "theme" => theme::run(resolved),
+        "notify" => notify::run(resolved),
         other => {
             eprintln!("lazyos {other}: this command has no direct handler");
             EXIT_USAGE
