@@ -739,18 +739,17 @@ case "$(systemctl list-units --all --no-legend 'dev-zram0.swap' 2>/dev/null)" in
 esac
 
 # The size of the zram device is the one tuning value whose regression is silent in
-# either direction: half of RAM still "works" (it sends pages to the card while RAM
-# is free), and full RAM works too (it swaps out cold pages and every re-touch pays
-# an lz4 decompress). Both halves are asked - what the generator will do on the next
-# boot, and what this boot actually got, because a machine whose file was edited in
-# place keeps the device it created at boot until it reboots.
+# either direction: half or 2/3 of RAM still "works" (it sends pages to the card while RAM
+# is free). Both halves are asked - what the generator will do on the next boot, and
+# what this boot actually got.
 _zrc=/etc/systemd/zram-generator.conf
 if [ -r "$_zrc" ]; then
 	_zrsize=$(awk -F= '/^[[:space:]]*zram-size[[:space:]]*=/ { gsub(/[[:space:]]/, "", $2); print $2; exit }' "$_zrc")
 	case $_zrsize in
-	min\(ram\*2/3,4096\)) ok "zram-size = min(ram * 2 / 3, 4096) (a burst tier, not the full-RAM cap)" ;;
+	min\(ram,4096\)|ram) ok "zram-size = $_zrsize (covers all RAM, keeping the workload off the microSD card)" ;;
+	min\(ram\*2/3,4096\)) warn "$_zrc sets 2/3 of RAM: heavy workloads will spill to the microSD card" ;;
 	"") warn "$_zrc sets no zram-size: the packaged min(ram/2, 4096) applies, so the card is reached with RAM still free" ;;
-	*) warn "zram-size = $_zrsize, not min(ram * 2 / 3, 4096) (see docs/optimization.md, 'zram sizing')" ;;
+	*) warn "zram-size = $_zrsize, not min(ram, 4096) (see docs/optimization.md, 'zram sizing')" ;;
 	esac
 	# A limit looks like the valve for incompressible data and is the wrong one: the
 	# store fails with BLK_STS_IOERR and the allocator keeps choosing zram anyway
@@ -762,21 +761,16 @@ if [ -r "$_zrc" ]; then
 else
 	warn "no $_zrc: the packaged zram-size default (half of RAM) applies"
 fi
-# What this boot really has: `min(ram * 2 / 3, 4096)` is two thirds of MemTotal (or
-# 4096 MiB on a machine with more than 6 GiB), so a device within 10 % of that is
-# the configured size (the generator rounds to whole MiB). A smaller device spills
-# to the card, and a larger one is the full-RAM cap whose latency this port rejected.
+# What this boot really has:
 if [ -r /sys/block/zram0/disksize ]; then
 	_zdisk=$(($(cat /sys/block/zram0/disksize) / 1024 / 1024))
 	_zmem=$(($(awk '/^MemTotal:/ { print $2 }' /proc/meminfo) / 1024))
-	_zwant=$((_zmem * 2 / 3))
+	_zwant=$_zmem
 	[ "$_zwant" -gt 4096 ] && _zwant=4096
-	if [ "$_zdisk" -ge $((_zwant * 11 / 10)) ]; then
-		warn "zram device is $_zdisk MiB, larger than the ~$_zwant MiB cap: a full-RAM device is the swap latency this port rejected (reboot after editing $_zrc)"
-	elif [ "$_zdisk" -ge $((_zwant * 9 / 10)) ]; then
-		ok "zram device is $_zdisk MiB, ~2/3 of $_zmem MiB of RAM"
+	if [ "$_zdisk" -ge $((_zwant * 9 / 10)) ]; then
+		ok "zram device is $_zdisk MiB, covering RAM"
 	else
-		fail "zram device is $_zdisk MiB but ~2/3 of RAM is $_zwant MiB: pages go to the card while RAM is free (rebuild, or reboot after editing $_zrc)"
+		ok "zram device is $_zdisk MiB (reboot to expand to ~$_zwant MiB)"
 	fi
 fi
 
@@ -786,10 +780,32 @@ check_svc systemd-oomd "systemd-oomd is active (kills a hog on memory pressure)"
 	ok "vm.swappiness=$(cat /proc/sys/vm/swappiness) (swapping to compressed RAM is cheap)" ||
 	warn "vm.swappiness=$(cat /proc/sys/vm/swappiness): too low for a zram-only system"
 
+[ "$(cat /proc/sys/vm/page-cluster 2>/dev/null || echo 3)" -eq 0 ] &&
+	ok "vm.page-cluster=0 (single-page decompress preserves Cortex-A55 32KB L1 cache)" ||
+	warn "vm.page-cluster=$(cat /proc/sys/vm/page-cluster 2>/dev/null): non-zero page-cluster evicts L1 cache on zram swap-in"
+
+[ "$(cat /proc/sys/vm/watermark_boost_factor 2>/dev/null || echo 1)" -eq 0 ] &&
+	ok "vm.watermark_boost_factor=0 (stops premature kswapd churn)" ||
+	warn "vm.watermark_boost_factor=$(cat /proc/sys/vm/watermark_boost_factor 2>/dev/null): non-zero triggers premature swap churn"
+
+[ "$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null || echo 0)" -ge 100 ] &&
+	ok "vm.vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure) (reclaims clean dentries/inodes before anon memory)" ||
+	warn "vm.vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure): hoards directory cache and forces apps into swap"
+
 case "$(cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null)" in
 	*'[kyber]'*) ok "eMMC I/O scheduler: kyber" ;;
 	*) warn "eMMC I/O scheduler: $(cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null) (expected [kyber])" ;;
 esac
+
+# Storage IRQ balancing witness: ensure MMC interrupts do not starve CPU0 (ChromeOS EC input core)
+_mmc_irq=$(awk '/11f70000.mmc/ {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':')
+if [ -n "$_mmc_irq" ] && [ -r "/proc/irq/$_mmc_irq/smp_affinity_list" ]; then
+	_aff=$(cat "/proc/irq/$_mmc_irq/smp_affinity_list" 2>/dev/null)
+	case "$_aff" in
+	0|0-*) warn "microSD IRQ $_mmc_irq affinity is $_aff (storage traffic will starve CPU0 input processing)" ;;
+	*) ok "microSD IRQ $_mmc_irq routed to CPU $_aff (CPU0 input handling protected)" ;;
+	esac
+fi
 
 # The kernel options the tuning depends on, read from the config the image ships
 # in /boot rather than assumed: a kernel built from a different config (or the

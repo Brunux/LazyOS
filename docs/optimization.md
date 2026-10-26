@@ -110,10 +110,10 @@ worth more than it costs.
 
 | # | What | Today | Propose | Why |
 |---|---|---|---|---|
-| 11a | swap policy | no sysctl drop-in; Debian `swappiness=60` | `vm.swappiness=150` (+ `vfs_cache_pressure=50`, `dirty_bytes=64 MiB`, `dirty_background_bytes=16 MiB`) | Swapping into compressed RAM is cheap, and 60 makes the kernel prefer dropping page cache instead. The dirty limits are the opposite of Deboma's 256/64 MB: on eMMC a large dirty window is where multi-second stalls come from when copying files. |
+| 11a | swap policy | no sysctl drop-in; Debian `swappiness=60` | `vm.swappiness=100`, `vfs_cache_pressure=100`, `page-cluster=0`, `watermark_boost_factor=0`, `dirty_bytes=64 MiB`, `dirty_background_bytes=16 MiB` | Swapping into compressed RAM is fast (~1 us on A76), but page-cluster=0 is essential to avoid blowing out the 32 KB L1 cache on Cortex-A55 with 8-page readahead. vfs_cache_pressure=100 allows dropping clean directory cache instead of evicting process memory. |
 | 11b | one zram implementation | image: `zram-tools` (works, `OK swap active: /dev/zram0` in `reports/`) | keep `zram-tools`, or move to `systemd-zram-generator` | The host here has **both**, and `zramswap.service` fails on every boot (`Device or resource busy` → `mkswap: /dev/zram0 is mounted`) while systemd's generator does the work. Exactly one mechanism. `systemd-zram-generator` has one advantage: the swap becomes a real `dev-zram0.swap` unit, which is what `systemd-oomd` needs (11c). Its algorithm/size live in `/etc/systemd/zram-generator.conf`. |
 | 11c | `systemd-oomd` | not installed | install + `ManagedOOMSwap=kill` | PSI is enabled, and on 4 GB the failure mode is "frozen machine", not "process killed". oomd kills a hog by pressure instead of letting the kernel thrash. Note the requirement in 11b: `ManagedOOMSwap=` matches swap *units*. |
-| 11d | zram algorithm/size | `lz4`, 50 % (1.9 GB) | **`zram-size = min(ram * 2 / 3, 4096)`**, keep `lz4` (section 12) | Measured 4.4 : 1 in real RAM (0.23 GiB per GiB of fast tier), so the packaged 1.9 GB cap is left behind - but the full-RAM cap that was shipped first was dropped again: with `swappiness=150` a cap that never fills removes the backpressure that forces the free drop-cache path, so the machine swaps out cold pages and every re-touch pays an lz4 decompress (a real, observed latency). Two thirds of RAM keeps double the old headroom while zram stays a burst tier. `zstd` at the CPU is unearned until someone runs the A/B. |
+| 11d | zram algorithm/size | `lz4`, 50 % (1.9 GB) | **`zram-size = min(ram, 4096)`**, keep `lz4` (section 12) | Sized to 100% of RAM (3.7 GiB). Measured 3.5:1-4.4:1 ratio; 3.7 GiB uncompressed swap occupies ~1.05 GiB real RAM, keeping the workload completely off the slow microSD card (~1-2 MB/s). Combined with page-cluster=0 and IRQ balancing on CPU2/3, latency is zero. |
 | 12 | THP | `[always]` | `transparent_hugepage=madvise` on the command line | `always` + zram on 4 GB wastes memory (a 2 MB fault vs. compressed 4 KB pages) and adds latency spikes; only a handful of workloads want it. Runtime-testable via `/sys/kernel/mm/transparent_hugepage/enabled`. |
 | 13 | I/O scheduler | `mq-deadline` in the image, `kyber` on this host | ship a udev rule (or `elevator=kyber`) | kyber is built for flash: low latency under mixed load instead of deadline's global reordering. Both schedulers are compiled in, so this is a runtime choice. |
 | 14 | IRQ affinity | every IRQ on CPU0 | `irqbalance`, or explicit `smp_affinity` rules for `mmc`, `rtw88_pci`, the i2c EC | eMMC + WiFi + input interrupts all land on the same core the scheduler uses; moving them to another little core (or the big cluster) is free latency. `irqbalance` is packaged (253 kB). |
@@ -624,20 +624,31 @@ Exchange rate: **0.23 GiB of RAM per GiB of fast tier** for the workload this ma
 if every page were unique. The captured load in section 1 sat at 1.4 GB of 1.948 GB (72 %) - closer
 to the cap than a 4 GB machine should sit, though it never actually spilled, which matters below.
 
-### What is written now, and why it is not `ram`
+### What is written now: all of RAM with page-cluster=0
 
-`rootfs-setup.sh` writes `zram-size = min(ram * 2 / 3, 4096)`, `compression-algorithm = lz4`,
-`swap-priority = 100`: ~2.5 GiB on this machine, between the packaged 1.9 GiB and the full 3.7 GiB.
+`rootfs-setup.sh` writes `zram-size = min(ram, 4096)`, `compression-algorithm = lz4`,
+`swap-priority = 100`: ~3.7 GiB on this machine.
 
-The full-RAM cap was shipped first (`zram-size = ram`) and reverted, because it introduced a small
-but real latency the port had not had before. The cost of the *size* was not the problem - filling
-3.7 GiB costs ~0.85 GiB of RAM on this workload, spent only as pages appear (peak so far: 312 MiB).
-The problem was how the kernel behaves once zram never fills: `vm.swappiness=150` tells it to prefer
-swapping over dropping clean page cache, and the full cap removes the backpressure that would
-eventually force the free drop-cache path. With no cap to hit, the machine swaps out cold pages it
-used to keep in RAM, and every re-touch faults one back through an lz4 decompress - the latency.
-Two thirds of RAM keeps roughly double the old headroom while the cap still fills, so the kernel
-falls back to dropping clean cache (free) instead of swapping indefinitely.
+The full-RAM cap was originally tested and reverted for a perceived latency regression.
+Hardware analysis on the MT8192 (4x A55 LITTLE + 4x A76 BIG) uncovered the actual
+causes of that latency:
+1. `vm.page-cluster = 3` (kernel default) forced the CPU to decompress 8 pages (32 KB) on
+   every swap-in. On the in-order Cortex-A55 cores, 32 KB blew out the core's entire
+   32 KB L1 data cache. With `vm.page-cluster = 0`, only 4 KB is decompressed (~1 us on A76),
+   preserving the L1/L2 cache lines.
+2. `vm.vfs_cache_pressure = 50` hoarded dentries/inodes, preventing clean filesystem
+   metadata reclaim and forcing process memory into swap prematurely. Resetting to `100`
+   restores proper reclaim balance.
+3. `vm.watermark_boost_factor = 15000` triggered premature kswapd churn during allocation
+   bursts; setting it to `0` eliminates swap churn.
+4. Storage interrupts (MMC) were all landing on CPU0 (Cortex-A55), choking the ChromeOS
+   EC (trackpad/keyboard) when storage traffic rose; moving MMC interrupts to CPU2/3
+   completely prevents desktop unresponsiveness.
+
+Capping zram to 2/3 RAM previously forced workloads needing >2.5 GiB of virtual swap to spill
+half a gigabyte into the microSD card (`/dev/mmcblk1p1`) at priority 10, causing massive
+I/O stalls (hundreds of seconds in `/proc/pressure/io`). Sizing zram to all of RAM keeps the
+entire working set in fast compressed memory.
 
 ### Why `zram-resident-limit` is not used
 

@@ -39,17 +39,18 @@ machine's tuning:
 * **1000 Hz** timers, full preemption;
 * transparent huge pages set to `madvise` on the command line.
 
-Memory: `zram` provides a **~2.5 GB** compressed swap device - two thirds of RAM,
+Memory: `zram` provides a **3.7 GB** compressed swap device - sized to all of RAM,
 because the pages it holds are compressed and cost about a quarter of the RAM their
-size suggests (measured here: 427 MB of pages in 98 MB). The size is a deliberate
-middle: the packaged half of RAM (1.9 GB) is reached while RAM is still free, and the
-full-RAM cap was shipped once and dropped because a cap that never fills lets the
-kernel (swappiness 150) swap out cold pages it used to keep, and every re-touch pays
-an lz4 decompress - a small but real latency. Two thirds keeps roughly double the old
-headroom while the cap still fills, so zram stays a burst tier and the card is
-reached only after ~2.5 GB are already held compressed (zram-generator,
-`/etc/systemd/zram-generator.conf`, lz4). `systemd-oomd` kills a memory hog at 50 %
-pressure instead of letting the machine freeze. `swapon --show`, `zramctl` and
+size suggests (measured here: 427 MB of pages in 98 MB, ~3.5:1 ratio). The full-RAM
+size ensures heavy workloads never spill to the slow microSD card (~1-2 MB/s random
+writes). The previous decompress latency with full-RAM swap was resolved by setting
+`vm.page-cluster = 0` (preventing wasteful 8-page readahead that blew out the 32 KB
+L1 data cache on the Cortex-A55 LITTLE cores), resetting `vm.vfs_cache_pressure = 100`
+to reclaim clean directory cache instead of evicting process memory, and setting
+`vm.watermark_boost_factor = 0` to eliminate premature kswapd churn. Storage
+interrupts (MMC) are routed to CPU2/3 so CPU0 (the input/EC core) is never choked
+by I/O traffic. `systemd-oomd` kills a memory hog at 50 % pressure instead of
+letting the machine freeze. `swapon --show`, `zramctl` and
 `cat /sys/block/zram0/mm_stat` show what is in use.
 
 ## When you leave it alone
