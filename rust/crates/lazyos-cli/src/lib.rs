@@ -65,6 +65,14 @@ pub fn run(argv: Vec<String>, env: &Env) -> i32 {
         .unwrap_or_else(|| "lazyos".to_string());
     let args: Vec<String> = argv.iter().skip(1).cloned().collect();
 
+    // The headless task runner: a menu starts a slow action by spawning
+    // `lazyos --task-run <id>` detached. It has no terminal and no window, so it
+    // is dispatched before the command table and never enters the terminal.
+    if args.first().map(String::as_str) == Some("--task-run") {
+        let id = args.get(1).cloned().unwrap_or_default();
+        return task_cmd::run(&id);
+    }
+
     if let Some(code) = global(&args) {
         return code;
     }

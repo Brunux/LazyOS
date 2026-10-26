@@ -96,6 +96,8 @@ pub struct TaskRecord {
     pub result: Option<String>,
     pub error_line: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub argv: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub started_at: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finished_at: Option<u64>,
@@ -119,6 +121,7 @@ impl TaskRecord {
             percent: task.percent,
             result: task.result.clone(),
             error_line: task.error_line.clone(),
+            argv: task.argv.clone(),
             started_at: task.started_at.map(system_to_secs),
             finished_at: task.finished_at.map(system_to_secs),
             pid: std::process::id().into(),
@@ -303,6 +306,9 @@ pub struct Task {
     pub result: Option<String>,
     pub error_line: Option<String>,
     pub percent: u8,
+    /// The command the task runs, so a detached runner can start it without the
+    /// UI passing it in-process. None until a menu (or a test) sets it.
+    pub argv: Option<Vec<String>>,
 
     state_dir: PathBuf,
     runtime_dir: Option<PathBuf>,
@@ -340,6 +346,7 @@ impl Task {
             result: None,
             error_line: None,
             percent: 0,
+            argv: None,
             state_dir: state_dir.as_ref().to_path_buf(),
             runtime_dir: None,
             busy_tag,
@@ -362,6 +369,13 @@ impl Task {
 
     pub fn with_busy_icon(mut self, icon: impl Into<String>) -> Self {
         self.busy_icon = icon.into();
+        self
+    }
+
+    /// The command a detached runner starts: an argv array, never a shell
+    /// string, so a menu pattern cannot become shell injection.
+    pub fn with_command(mut self, argv: &[&str]) -> Self {
+        self.argv = Some(argv.iter().map(|s| s.to_string()).collect());
         self
     }
 
@@ -431,6 +445,13 @@ impl Task {
             .join(format!("{}.stop", self.id))
     }
 
+    /// Whether this task owns the child process (the runner's case) or only
+    /// watches a detached runner through the state file (the viewer's case). A
+    /// runner exits once this is false; a viewer never owns the child.
+    pub fn owns_child(&self) -> bool {
+        self.child.is_some()
+    }
+
     /// Start the child process. The command is an argv array; no shell is
     /// involved, so a menu pattern cannot become shell injection.
     pub fn spawn(&mut self, argv: &[&str]) -> io::Result<()> {
@@ -474,6 +495,18 @@ impl Task {
         self.stop_sent = Some(Instant::now());
         self.state_dirty = true;
         let _ = self.write_state();
+    }
+
+    /// A viewer that does not own the child asks the runner to stop by writing
+    /// the request file the runner's [`Self::tick`] checks. The runner then
+    /// forwards SIGINT (and SIGTERM after two seconds) to the child and records
+    /// `Stopped`. The viewer never signals a process it does not own.
+    pub fn request_stop(&self) {
+        let path = self.stop_request_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&path, "stop\n");
     }
 
     /// Called when the UI loop wakes for a tick. It drains child output,
@@ -666,6 +699,7 @@ impl Task {
             result: record.result,
             error_line: record.error_line,
             percent: record.percent,
+            argv: record.argv,
             state_dir: state_dir.as_ref().to_path_buf(),
             runtime_dir: None,
             busy_tag: slugify(&id),
@@ -1087,7 +1121,13 @@ impl Screen for TaskView {
 
         match key.code {
             KeyCode::Char('s') | KeyCode::Char('S') => {
-                self.task.stop();
+                if self.task.child.is_some() {
+                    // This view owns the child (a test or a runner): stop it.
+                    self.task.stop();
+                } else {
+                    // A viewer of a detached runner: ask the runner to stop.
+                    self.task.request_stop();
+                }
                 self.update_keybar();
                 Outcome::Continue
             }
@@ -1275,6 +1315,7 @@ mod tests {
             percent: 0,
             result: None,
             error_line: None,
+            argv: None,
             started_at: None,
             finished_at: None,
             // Use this process's pid but a comm that cannot match.
@@ -1404,5 +1445,57 @@ mod tests {
             task.state == TaskState::Stopped
         });
         assert_eq!(task.state, TaskState::Stopped);
+    }
+
+    #[test]
+    fn the_record_round_trips_the_command() {
+        let (state, _) = temp_dirs();
+        let mut task =
+            Task::new("argv", "argv test", &state).with_command(&["/bin/sh", "-c", "echo hi"]);
+        task.write_state().unwrap();
+        let loaded = Task::load("argv", &state).unwrap().expect("task loads");
+        assert_eq!(
+            loaded.argv,
+            Some(vec!["/bin/sh".into(), "-c".into(), "echo hi".into()])
+        );
+    }
+
+    #[test]
+    fn a_viewer_stop_writes_the_request_file_not_a_signal() {
+        let (state, _) = temp_dirs();
+        // A viewer's Task has no child: it asks the runner through a file.
+        let task = Task::new("viewer", "viewer test", &state);
+        assert!(task.child.is_none());
+        task.request_stop();
+        assert!(task.stop_request_path().is_file());
+    }
+
+    #[test]
+    fn stopping_a_finished_task_does_nothing() {
+        let (state, _) = temp_dirs();
+        let mut task = Task::new("done-stop", "stop after done", &state);
+        task.set_stoppable(true);
+        task.add_step("one");
+        run_task_to_end(&mut task, &["/bin/sh", "-c", "exit 0"]);
+        assert_eq!(task.state, TaskState::Done);
+        let result = task.result.clone();
+
+        // The key is still bound; it must not turn a finished task into a
+        // stopped one, and it must not rewrite the result.
+        task.stop();
+        assert_eq!(task.state, TaskState::Done);
+        assert_eq!(task.result, result);
+    }
+
+    #[test]
+    fn the_log_is_a_ring_that_drops_the_oldest_lines() {
+        let (state, _) = temp_dirs();
+        let mut task = Task::new("ring", "ring test", &state);
+        for n in 0..5_001 {
+            task.log.push(format!("line {n}"));
+        }
+        // 5,001 lines trip the cap once and drop the oldest 1,000.
+        assert_eq!(task.log.lines().len(), 4_001);
+        assert_eq!(task.log.lines().first().unwrap(), "line 1000");
     }
 }
