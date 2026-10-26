@@ -1,8 +1,10 @@
 /* Solarized Dark, the GTK4/libadwaita half of the palette.
  *
  * One palette, five surfaces: foot draws the terminal in it, waybar and rofi
- * paint their own layer-shell surfaces from their own files, gtk-3.0/gtk.css
- * paints the one GTK3 window (pcmanfm), and this file paints the GTK4 ones.
+ * paint their own layer-shell surfaces from their own files, gtk-3.0/gtk.css is
+ * the GTK3 half (guvcview, the camera window, plus waybar and anything installed
+ * later - the file manager is favnyr and links no GTK), and this file paints the
+ * GTK4 ones.
  * `papers` is that window today (the document reader), and it opened white:
  * libadwaita wants the desktop colour scheme from the settings portal, which
  * this image does not run, so it fell back to its light default. settings.ini
