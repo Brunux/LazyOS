@@ -20,6 +20,12 @@
 # scripts/build.sh on the build host).
 #
 # Writing requires CONFIRM=yes; what it replaces is backed up first.
+#
+# RESUME=yes|no only applies to the rebuilt image: `yes` adds the port's
+# `resume=LABEL=lazyos_swap` (the label the Auxiliary swap menu writes, which is
+# what hibernation needs to come back), `no` drops a resume= the machine has, and
+# unset carries the running command line's own resume= over. See the paragraph
+# below on why it is carried instead of dropped.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 . "$(dirname "$0")/lib-cgpt.sh"
@@ -27,7 +33,8 @@ set -euo pipefail
 if [ "$(id -u)" -ne 0 ]; then
 	# sudo -n starts from a clean environment, so CONFIRM=yes has to be forwarded
 	# explicitly or the guard below can never pass through the re-exec.
-	exec sudo -n DEVICE="$DEVICE" CONFIRM="${CONFIRM:-}" "$(readlink -f "$0")" "$@"
+	exec sudo -n DEVICE="$DEVICE" CONFIRM="${CONFIRM:-}" RESUME="${RESUME:-}" \
+		"$(readlink -f "$0")" "$@"
 fi
 
 # Never act from a chroot: /proc/cmdline there belongs to the host, so the GUID
@@ -74,7 +81,44 @@ else
 	[ -d "/lib/modules/$KERNEL_RELEASE" ] || die "no /lib/modules/$KERNEL_RELEASE"
 	IMG="$WORK_DIR/kpart-running-$DEVICE"
 	log "Building the kpart from the running system ($KERNEL_RELEASE)"
-	"$REPO_DIR/scripts/make-kpart.sh" / "$IMG" "root=UUID=$ROOT_UUID rootwait rw"
+	# The command line is built from what this machine needs *now*: root= is read
+	# from the running filesystem, because that is the one /boot and /lib/modules
+	# describe. resume= is carried over for the same reason and one more: losing
+	# it is silent. A machine that hibernates keeps writing the image to the card
+	# and then boots cold, with the session gone, and nothing in the log names the
+	# reason. RESUME=yes is how it gets there the first time (the label is the one
+	# the Auxiliary swap menu writes); RESUME=no is the way back for a machine
+	# whose swap card is gone; unset keeps whatever the running kernel was given.
+	_cmdline="root=UUID=$ROOT_UUID rootwait rw"
+	_running_resume=""
+	for _x in $(cat /proc/cmdline); do
+		case "$_x" in
+			resume=*) _running_resume="$_x" ;;
+		esac
+	done
+	case "${RESUME:-}" in
+		'' | yes | no) ;;
+		*) warn "RESUME=$RESUME is neither yes nor no: using the running command line as it is" ;;
+	esac
+	case "${RESUME:-keep}" in
+		yes)
+			# The label has to exist by the boot that follows, or the wait in
+			# local-premount/resume is 30 s with nothing on the screen. It is a
+			# warning and not a refusal: the swap card can be written after the
+			# kernel partition, and an unlabelled card is not a broken kpart.
+			findfs LABEL=lazyos_swap >/dev/null 2>&1 ||
+				warn "no partition carries the lazyos_swap label yet: the next boot waits up to 30 s for it, and hibernation still has nowhere to go"
+			_cmdline="$_cmdline resume=LABEL=lazyos_swap"
+			;;
+		no) log "Dropping ${_running_resume:-the previous resume=} from the rebuilt command line" ;;
+		*)
+			if [ -n "$_running_resume" ]; then
+				_cmdline="$_cmdline $_running_resume"
+				log "Keeping $_running_resume on the rebuilt command line"
+			fi
+			;;
+	esac
+	"$REPO_DIR/scripts/make-kpart.sh" / "$IMG" "$_cmdline"
 fi
 
 kpart_fits "$IMG" "$PART"

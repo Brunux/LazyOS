@@ -739,6 +739,54 @@ while the line is gone. An image built before it needs a rebuild; until then the
 tools still work from a terminal with their full path (`/usr/sbin/parted`), and
 the menu's own rows are the part that cannot see them.
 
+## Hibernation refuses, or comes back to a fresh session
+
+`sway-hibernate` (power menu, `Alt+Escape` → **Hibernate**) refuses with a card
+that names the one condition it is missing, and `~/.config/bin/sway-hibernate
+--status` prints all of them at once, without hibernating:
+
+```sh
+kernel=yes
+swap=/dev/mmcblk1p1
+swap_kb=8388604
+need_kb=1558696
+resume=no
+resume_broken=no
+hibernate=no
+```
+
+* **`swap` is empty** - there is no swap on disk, only zram, and compressed RAM
+  cannot hold a resume image. Places → **Auxiliary swap** writes the partition
+  and the fstab line that activates it at every boot.
+* **`swap_kb` is below `need_kb`** - the kernel's image is 2/5 of RAM by default,
+  so a 4 GB machine wants about 1.5 GB of free swap and a card smaller than that
+  cannot take it. `swap_kb` is the partition's size, not how much of it is in use:
+  an idle swap still has all of it free.
+* **`resume=no`** - the kernel command line does not say where the image goes, so
+  a hibernation could not be restored. That value is baked into the kernel
+  partition, so it is added once with `CONFIRM=yes RESUME=yes
+  ~/Dev/LazyOS/scripts/install-kpart.sh` and kept across kernel updates (see
+  **The system** page, § Suspend and hibernate).
+* **`resume=yes` but `resume_broken=yes`** - the command line says where the
+  image goes, but no device on this boot answers to that name: the swap card was
+  relabelled, repartitioned or left at home. Hibernating would write the image and
+  the next boot would start a fresh session, so the helper refuses. Fix the card
+  (`sudo swaplabel -L lazyos_swap <device>`) or take the spec out of the boot
+  (`CONFIRM=yes RESUME=no ~/Dev/LazyOS/scripts/install-kpart.sh`).
+* **A card says *Hibernating to /dev/...* and then *systemd refused to hibernate:
+  ...*** - the helper's own conditions passed, and `systemctl hibernate` said no
+  afterwards. It prints its reason in that card instead of the journal, because a
+  key that does nothing is invisible: *Not enough swap space* means the swap the
+  kernel will resume from is smaller than the image (`need_kb`), and *Access
+  denied* means polkit does not trust this session for sleep, the same case
+  `sway-suspend` works around.
+* **It hibernates and the next boot starts a fresh session** - the image was
+  written and the reboot could not find it: `resume=` names a card that is
+  missing or was relabelled. `check-system.sh` resolves `resume=` and fails naming
+  the spec it cannot find; `sudo swaplabel -L lazyos_swap <device>` fixes a
+  relabelled card, and `CONFIRM=yes RESUME=no ~/Dev/LazyOS/scripts/install-kpart.sh`
+  takes a card that is gone out of the boot.
+
 ## The Developer menu does not offer the stick
 
 **Export my profile** (Alt+Ctrl+D) lists three kinds of target: a mounted

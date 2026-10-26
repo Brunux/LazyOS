@@ -230,16 +230,38 @@ lock instead of a flat colour.
 * `resume=` on the kernel command line, so the next boot restores the image
   instead of starting fresh. Because `resume=` is resolved through udev, a
   **label** is enough: a swap partition labelled `lazyos_swap` plus
-  `resume=LABEL=lazyos_swap` in `devices/google-asurada/kernel-cmdline.conf`.
+  `resume=LABEL=lazyos_swap` on the command line.
 
 The **Auxiliary swap** row in Places (and in the root menu) writes that partition
 and the `/etc/fstab` line that activates it on every boot, with priority 10 so
 zram keeps being used first. It does not add `resume=`: that is a kernel command
-line change and needs the kernel partition rebuilt.
+line change and needs the kernel partition rebuilt. The image ships the checkout
+it was built from, so this is done once, on the machine:
+
+```sh
+CONFIRM=yes RESUME=yes ~/Dev/LazyOS/scripts/install-kpart.sh
+```
+
+`install-kpart.sh` asks for `CONFIRM=yes` because it rewrites the partition this
+system booted from, and it keeps a copy of what it replaced. It also **carries a
+`resume=` the machine already has across a kernel update**, because dropping it is
+silent: the machine keeps hibernating and then boots cold with the session gone.
+`RESUME=yes` is how it gets added the first time, and `RESUME=no` is how a machine
+whose swap card is gone gets rid of it. Nothing is in the image's own command
+line: a card with no `lazyos_swap` partition boots exactly as it did before,
+because only a machine that asked for `resume=` waits for one.
 
 `sway-hibernate` (in the root menu, and as a launcher entry) checks both and says
 which one is missing. It never hibernates into a swap the machine cannot resume
-from.
+from: a `resume=` that names a device this boot cannot find (a relabelled or
+removed swap card) is refused too, because the image would be written and the
+next boot would come up cold. If those conditions pass and `systemctl` still says
+no, its own words become the card instead of a journal line nobody reads.
+`~/.config/bin/sway-hibernate --status` prints the conditions in one block
+(`kernel=`, `swap=`, `swap_kb=`, `need_kb=`, `resume=`, `resume_broken=`,
+`hibernate=`) and does nothing else: it is the quickest answer to "why does it
+refuse?", and what `check-system.sh` asks so that the size it reads is the
+partition's size and not how much of it is in use.
 
 ## The microSD and the firmware
 

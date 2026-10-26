@@ -2054,15 +2054,37 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   never hangs, and the root menu keeps a **Dictation** row so the mouse can stop it too.
   Omarchy runs voxtype (a Rust daemon) for the same interaction. `sway-hibernate` refuses unless three things hold, each with
   its own message: `/sys/power/state` has `disk`, a **disk** swap (not zram) of at least 2/5 of RAM
-  exists, and the kernel command line carries `resume=`. `resume=LABEL=lazyos_swap` is the intended
-  wiring (initramfs-tools resolves the label through udev, so an SD swap partition labelled
-  `lazyos_swap` is enough) - a swap *file* cannot be used for resume because it has no label. The
-  default image has no disk swap, so the menu entry explains instead of hibernating into a swap the
-  machine cannot resume from. **Auxiliary swap** (Places and the root menu) prepares that partition
-  and the fstab line that activates it at every boot; `resume=LABEL=lazyos_swap` still has to be
-  added to the kernel command line and needs the kpart rebuilt. `check-system.sh` checks the manual,
-  `rofi-keys`, the dictation tools,
-  the model (SKIP when absent) and the hibernate conditions (SKIP/WARN, never FAIL).
+  exists, and the kernel command line carries `resume=`. **The size it checks is `/proc/swaps`
+  column 3 (`Size`), never column 4 (`Used`), and that is a bug this port shipped**: an idle swap
+  reads `0` in `Used`, so a freshly created 8 GB partition on the microSD was refused as "0 MiB"
+  while `swapon --show` was reporting 8G. `--status` exists for that reason - it prints the
+  conditions (`kernel=`, `swap=`, `swap_kb=`, `need_kb=`, `resume=`, `resume_broken=`,
+  `hibernate=`) and does nothing else, so `check-system.sh` can ask it what size it read and FAIL
+  when the answer is not the kernel's own, without a report ever being able to hibernate the
+  machine. `resume=LABEL=lazyos_swap`
+  is the intended wiring (initramfs-tools resolves the label through udev, so an SD swap partition
+  labelled `lazyos_swap` is enough) - a swap *file* cannot be used for resume because it has no
+  label, and `resume=` is not in the image's own command line on purpose: a machine with no
+  `lazyos_swap` partition would wait 30 s in the initramfs (`local_device_setup` in
+  `local-premount/resume`) before mounting root, so the port keeps it opt-in -
+  `CONFIRM=yes RESUME=yes scripts/install-kpart.sh` adds it once on the machine, `install-kpart.sh`
+  carries an existing `resume=` across every later kernel update (dropping it is silent: the machine
+  hibernates and comes back cold, with the session gone), and `RESUME=no` removes it.
+  **A `resume=` that names nothing on this boot is a refusal of its own** (`resume_broken=yes`):
+  the image would be written and the next boot would come up cold, which reads as hibernation losing
+  the session rather than as a spec that points at a card that is gone - so the helper names both
+  ways out (`swaplabel` the card, or `RESUME=no` on the partition) instead of hibernating. And
+  because it runs from a key with no terminal, `systemctl hibernate`'s own refusal (*Not enough swap
+  space*, *Access denied*) is captured and becomes the card rather than a journal line, which is
+  indistinguishable from the key doing nothing. Turning `resume=` on needs the kernel partition
+  rebuilt and nothing else: the running initramfs already carries
+  `scripts/local-premount/resume`. The default image has no disk swap, so the menu entry explains
+  instead of hibernating into a swap the machine cannot resume from. **Auxiliary swap** (Places and
+  the root menu) prepares that partition and the fstab line that activates it at every boot;
+  `resume=LABEL=lazyos_swap` still has to be added to the kernel command line and needs the kpart
+  rebuilt. `check-system.sh` checks the manual, `rofi-keys`, the dictation tools,
+  the model (SKIP when absent) and the hibernate conditions (SKIP/WARN, never FAIL, plus the
+  `--status` size agreement above).
 - **Agents** (`rofi-agents`, Alt+Ctrl+Shift+A = Omarchy's Super+Shift+Ctrl+A) is the local half of
   Omarchy's agents feature: launch (in foot, from `~/Work`, because the agents refuse to remember
   trust in `$HOME`), install (`npm install -g --prefix ~/.local <pkg>` - an explicit prefix, so npm
