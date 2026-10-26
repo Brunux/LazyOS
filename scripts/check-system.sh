@@ -2926,13 +2926,19 @@ else
 fi
 
 # The windowed file manager is favnyr (replaced pcmanfm with Brunux/Favnyr-aarm64 v0.3.6 binary at /usr/bin/favnyr);
-# Alt+Search finds files). What fails here does so silently: without its config
-# the terminal command is x-terminal-emulator, which this image does not have, so
-# "Open Terminal Here" does nothing; without the association a double click on a
-# photo starts the browser (280 MB) or nothing; and libfm's own loader is the only
-# thumbnail decoder, so a lost setting is invisible until a directory looks empty.
+# Alt+Search finds files). What fails here does so silently: the terminal comes
+# from $TERMINAL with a fallback list foot is not in (the check below), a double
+# click on a photo goes through the association, and the icons it draws come from
+# the theme rather than from the binary, so a lost PNG is a hole in the sidebar
+# and the icon view.
 if have favnyr; then
-	ok "file manager installed (favnyr $(/usr/bin/favnyr --version 2>/dev/null || echo installed))"
+	# **Never run it to ask its version.** This build parses `--version` as a
+	# startup location ("WARN favnyr: invalid startup location
+	# location=--version"), then opens its Slint event loop and never exits:
+	# the report stopped on this line, and every check after it - the whole
+	# framework section included - never ran. `--help` opens the window too.
+	# Presence and the exec bit are what can be asked without starting one.
+	ok "file manager installed (favnyr is executable)"
 else
 	fail "favnyr is missing: the Files (window) entry and 'Open containing folder' do nothing"
 fi
@@ -3050,16 +3056,18 @@ if have eject; then
 else
 	fail "eject is missing: favnyr's Unmount may fail with missing child process"
 fi
-_pcm_dirs=${XDG_CONFIG_DIRS:-/etc/xdg}
-_pcm_conf=${_pcm_dirs%%:*}/favnyr/default/favnyr.conf
-[ -r "$_pcm_conf" ] || _pcm_conf=/etc/xdg/favnyr/default/favnyr.conf
-if grep -qs '^terminal=foot' "$_pcm_conf"; then
-	ok "favnyr opens a terminal with foot (terminal=foot in favnyr config)"
+_xdg_dirs=${XDG_CONFIG_DIRS:-/etc/xdg}
+# favnyr has no `terminal=` setting to read: it runs $TERMINAL and then a list of
+# known emulators (kgx, konsole, gnome-terminal, kitty, alacritty, wezterm,
+# xfce4-terminal, lxterminal, tilix, xterm) that does not include foot, so the
+# image exports TERMINAL=foot in /etc/environment - the file pam_env reads in
+# both greetd's and sudo's session stacks, verified on this machine with
+# `sudo -n env`. Without it "Open terminal here" answers
+# "no terminal detected ($TERMINAL or known candidates)" and starts nothing.
+if grep -qx 'TERMINAL=foot' /etc/environment 2>/dev/null; then
+	ok "favnyr opens a terminal with foot (TERMINAL=foot in /etc/environment)"
 else
-	warn "no terminal=foot in $_pcm_conf: 'Open Terminal Here' (F4) starts nothing"
-fi
-if [ "$(grep -s '^show_thumbnail=' "$_pcm_conf" | cut -d= -f2)" = 0 ]; then
-	warn "thumbnails are off in $_pcm_conf: the icon view shows no pictures"
+	fail "no TERMINAL=foot in /etc/environment: 'Open terminal here' in favnyr finds no terminal"
 fi
 # The names it draws with come from the theme, not from the package: Adwaita 51
 # ships no full-colour "folder" at all, so a PNG that did not make it into the
@@ -3109,7 +3117,7 @@ _mime_default() { # MIME-TYPE
 		LC_ALL=C gio mime "$1" 2>/dev/null |
 			awk 'NR == 1 && /: / { sub(/^.*: /, ""); print; exit }'
 	else
-		sed -n "s|^$1=||p" "${_pcm_dirs%%:*}/mimeapps.list" 2>/dev/null | head -1
+		sed -n "s|^$1=||p" "${_xdg_dirs%%:*}/mimeapps.list" 2>/dev/null | head -1
 	fi
 }
 _mime=$(_mime_default image/png)
