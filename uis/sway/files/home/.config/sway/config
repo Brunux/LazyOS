@@ -46,7 +46,7 @@ bindsym --no-repeat --release Super_L+Mod1 exec /home/brunux/.config/bin/rofi-fi
 
 # Search+Shift is the same key held with Shift: the *terminal* file search
 # (~/.config/bin/lazyos-find), fd streamed into fzf with a preview pane. The
-# windowed manager (pcmanfm) moved to the Alt+Ctrl+Shift+F family in
+# windowed manager (favnyr) moved to the Alt+Ctrl+Shift+F family in
 # 24-keys.conf, where the Files key already lives, so this chord stays with the
 # Search key: Search opens the launcher, Alt+Search the file list, Search+Shift
 # the terminal filter - three lists, no window. The two do not compete: a

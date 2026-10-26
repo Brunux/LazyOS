@@ -1,18 +1,19 @@
 # Default applications for the whole image (/etc/xdg/mimeapps.list).
 #
 # Every GIO program resolves "open this file" through this list, and this image
-# has no xdg-desktop-portal to ask instead: pcmanfm's double click, `gio open`,
+# has no xdg-desktop-portal to ask instead: favnyr's double click, `gio open`,
 # a "Open with" dialog in any application. The point of the file is that a
 # picture opens in imv (a GPU viewer, not a browser) and a text file opens paged
 # in bat - the same rules rofi-files follows, so the Files menu and a double
-# click in pcmanfm do not disagree.
+# click in favnyr do not disagree.
 #
 # A user's ~/.config/mimeapps.list is read first and overrides everything here,
 # and `xdg-mime default` writes there, so nothing in the image is locked in.
 #
-# Deliberately absent: inode/directory is handled by favnyr (replaced pcmanfm),
-# through the shadowed desktop entry (~/.local/share/applications/pcmanfm.desktop -> Exec=favnyr).
-# rofi-files is the keyboard file list, not the directory handler.
+# inode/directory names `pcmanfm.desktop` and not a favnyr entry on purpose: the
+# name is what the launcher and GIO already know, and the file that carries it is
+# the user-level shadow (~/.local/share/applications/pcmanfm.desktop) whose Exec
+# is `favnyr`. rofi-files is the keyboard file list, not the directory handler.
 # http/https stay with Firefox, which is the browser the shim already calls.
 
 [Default Applications]

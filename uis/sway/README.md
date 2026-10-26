@@ -391,7 +391,7 @@ Alt+Ctrl+F and the menu entry would silently do nothing (or answer "no browser i
 and warns when the thumbnail cache is not writable or the script stops asking for pictures.
 
 `usr/local/bin/xdg-open` is two dozen lines around the same question: a URL goes to Firefox as it
-is, and a path goes to **`lazyos-view`** - the same rules a double click in pcmanfm applies - with
+is, and a path goes to **`lazyos-view`** - the same rules a double click in favnyr applies - with
 the browser as the answer for a user who has no session `bin` directory (root, an ssh session).
 That is what foot's ctrl+click, `yt-dlp --print-trailer` and any script that shells out to
 `xdg-open` expect, and there is no desktop portal in this image.
@@ -403,68 +403,78 @@ which applies the same rules as the browser: text in `bat`, a document in `paper
 
 ![rofi-files over ~/Documents, with the sizes and dates dimmed](../../docs/screenshots/hayato-r1-files.png)
 
-## Files in a window (pcmanfm)
+## Files in a window (favnyr)
 
-The mouse half of the same story is **pcmanfm** (`uis/sway/packages.list`, with `gvfs`). It is a
-second entry, not a replacement: `Alt+Search` and `Alt+Ctrl+F` keep opening `rofi-files` (one
-process, no window, a list a key opens and a key closes), and `Alt+Ctrl+Shift+F` opens the window
-for what a list cannot do - drag and drop, several files at once, rename in place, the trash. The
-launcher carries both rows (**Files**, **Files (window)**) and so does the root menu.
+The mouse half of the same story is **favnyr**: `uis/sway/files/usr/bin/favnyr`, one statically
+linked Slint binary (Brunux/Favnyr-aarm64 v0.3.6, 36 MB) committed in the tree. It is a second
+entry, not a replacement: `Alt+Search` and `Alt+Ctrl+F` keep opening `rofi-files` (one process, no
+window, a list a key opens and a key closes), and `Alt+Ctrl+Shift+F` opens the window for what a
+list cannot do - drag and drop, several files at once, rename in place, the trash. The launcher
+carries both rows (**Files**, **Files (window)**) and so does the root menu.
 
-* **Why not nautilus**: on forky its closure is **504 packages** (GTK4 + libadwaita, 38 MB of ICU,
-  GStreamer, 31 MB of `samba-libs`), it needs a **resident indexer** (`localsearch` crawling
-  `$HOME`) and it decodes thumbnails through glycin's sandboxed helpers. pcmanfm is 229 packages
-  and 4.9 MB, on the GTK3 the image already has for waybar, with no indexer and no
-  daemon. The measurements and the rejected alternative are in `docs/omarchy-gap.md` §1.
+* **Why it is a binary in the tree and not a package**: it is not packaged for Debian, and the two
+  alternatives were both expensive. nautilus is a **504-package** closure (GTK4 + libadwaita, 38 MB
+  of ICU, GStreamer, 31 MB of `samba-libs`), needs a **resident indexer** (`localsearch` crawling
+  `$HOME`) and decodes thumbnails through glycin's sandboxed helpers; the GTK3 manager this image
+  used before it was 229 packages and 4.9 MB for a window. favnyr links neither GTK nor libgio, so
+  it pulls in nothing - and nothing can upgrade it behind the image's back, which is why the
+  version and the SHA are the commit that carries it. The measurements of the rejected alternatives
+  are in `docs/omarchy-gap.md` §1.
 * **A double click opens what the Files list opens.** `/etc/xdg/mimeapps.list` sends the types to
   `org.lazyos.view.desktop`, whose `Exec` is `~/.config/bin/lazyos-view` - the same rule table as
   `rofi-files` (which reads an HTML file as text): text in `bat`, a document in `papers`, a
   picture in `imv` (or `chafa`'s sixels when imv gets no EGL context), a video in `mpv`, and an
-  HTML page, an EPUB or a `.deb` in Firefox. There is
-  no desktop portal here, so that pair *is* the "open with" mechanism for every GIO program.
+  HTML page, an EPUB or a `.deb` in Firefox. `inode/directory` names `pcmanfm.desktop` on purpose:
+  the *name* is what GIO and the launcher know, and the file that carries it is the user-level
+  shadow `~/.local/share/applications/pcmanfm.desktop` whose `Exec` is `favnyr` and whose `Name`
+  is *Files (window)*. There is no desktop portal here, so that pair *is* the "open with"
+  mechanism for every GIO program.
   **A trap worth knowing**: GIO silently drops a `.desktop` whose `Exec` program does not exist,
-  so a missing executable bit on `lazyos-view` reads as "no default application" rather than as an
-  error - which is why `check-system.sh` asks `gio mime image/png` *and* checks the mode. No
-  `mimeinfo.cache` regeneration is needed for the associations to resolve (verified).
-* **The GTK3 half of the palette** is two files in `home/.config/gtk-3.0/`: `settings.ini`
-  (`Adwaita-dark`, `gtk-application-prefer-dark-theme=1`, `LazyOS`, `JetBrains Mono 10`, animations
-  off) and `gtk.css`, which repaints the surfaces with explicit selectors at the same specificity
-  Adwaita uses and is parsed last. The colours are **opaque**: a translucent window would show the
-  wallpaper through its own text. pcmanfm is the only window whose look comes from the GTK theme
-  (waybar is GTK3 too but paints the bar from its own stylesheet, foot is pixman and rofi draws
-  its own surfaces), so this is a stylesheet, not a theme.
-* **The icon names came with it**: Adwaita 51 ships no full-colour `folder`, `user-home` or
-  `drive-harddisk` at all, so `scripts/make-icons.sh` gained a **fourth table** (the places, the
-  actions and the mimetypes the sidebar and the icon view ask for by name) and the LazyOS theme now
-  carries 219 PNGs in `48x48/apps` + `scalable/apps`.
-* **The settings live in `etc/xdg/pcmanfm/default/pcmanfm.conf`**: `terminal=foot` (under
-  `[config]`, which is where libfm reads it, not the `[ui]` section the dialog suggests - the
-  default `x-terminal-emulator` is not installed here, so F4 would do nothing), `use_trash=1`
-  (`gvfsd-trash` is what makes it restorable), `thumbnail_max=4096` **kilobytes** (libfm decodes on
-  the UI thread with gdk-pixbuf, and a 24 MP JPEG costs ~83 MB for a 128 px thumbnail),
-  `bm_open_method=0` (ask GIO, which is how `mimeapps.list` is reached), `autorun=0`, the Network
-  places off (`gvfs-backends` is 31 MB of `samba-libs` and is not installed) and a 900x600 window.
+  so a missing executable bit on `lazyos-view` - or on `favnyr` itself - reads as "no default
+  application" rather than as an error, which is why `check-system.sh` asks `gio mime image/png`
+  *and* checks both modes. No `mimeinfo.cache` regeneration is needed for the associations to
+  resolve (verified).
+* **Its icons come from the session's theme, not from its own resources.** favnyr reads
+  `gtk-icon-theme-name=` out of `home/.config/gtk-3.0/settings.ini` (it parses that file) and asks
+  the named theme for the folder, trash, drive and mimetype pictures it draws. Adwaita 51 ships no
+  full-colour `folder`, `user-home` or `drive-harddisk` at all, so `scripts/make-icons.sh` gained a
+  **fourth table** (the places, the actions and the mimetypes the sidebar and the icon view ask for
+  by name) and the LazyOS theme carries them in `48x48/apps` + `scalable/apps`. That one key is
+  also why the GTK3 pair matters to a window that links no GTK.
+* **A terminal from inside it is foot, through `$TERMINAL`.** favnyr has no `terminal=` setting: it
+  runs `$TERMINAL` and then a built-in list of emulators (kgx, konsole, gnome-terminal, kitty,
+  alacritty, wezterm, xfce4-terminal, lxterminal, tilix, xterm) that does **not** include foot.
+  `/etc/environment` therefore carries `TERMINAL=foot`: the window is started by the compositor, so
+  `/etc/profile.d` is never read on that path, while `pam_env` reads `/etc/environment` in greetd's
+  session stack and in sudo's. Without it the menu item answers *no terminal detected* and starts
+  nothing.
+* **A disk it cannot unmount says why.** The removal action goes through `udisksctl`, and when
+  udisks refuses because something holds the mount, the window runs `fuser -m` to fill its
+  *In use by: …* sentence - so `psmisc` is in the package list. `eject` is not involved; it was the
+  GTK3 manager's dependency and nothing in this image execs it any more.
 * **`Alt+Ctrl+Shift+F` is the Shift variant of the Files key** (`Alt+Ctrl+F`), which is the key
   scheme's pattern: the plain chord opens the menu, the Shift chord the window it stands for. It
   keeps the Search key for lists and filters (launcher, file list, terminal search), and it is the
   same shape Omarchy uses for its file manager.
-* **What it does not do**: its thumbnails are images only (libfm ignores the freedesktop
-  `.thumbnailer` files, so a PDF or a video keeps its mimetype icon there, while `rofi-files`
-  draws both through `lazyos-thumbnail`); SMB and phone mounts need `gvfs-backends`; and
-  `pcmanfm --desktop` is X11-only, so nothing starts it on sway. Its Devices pane does mount a
-  USB stick, because `udisks2` is installed and `gvfs`' volume monitor is the client - the same
-  `udisksd` `rofi-places` talks to through `udisksctl`, and there is no `udiskie` (the resident
-  tray daemon) on purpose: a plugged USB stick mounts itself through the udev helper above, one
-  process per plug and nothing in between.
+* **The settings are TOML under `~/.config/favnyr/`** (`config.toml`, `openers.toml`,
+  `favorites.toml`, `workspace.toml`; `favorites.toml` and `workspace.toml` live in
+  `~/.local/share/favnyr/`), the log is `~/.cache/favnyr/favnyr.log`, and both roots are in
+  `lazyos-profile`'s list so a profile export carries them. The window follows the palette by
+  itself - it draws its own widgets - and previews come from tools the image already has
+  (`ffmpeg`, poppler's `pdftoppm`/`pdftocairo`, the same ones `lazyos-thumbnail` uses).
+* **Never run it to ask its version.** `favnyr --version` parses the flag as a startup location
+  (*WARN favnyr: invalid startup location location=--version*) and then opens its event loop;
+  `--help` does the same. `check-system.sh` hung on exactly that line, which is why it now asks for
+  the exec bit instead.
 
 ## Files in a terminal (lazyos-find)
 
 **Search+Shift** opens `lazyos-find`: `fd` streamed into **fzf** in a floated foot window, one row
 per file under `$HOME`, a preview pane on the right, and Enter handing the choice to `lazyos-view`
-- the same opener a double click in pcmanfm reaches. It is the third answer to "where is that
+- the same opener a double click in favnyr reaches. It is the third answer to "where is that
 file", and the three are one feature with three shapes: `rofi-files --search` is a *menu* (rows
 with icons and thumbnails, open before you type, one bounded `fd` run, a list you scroll),
-pcmanfm is the *window* (drag and drop, the trash), and this is the *filter* - uncapped, live
+favnyr is the *window* (drag and drop, the trash), and this is the *filter* - uncapped, live
 while the walk is still running, with the file's contents beside it.
 
 **It is a release binding**, like the launcher on Search and the file list on `Alt+Search`: sway
@@ -543,7 +553,7 @@ own it. The whole set is the *Shortcuts* page of the manual
 | browser | `Alt+Shift+Return` opens `firefox-esr` | `19-launcher.conf` |
 | windows | `Alt+Q` close, `Alt+T` float, `Alt+F` fullscreen, `Alt+grave` scratchpad, `Alt+R` resize | `config`, `24-keys.conf` |
 | views | `Alt+Ctrl+K` every binding, `Alt+Ctrl+X` dictation, `Alt+Ctrl+Shift+A` agents | `24-keys.conf` |
-| files | `Alt+Ctrl+F` (`rofi-files`), `Alt+Ctrl+Shift+F` (pcmanfm, the window) | `24-keys.conf` |
+| files | `Alt+Ctrl+F` (`rofi-files`), `Alt+Ctrl+Shift+F` (favnyr, the window) | `24-keys.conf` |
 
 The three places where the letter differs are deviations with a reason, and each is written
 next to the binding: close is `Alt+Q` because `Alt+W` is sway's tabbed layout, the key view is

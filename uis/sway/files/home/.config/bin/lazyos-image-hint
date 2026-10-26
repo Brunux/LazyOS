@@ -9,7 +9,7 @@
 # before the card is queued so a runtime directory that cannot be written stays
 # quiet instead of raising the toast on every picture.
 #
-# It is called by lazyos-view (a double click in pcmanfm) and by rofi-files
+# It is called by lazyos-view (a double click in favnyr) and by rofi-files
 # (the Files list) right before they start imv, never for another kind of file.
 # Nothing is resident: this script ends, and the notification is mako's.
 set -eu

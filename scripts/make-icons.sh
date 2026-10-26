@@ -133,7 +133,7 @@ org.gnome.Papers                   f02d
 multimedia-photo-viewer            f03e
 document-print-preview             f02f
 # The Download entry asks for folder-download, which the fourth table also
-# renders because pcmanfm's places sidebar asks for the same name: the file is
+# renders because the file manager's places sidebar asks for the same name: the file is
 # the same PNG either way, and each table stays a complete answer to its own
 # question (what the launcher shows / what the file manager draws).
 folder-download                    f019
@@ -304,10 +304,10 @@ preferences-desktop-effects        f0d0
 preferences-system-windows         f009
 NAMES
 
-# 4. The windowed file manager.  pcmanfm draws its places sidebar, its icon view
+# 4. The windowed file manager.  favnyr draws its places sidebar, its icon view
 #    and its context menus from freedesktop names, and Adwaita 51 ships none of
 #    the full-colour ones ("folder" resolves to nothing, so an icon view would be
-#    a grid of image-missing).  These are the names libfm and pcmanfm actually ask
+#    a grid of image-missing).  These are the names the file manager asks
 #    for: the places (user-home, drive-harddisk, the per-category folders), the
 #    actions (go-previous, edit-copy, folder-new, ...) and the file types that
 #    share no generic icon with the table above.  They are the same cyan glyphs as

@@ -1,7 +1,7 @@
 #!/bin/sh
 # The terminal file search behind Search+Shift: every file under $HOME (or
 # DIR) in one fzf, narrowed by typing, with a preview pane, and Enter hands the
-# choice to lazyos-view - the same program a double click in pcmanfm uses.
+# choice to lazyos-view - the same program a double click in favnyr uses.
 #
 #   lazyos-find            search $HOME
 #   lazyos-find <dir>      search that directory instead
