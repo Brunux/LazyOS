@@ -19,10 +19,10 @@ use std::path::PathBuf;
 
 use lazyos_ui::widgets::put;
 use lazyos_ui::{
-    App, BodyCtx, ColorRole, Confirm, Design, EmptyScreen, FailureScreen, GLYPHS, Glyph, Header,
-    KeyHint, ListState, LogPane, Row, Screen, StepState, Task, TaskState, TaskView, TextStyle,
-    draw_badge, draw_card, draw_empty, draw_failure, draw_gauge, draw_header, draw_keybar,
-    draw_progress,
+    App, BodyCtx, Card, ColorRole, Confirm, Design, EmptyScreen, FailureScreen, GLYPHS, Glyph,
+    Header, Icon, KeyHint, Kind, ListState, LogPane, Row, Screen, StepState, Task, TaskState,
+    TaskView, TextStyle, Urgency, draw_badge, draw_card, draw_empty, draw_failure, draw_gauge,
+    draw_header, draw_keybar, draw_progress,
 };
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -310,6 +310,93 @@ fn card() {
         let inner = draw_card(buf, area, design, Some("Free space"), true);
         let list = body_rows();
         list.render(inner, buf, design, true);
+    });
+}
+
+/// A notification's card drawn inside a window (spec 006). A snapshot holds the
+/// text, so this pins the layout: the glyph column, the title on the border, the
+/// body and the bar. The frame colours of the three urgencies are asserted cell
+/// by cell in `card::tests` (`a_critical_card_is_drawn_in_the_danger_role`).
+#[test]
+fn notice_cards_at_three_urgencies() {
+    check("card-urgency", |buf, area, design| {
+        for (row, urgency) in [Urgency::Low, Urgency::Normal, Urgency::Critical]
+            .into_iter()
+            .enumerate()
+        {
+            let rect = Rect {
+                y: area.y + row as u16 * 5,
+                height: 5,
+                ..area
+            };
+            Card::new("Saved")
+                .urgency(urgency)
+                .kind(Kind::Path {
+                    dir: false,
+                    name: "shot.png",
+                })
+                .body("~/Pictures/shot.png")
+                .render(rect, buf, design);
+        }
+    });
+}
+
+#[test]
+fn notice_card_with_and_without_a_picture() {
+    check("card-icon", |buf, area, design| {
+        Card::new("Saved")
+            .body("with a picture")
+            .render(Rect { height: 4, ..area }, buf, design);
+        Card::new("Saved").body("text only").no_icon().render(
+            Rect {
+                y: area.y + 4,
+                height: 4,
+                ..area
+            },
+            buf,
+            design,
+        );
+    });
+}
+
+#[test]
+fn notice_card_with_progress() {
+    check("card-progress", |buf, area, design| {
+        Card::new("Volume")
+            .body("40%")
+            .icon(Icon::Glyph(Glyph::Volume))
+            .progress(40)
+            .render(Rect { height: 4, ..area }, buf, design);
+        Card::new("Brightness")
+            .urgency(Urgency::Critical)
+            .body("full")
+            .progress(100)
+            .render(
+                Rect {
+                    y: area.y + 4,
+                    height: 4,
+                    ..area
+                },
+                buf,
+                design,
+            );
+    });
+}
+
+#[test]
+fn notice_card_truncates_a_long_body() {
+    check("card-long", |buf, area, design| {
+        let body = "a long line of text that is not going to fit in a card of this width \
+            and must end in an ellipsis rather than grow the window";
+        Card::new("Long").body(body).no_icon().render(
+            Rect {
+                width: area.width.min(48),
+                height: 4,
+                ..area
+            },
+            buf,
+            design,
+        );
     });
 }
 

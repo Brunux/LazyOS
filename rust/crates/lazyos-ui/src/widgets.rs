@@ -292,13 +292,42 @@ pub fn draw_card(
     title: Option<&str>,
     focused: bool,
 ) -> Rect {
+    if focused {
+        draw_card_with(
+            buf,
+            area,
+            design,
+            title,
+            ColorRole::Accent,
+            design.style(TextStyle::Title),
+        )
+    } else {
+        draw_card_with(
+            buf,
+            area,
+            design,
+            title,
+            ColorRole::SurfaceAlt,
+            design.style(TextStyle::Dim),
+        )
+    }
+}
+
+/// The card frame with its border and title chosen by the caller: a
+/// notification's card is drawn in its urgency's role (spec 006), a focused
+/// list card in the accent. The frame, the title placement and the truncation
+/// are the same in both, which is why this is the one function that draws them.
+pub fn draw_card_with(
+    buf: &mut Buffer,
+    area: Rect,
+    design: &Design,
+    title: Option<&str>,
+    border: ColorRole,
+    title_style: Style,
+) -> Rect {
     let block = design
         .block(Border::Rounded)
-        .border_style(Style::default().fg(if focused {
-            design.color(ColorRole::Accent)
-        } else {
-            design.color(ColorRole::SurfaceAlt)
-        }));
+        .border_style(Style::default().fg(design.color(border)));
     let inner = block.inner(area);
     block.render(area, buf);
     // The title is written over the top border by hand instead of through
@@ -306,14 +335,16 @@ pub fn draw_card(
     // card per frame, and a card is drawn on every tick of every screen that
     // has one.
     if let Some(title) = title {
-        let style = if focused {
-            design.style(TextStyle::Title)
-        } else {
-            design.style(TextStyle::Dim)
-        };
-        let x = put(buf, area.x + 1, area.y, " ", 1, style);
-        let x = put_trunc(buf, x, area.y, title, area.width.saturating_sub(4), style);
-        put(buf, x, area.y, " ", 1, style);
+        let x = put(buf, area.x + 1, area.y, " ", 1, title_style);
+        let x = put_trunc(
+            buf,
+            x,
+            area.y,
+            title,
+            area.width.saturating_sub(4),
+            title_style,
+        );
+        put(buf, x, area.y, " ", 1, title_style);
     }
     inner
 }

@@ -29,19 +29,21 @@
 //! (`tests/no_alloc.rs` watches that).
 
 pub mod app;
+pub mod card;
 pub mod design;
 pub mod glyphs;
 pub mod task;
 pub mod widgets;
 
 pub use app::{App, BodyCtx, EmptyScreen, FailureScreen, MOTION_MS, Outcome, Screen};
+pub use card::{Card, Icon, Kind, Timeout, Urgency};
 pub use design::{Border, ColorRole, Density, Design, GLYPHS, Space, TextStyle};
 pub use glyphs::Glyph;
 pub use task::{Step, StepState, Task, TaskState, TaskView};
 pub use widgets::{
     Confirm, ConfirmAction, Header, KeyHint, ListAction, ListState, LogPane, Row, centered,
-    draw_badge, draw_card, draw_empty, draw_failure, draw_gauge, draw_header, draw_keybar,
-    draw_progress,
+    draw_badge, draw_card, draw_card_with, draw_empty, draw_failure, draw_gauge, draw_header,
+    draw_keybar, draw_progress,
 };
 
 /// A buffer as text, one line per row, for tests that want to read the screen
