@@ -1076,39 +1076,46 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   `mpris.so` plugin, `ffmpeg`, `pdftocairo` or `chafa` is missing, and warns when the thumbnail
   cache is unwritable or `rofi-files` stops passing `-show-icons`/`thumbnail://` - a dropped flag
   makes the list silently text-only.
-- **Files exists twice on purpose: `rofi-files` is the list and `pcmanfm` is the window.** The
+- **Files exists twice on purpose: `rofi-files` is the list and `favnyr` is the window.** The
   file list (`Alt+Search`) and `Alt+Ctrl+F` open the list (one process, no window);
-  **`Alt+Ctrl+Shift+F`** opens pcmanfm, and the launcher and the root menu carry both rows - **Files**
-  and **Files (window)**
-  (`pcmanfm.desktop` is shadowed by a user-level copy with that name, so the launcher says what it
-  opens). nautilus was measured and rejected (`docs/omarchy-gap.md` §1: 504 packages, GTK4 +
-  libadwaita + 38 MB of ICU + GStreamer + 31 MB of `samba-libs`, a `localsearch` indexer crawling
-  `$HOME`, glycin); pcmanfm is 229 packages and 4.9 MB on the GTK3 the image already has, `gvfs`
-  adds the trash (`gvfsd-trash`) and the volume monitor, and `gvfs-backends` is deliberately out
-  (that is where `samba-libs` and the mtp/gphoto backends come from), so the Network places are
-  off. It ships `etc/xdg/pcmanfm/default/pcmanfm.conf`: **`terminal=foot` under `[config]`**,
-  which is where libfm reads it - not `[ui]`, where the Preferences dialog makes it look like it
-  belongs - because the packaged default `x-terminal-emulator` does not exist here and F4/"Open
-  Terminal Here" would silently do nothing; `bm_open_method=0` (ask GIO, which is how the
-  association below is reached), `use_trash=1`, `thumbnail_max=4096` **kilobytes** (libfm decodes
-  on the UI thread with gdk-pixbuf and ignores `.thumbnailer` files, so thumbnails are images
-  only, and a 24 MP JPEG costs ~83 MB for a 128 px thumbnail), `autorun=0`, a 900x600 window.
-- **A double click in pcmanfm resolves through `/etc/xdg/mimeapps.list` ->
+  **`Alt+Ctrl+Shift+F`** opens favnyr, and the launcher and the root menu carry both rows - **Files**
+  and **Files (window)**. favnyr is one statically linked Slint binary (Brunux/Favnyr-aarm64
+  v0.3.6, 36 MB at `/usr/bin/favnyr`), committed in `uis/sway/files/usr/bin/` rather than
+  installed from a package: it links no GTK and no libgio, so it is not in `uis/sway/packages.list`
+  and no dependency pulls it in. `gvfs` still adds the trash (`gvfsd-trash`) and the volume
+  monitor, and `gvfs-backends` is deliberately out (that is where `samba-libs` and the
+  mtp/gphoto backends come from), so the Network places are off. **It has no `terminal=`
+  setting**: "Open terminal here" runs `$TERMINAL` and then a list of known emulators (kgx,
+  konsole, gnome-terminal, kitty, alacritty, wezterm, xfce4-terminal, lxterminal, tilix, xterm)
+  that does **not** include foot, so the image ships `TERMINAL=foot` in `/etc/environment` - the
+  file `pam_env` reads, in greetd's session stack and in sudo's - because a window started by the
+  compositor inherits the PAM environment and not a login shell's `profile.d`. Without it the menu
+  item answers "no terminal detected ($TERMINAL or known candidates)" and starts nothing.
+  **The report must never run it to ask its version**: `favnyr --version` parses the flag as a
+  startup location ("WARN favnyr: invalid startup location location=--version") and then opens its
+  Slint event loop, so `check-system.sh` stopped on that line and every check after it - the whole
+  framework section included - never ran. `--help` opens the window too. Presence and the exec bit
+  are what the report asks.
+- **A double click in favnyr resolves through `/etc/xdg/mimeapps.list` ->
   `org.lazyos.view.desktop` -> `~/.config/bin/lazyos-view`**, which applies exactly the rules
   `rofi-files` applies (text in `bat`; a document - PDF, DjVu, a comic - in `papers`; a picture
   in `imv` with `chafa`'s sixels as the fallback when imv gets no EGL context; a video in `mpv`;
   and an HTML page, an EPUB or a `.deb` in `firefox-esr`), so a file opens the same way from the
   list and from the window - with one deliberate exception, an HTML file, which the list reads as
   text in `bat` and a double click takes to the browser, because that is what a page is.
-  `inode/directory` stays `pcmanfm.desktop`. There is no `xdg-desktop-portal` in the image, so this pair *is* the
-  open-with mechanism for every GIO program. **GIO silently drops a `.desktop` whose `Exec`
+  `inode/directory` stays `pcmanfm.desktop`, which is now a **name** and not a program: the
+  system entry is shadowed by `~/.local/share/applications/pcmanfm.desktop` whose `Exec` is
+  `favnyr`, so a GIO program that asks for the directory handler starts the window, and the
+  launcher row it draws is called *Files (window)*. There is no `xdg-desktop-portal` in the image,
+  so this pair *is* the open-with mechanism for every GIO program. **GIO silently drops a
+  `.desktop` whose `Exec`
   program does not exist**: with `lazyos-view` not executable (or absent) `gio mime image/png`
   answers "no default application" instead of an error, which looks like a broken association -
   so the `check-system.sh` line is both the association test and the mode test
   (`LC_ALL=C gio mime image/png` must say `Default application: org.lazyos.view.desktop`, and
   `gio mime inode/directory` must say `pcmanfm.desktop`). That CLI is **`libglib2.0-bin`**
-  (0.9 MB, no daemon) and it is in `uis/sway/packages.list` for exactly this: `pcmanfm` and
-  `gvfs` link libgio but ship no `/usr/bin/gio`, and without it the check can only read
+  (0.9 MB, no daemon) and it is in `uis/sway/packages.list` for exactly this: `gvfs` links libgio
+  but ships no `/usr/bin/gio`, and without it the check can only read
   `mimeapps.list` - it would pass while GIO refused the entry. No `mimeinfo.cache` regeneration is
   needed for that to resolve (verified), and a user `~/.config/mimeapps.list` overrides the
   system file, so nothing is locked in.
