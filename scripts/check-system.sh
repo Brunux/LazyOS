@@ -3480,6 +3480,17 @@ if have lazyos; then
 			fi
 		done <<<"$_fw_links"
 	fi
+	# Spec 005: the task surface must be listed, because its symlink is what
+	# `lazyos task attach` keeps working after the window closed. The stop
+	# contract itself (a stoppable task writes a stop line, a non-stoppable one
+	# does not) is a unit test in `lazyos-ui`; there are no task declarations in
+	# the shell yet, so there is nothing here to inspect.
+	if grep -q '^  task attach' <<<"$_fw_help"; then
+		ok "lazyos --help lists task attach (the task surface reattaches by id)"
+	else
+		fail "lazyos --help does not list 'task attach': a closed task window cannot be reopened"
+	fi
+
 	# The other direction: a link someone made by hand, pointing at the
 	# framework but absent from the table, is drift - the table is the source of
 	# truth and `--symlinks` is what the installer and this check both read.

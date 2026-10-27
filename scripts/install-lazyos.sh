@@ -8,9 +8,10 @@
 # `install-lazyos.sh /` installs it on the running system, which is the
 # counterpart of install-kpart.sh when the binary changes.
 #
-# Two things land: /usr/bin/lazyos and the symlink /usr/bin/lazyos-menu ->
-# lazyos. The link is the "migrated set" check-system.sh validates: a name whose
-# `check-system.sh` line must resolve, and whose command must be in `--help`.
+# Two things land: /usr/bin/lazyos and the symlinks /usr/bin/lazyos-menu and
+# /usr/bin/lazyos-task -> lazyos. The links are the "migrated set"
+# check-system.sh validates: a name whose `check-system.sh` line must resolve,
+# and whose command must be in `--help`.
 # The ~64 old names under ~/.config/bin join it one spec at a time, because each
 # one replaces a script that still has to work until its surface is ported.
 set -euo pipefail
@@ -38,6 +39,7 @@ fi
 
 install -m 0755 "$LAZYOS_STAGE/lazyos" "$ROOTFS/usr/bin/lazyos"
 ln -sfn lazyos "$ROOTFS/usr/bin/lazyos-menu"
+ln -sfn lazyos "$ROOTFS/usr/bin/lazyos-task"
 
 # Read back what was written: a binary that does not answer is a broken copy,
 # and the version is what check-system.sh compares with the image's record.
@@ -46,5 +48,7 @@ REPORTED="$("$ROOTFS/usr/bin/lazyos" --version 2>/dev/null || true)"
 	die "$ROOTFS/usr/bin/lazyos does not report $(cat "$REPO_DIR/VERSION") (got '$REPORTED')"
 [ -x "$ROOTFS/usr/bin/lazyos-menu" ] ||
 	die "$ROOTFS/usr/bin/lazyos-menu does not resolve to the binary"
+[ -x "$ROOTFS/usr/bin/lazyos-task" ] ||
+	die "$ROOTFS/usr/bin/lazyos-task does not resolve to the binary"
 
 log "lazyos $REPORTED installed; its menu opens with 'lazyos menu' from the session"

@@ -46,7 +46,8 @@ yet present in `scripts/` as not implemented.
   so the session starts nothing that stays. Two agreed exceptions, both because only something
   watching can answer the question: `cliphist`'s watcher (no history without one) and `workstyle`
   (which windows are in which workspace, see the UI section). A slow action gets a `busy` card
-  **and** a bar spinner, and says whether it can be stopped.
+  **and** a bar spinner, says whether it can be stopped, and **ends by showing its own result in
+  the task window** instead of a toast that expires.
   The rule is a test, not only a paragraph: `check-system.sh` FAILs when a **declined daemon** is
   running (`udiskie`, `swaync`, `dunst`, `picom`, `blueman-applet`, `packagekitd`,
   `localsearch-3`, `tracker-miner-fs-3` - each is a package the comments and `docs/omarchy-gap.md`
