@@ -158,3 +158,61 @@ disk swap and `resume=`; `dictate` (whisper.cpp, a pinned model, `wtype`); the a
 per-account `CLAUDE_CONFIG_DIR`/`CODEX_HOME` homes; `rofi-files` as a script instead of a file
 manager; and a session whose entire resident set is the compositor, waybar, mako, pipewire and the
 bar scripts.
+
+## 7. Omarchy 4.5 (release candidate, 20 October 2026)
+
+4.5 is the first feature release since Quattro (v4), the release sections 1-4 were diffed
+against, and it is a **release candidate**: the notes say to expect rough edges. It is read here
+for the same reason the v4 list was - "is this something we should have?" - not to follow a
+moving target. Sources: the `v4.5.0-rc1` release notes and the manual pages they link, read on
+26 October 2026. One detail matters for the comparison itself: **4.5 ships an aarch64 ISO**, so
+this is the first release where the two desktops are on the same architecture rather than
+different ones.
+
+### 7.1 Already at parity (the headline is something this port does)
+
+| 4.5 headline | Here |
+|---|---|
+| Notifications stacked by sender | mako's `group-by=app-name` in `~/.config/mako/config`; the card's header is the application name. |
+| Notification history and Do Not Disturb | `rofi-notify` (Alt+Ctrl+N) lists mako's `max-history=20`; DND is a row in `rofi-quick` and a `makoctl mode`. |
+| Apps opaque, terminals transparent | the carriers are already split that way: foot 0.87, rofi 0.82, waybar 0.71, mako 0.88, and the GTK3/GTK4 fills are opaque base03. |
+| Scratchpad console on `Super+Grave` | `Alt+grave` (`Alt+minus` as the alias). |
+| `Super+Shift+S` for a screenshot | `Alt+Shift+S` (area), `Alt+Shift+F` (full), both through `screenshot` + `grimshot -n`. |
+| A second close chord | `Alt+Q` is the only close, and it is the documented one: foot's `Ctrl+Shift+W` never reached the held About windows on this keyboard. |
+| Agent account selection applied to subprocesses | that is the design here: `CLAUDE_CONFIG_DIR` and `CODEX_HOME` are set per account (`rofi-agents`), so every process an agent starts inherits the choice. |
+| No-animations mode, on by default in VMs | `LAZYOS_REDUCED_MOTION=1` skips the framework's one 300 ms sweep (`app.rs`); there is no toggle in the session yet (7.2). |
+
+### 7.2 Worth taking (and which spec would carry it)
+
+Each row names the smallest thing that makes it real, because "add an Appearance menu" is a
+project and "one more row in the network panel" is a commit.
+
+| 4.5 feature | Today | What it takes |
+|---|---|---|
+| **Captive portal status and a sign-in action** | a hotel or airport network shows "connected, no internet" and nothing offers the page | `nmcli networking connectivity check` answers `full`/`limited`/`portal`/`none` (verified here: `full`), and `nmcli -g GENERAL.STATE` names the connection. One row in `bar-network`/`rofi-quick` that reads the state and opens `http://nmcheck.gnome.org/` in Firefox, where the portal's own redirect takes over. No package, no daemon. **The best-value item in this list**, and the only one that fixes a situation where the machine is otherwise unusable. |
+| **Actions, codes and links on the card** | mako 1.11 is installed and **supports it** (`actions=1`, `on-button-left`, `on-notify` in its own man page and binary); the config does not set it | `actions=1` in the mako template plus a `default` action on the call sites that have one ("open the folder", "show the log"). Belongs to spec 006, whose `Card` already carries an `action` field. |
+| **Snooze** | dismissing a card loses it (it stays in `makoctl`'s history, not on screen) | no mako option; the shape already exists in `rofi-remind` - `systemd-run --user --collect` a one-shot that re-sends the card. A row on the card's menu, not a daemon. Spec 006. |
+| **An Appearance menu** | theme (`Alt+Shift+T`), wallpaper (`Alt+Shift+W`), night light and the radio switches are four separate places; the root menu's *Settings* row says "Wi-Fi, Bluetooth, night light, tablet mode, rotation" | a group, not a daemon: theme, wallpaper, night light, reduced motion, bar position, and (once it exists) density. Spec 013 is where the theme engine's user-facing surface lands, so the grouping is its job. |
+| **A short intro when the theme loads** | `theme next` rewrites eleven files and prints a line | the framework's animation budget already allows **one** sweep of at most 300 ms, skipped by `LAZYOS_REDUCED_MOTION=1`; the surface that draws it is the framework window, so this is spec 013/014 work, not a `swaybg` trick. |
+| **Remembering the wallpaper per theme** | one wallpaper for the session; `theme next` keeps it | `wallpaper next` already chooses; the per-theme memory is one file under `~/.local/state/lazyos/theme/` keyed by theme name. Spec 013. |
+| **Dimming installed software instead of hiding it** | `rofi-pkg` marks what is installed; `rofi-install` lists rows | one `ui_row` for the installed state with the dim colour, i.e. the shape `rofi-pkg` already uses. Spec 012 (the launcher/reference surfaces). |
+| **Scrolling through workspaces from the bar** | already on: waybar 0.15's `sway/workspaces` scrolls unless `disable-scroll: true`, which this config does not set (verified in `waybar-sway-workspaces(5)`), so the pills cycle on a scroll today. | nothing; noted so it is not "added" twice. |
+| **A clock with live seconds** | `sway/clock` with a one-minute interval | `interval: 1` costs a wakeup a second all day on a battery device: **opt-in**, and the honest default stays minutes. |
+| **`Shift+Caps Lock` as the compose key** | neither Compose nor a dead-key layer is set; accents come from `wvkbd`'s `Cmp` key on the touch keyboard | xkb's `compose:caps` option is available in this tree's `evdev` rules (verified); it is one line in the keyd/xkb setup and it returns Caps Lock to normal. Worth doing for typing on a physical keyboard, and it has to be checked against keyd's own layer. |
+| **Keeping an update safe from a logout mid-transaction** | `lazyos-install-run` and `sway-suspend` already use `systemd-inhibit`; `rofi-pkg` and the update row do not | the same `systemd-inhibit --what=shutdown:sleep` wrapper around the `apt-get` call, plus the busy card it already opens. |
+| **BBR and the kyber I/O scheduler** | `optimization.md` tunes sysctls; the scheduler is the kernel's default | both are measurable here (`sysctl net.ipv4.tcp_congestion_control=bbr`, `echo kyber > /sys/block/mmcblk0/queue/scheduler`), and both belong in `optimization.md` with numbers **before** they become a drop-in. |
+| **Hardware video decoding in mpv** | `lazyos-view` and `rofi-files` run `mpv --no-config` with **no `--hwdec`**, so playback is software everywhere today | the MT8192 has a stateless `mtk-vcodec` decoder; whether `--hwdec=v4l2request` opens a real node here has not been measured, and a codec that silently falls back is not a saving. One `mpv --hwdec=v4l2request --msg-level=vd=v` against a known file answers it, then `optimization.md`. A `fix:` commit only after the measurement. |
+
+### 7.3 Deliberately not
+
+| 4.5 feature | Why not |
+|---|---|
+| **Floating workspaces with a dock** | sway has no dock layer and no floating workspace: its layouts are stacking/tabbed/split, and the bar already carries the workspace pills with `workstyle`'s icons. A dock is a window manager feature, not a bar module. |
+| **Workspaces remembered per monitor** | sway assigns workspaces to outputs by rule (`workspace N output DP-1`), and the display menu writes positions rather than a workspace map; the normal case here is one internal panel. Revisit if a docked desk becomes common. |
+| **Video wallpapers** | a resident video decoder for as long as the desktop is up, on a 4 GB battery device whose idle screen already costs a measured 12 % of a core at 30 fps. `mpvpaper` is not in forky either. `swaybg` draws one image and stops. |
+| **50 languages, switched live** | the image is built with one locale and one keymap; live layout switching is a separate decision because keyd owns the keyboard and remaps the top row. The fonts for the scripts are already there (`fonts-noto-core`), which is the part that matters for reading, not for the UI language. |
+| **The Quickshell plugin surface, dock app grid, tray drawer** | that is the Qt6/Quickshell shell, which section 3 declines wholesale; this session's bar is waybar's own modules. |
+| **Agent usage meters and provider spend limits** | `plan-agents.md` P4 declines the provider APIs on purpose; a meter that changes shape every release is worse than none. The local, on-demand shape (P3) is still open. |
+| **Microsoft web apps, Slack, T3 Code, Hype, Monologue, Signed, Disktree** | an application catalogue, not a desktop feature. Two of them have a cheaper answer here already (`papers` for documents; `ncdu` for disk usage), and the rest are one `apt` or one browser tab away. |
+| **NVIDIA N1x, Snapdragon X, Apple Silicon** | not this hardware. |
+| **Japanese/Chinese/Korean input methods from the installer** | `fcitx5` is packaged in forky (`5.1.23-1`, verified), but an IME is a resident daemon plus engines plus a per-language configuration, and this port's rule is that nothing stays resident unless only a watcher can answer the question. It is an `apt install` documented in `04-software.md`, not part of the image. |
