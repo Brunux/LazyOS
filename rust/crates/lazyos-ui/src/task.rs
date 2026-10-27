@@ -168,6 +168,12 @@ fn pipe_reader<R: std::io::Read + Send + 'static>(
             Err(_) => break,
         }
     }
+    // Flush before this reader ends: the waiter only reports `Done` after both
+    // readers have returned (see `spawn_child`), so an explicit flush makes the
+    // rule visible - a finished task's log is complete on disk, not mostly.
+    if let Some(mut w) = writer {
+        let _ = w.flush();
+    }
 }
 
 fn spawn_child(argv: &[&str], log_path: &Path) -> io::Result<(u32, Receiver<ChildEvent>)> {
@@ -190,19 +196,37 @@ fn spawn_child(argv: &[&str], log_path: &Path) -> io::Result<(u32, Receiver<Chil
 
     let (tx, rx) = mpsc::channel::<ChildEvent>();
     let stdout = child.stdout.take().expect("stdout was piped");
-    thread::spawn({
+    let out_reader = thread::spawn({
         let tx = tx.clone();
         let log_path = log_path.to_path_buf();
         move || pipe_reader(stdout, log_path, tx)
     });
     let stderr = child.stderr.take().expect("stderr was piped");
-    thread::spawn({
+    let err_reader = thread::spawn({
         let tx = tx.clone();
         let log_path = log_path.to_path_buf();
         move || pipe_reader(stderr, log_path, tx)
     });
+    // **`Done` is the last event, not merely the child's exit.** `child.wait()`
+    // returns while the readers may still hold output - the pipes are not empty
+    // just because the process is gone, and each reader writes through a
+    // `BufWriter`. Reporting Done from `wait()` alone therefore let a task's
+    // state say "finished" while its log was still buffered, so a person who
+    // reattached right then read a finished task with a truncated log, and the
+    // detached-runner test saw `the log should carry the child's output` on CI
+    // while passing here. Joining both readers first makes the invariant hold by
+    // construction: when the state file says Done, every line the child wrote is
+    // on disk, and every `Line` event has preceded the `Done` in the channel.
+    //
+    // The cost is that Done waits for EOF on both pipes, which is the same rule
+    // `Command::output()` follows: a child that leaves a grandchild holding its
+    // stdout keeps the pipe open, and such a task now stays `Running` instead of
+    // reporting a finish with half its log. One process per task makes that the
+    // honest answer; the stop path still terminates it.
     thread::spawn(move || {
         let status = child.wait();
+        let _ = out_reader.join();
+        let _ = err_reader.join();
         let _ = tx.send(ChildEvent::Done(status));
     });
 
@@ -1235,6 +1259,99 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(20));
             }
         }
+    }
+
+    /// The regression test for the detached runner's empty log on CI, in the
+    /// form that does not depend on winning a race.
+    ///
+    /// A child that exits at once but leaves a grandchild holding its stdout and
+    /// stderr open makes the ordering visible instead of lucky: `child.wait()`
+    /// returns at the exit, while the readers cannot see EOF until `sleep` is
+    /// gone a second later. When `Done` was sent from `wait()` alone it arrived
+    /// in a millisecond or two, so the runner wrote `state=Done` and exited -
+    /// killing the readers before their `BufWriter`s were flushed - and a task
+    /// read back as finished carried an empty log. That is what CI reported as
+    /// `the log should carry the child's output`, and it passed here only
+    /// because a fast machine usually lets the readers finish first.
+    ///
+    /// So the assertion is the invariant, not the timing: `Done` is the last
+    /// event, and when it arrives every line is on disk.
+    #[test]
+    fn done_waits_for_the_output_pipes_to_close() {
+        let (state, _) = temp_dirs();
+        let log = state.join("tasks").join("held.log");
+        let (_pid, rx) = spawn_child(&["/bin/sh", "-c", "sleep 1 & echo early"], &log)
+            .expect("the child starts");
+
+        let start = Instant::now();
+        let mut lines = Vec::new();
+        loop {
+            match rx.recv_timeout(Duration::from_secs(30)) {
+                Ok(ChildEvent::Line(line)) => lines.push(line),
+                Ok(ChildEvent::Done(status)) => {
+                    assert!(status.unwrap().success(), "the child exited cleanly");
+                    break;
+                }
+                Err(err) => panic!("the child should finish: {err}"),
+            }
+        }
+        let waited = start.elapsed();
+
+        assert_eq!(lines, ["early"], "the output arrives before Done");
+        assert!(
+            waited >= Duration::from_millis(600),
+            "Done came {} ms after the spawn, while the grandchild still held the \
+             output pipe: it was reported from the exit, not from the last line",
+            waited.as_millis()
+        );
+        let on_disk = std::fs::read_to_string(&log).expect("the log file exists");
+        assert_eq!(
+            on_disk.lines().collect::<Vec<_>>(),
+            ["early"],
+            "the log is complete at the moment Done is reported"
+        );
+    }
+
+    /// The same invariant at scale: nothing is dropped when the output is far
+    /// larger than the readers' buffers.
+    #[test]
+    fn a_finished_task_carries_every_line_the_child_wrote() {
+        let (state, _) = temp_dirs();
+        let mut task = Task::new("complete-log", "complete log", &state);
+        // 5,000 lines is ~24 kB, well past the 8 kB `BufWriter` the readers write
+        // through, so the tail is still buffered at some point in the run.
+        // `done_waits_for_the_output_pipes_to_close` is the test that proves the
+        // ordering; this one proves the size does not matter.
+        run_task_to_end(
+            &mut task,
+            &[
+                "/bin/sh",
+                "-c",
+                "i=0; while [ $i -lt 5000 ]; do echo \"line $i\"; i=$((i+1)); done",
+            ],
+        );
+        assert_eq!(task.state, TaskState::Done);
+        assert_eq!(
+            task.log.lines().len(),
+            5_000,
+            "the in-memory log keeps every line"
+        );
+
+        // The log file is what `Task::load` reads, so it has to be complete at
+        // the instant the state file can say Done.
+        let on_disk = std::fs::read_to_string(state.join("tasks").join("complete-log.log"))
+            .expect("the log file exists");
+        assert_eq!(
+            on_disk.lines().count(),
+            5_000,
+            "the log on disk is complete when the task is Done"
+        );
+        let loaded = Task::load("complete-log", &state).unwrap().unwrap();
+        assert_eq!(loaded.log.lines().len(), 5_000);
+        assert_eq!(
+            loaded.log.lines().last().map(String::as_str),
+            Some("line 4999")
+        );
     }
 
     #[test]

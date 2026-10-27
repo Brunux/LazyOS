@@ -80,7 +80,11 @@ daemon, the installer's screens (they *use* this).
       `lazyos-cli/tests/task.rs::a_detached_task_runs_to_done_without_a_viewer` starts it and
       never owns it, `a_viewer_stops_a_detached_task_through_the_request_file` stops it through
       the request file, and `task::tests::attach_after_finish_shows_the_saved_result` reads the
-      finished record back.
+      finished record back. A reattached task is only as honest as its log, so that half has
+      its own witness: `task::tests::done_waits_for_the_output_pipes_to_close` (a child that
+      exits while a grandchild still holds the pipe; `Done` must not arrive before the last
+      line is on disk) and `task::tests::a_finished_task_carries_every_line_the_child_wrote`
+      (5,000 lines, all three copies: memory, file, reloaded record).
 - [x] the bar spinner appears and disappears with the task, and a click on it stops a stoppable
       task exactly like `s`. **Observed**: `task::tests::busy_tag_matches_stop` (the tag, label
       and `BUSY_STOP` line match `bin/busy`'s format) and
@@ -106,7 +110,8 @@ daemon, the installer's screens (they *use* this).
 ## Tests
 
 - **Unit** (`cargo test`): `stop_is_not_failure`, `late_output_after_stop_is_dropped`,
-  `state_file_is_atomic`, `pid_identity_rejects_reuse`, `busy_tag_matches_stop`.
+  `state_file_is_atomic`, `pid_identity_rejects_reuse`, `busy_tag_matches_stop`,
+  `done_waits_for_the_output_pipes_to_close`, `a_finished_task_carries_every_line_the_child_wrote`.
 - **Snapshot**: queued/running/done/failed/stopped, with and without a stoppable action.
 - **Integration**: run `/bin/sh -c` fixtures (success, failure, long sleep, ignore-SIGINT) in
   a temp state dir and assert the final state, exit code and log tail.
