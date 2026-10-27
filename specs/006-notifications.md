@@ -1,6 +1,6 @@
 # Spec 006 — Cards: notifications and in-window messages
 
-- **Status**: in progress
+- **Status**: merged (PR #19)
 - **Phase**: 2
 - **Depends on**: 002, 003
 - **Model**: `opencode-go/claude-haiku-5-5` — a small, well-shaped surface over an existing
