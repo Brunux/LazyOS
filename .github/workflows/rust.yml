@@ -46,6 +46,16 @@ jobs:
       - name: Lint
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # Two witnesses run a real program against a private bus: the card's route
+      # (notify-send, dbus-daemon, dbus-monitor) and the pty tests. They skip when
+      # the tools are absent, and a skip that reads like a pass is how the bus
+      # address and the picture stopped being checked at all - the first CI run
+      # of spec 006 failed here because the runner had no `notify-send`.
+      - name: Install the tools the protocol tests drive
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libnotify-bin dbus
+
       - name: Test
         run: cargo test --workspace --all-targets
 

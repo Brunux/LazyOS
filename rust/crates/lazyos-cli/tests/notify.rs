@@ -10,8 +10,9 @@
 //!   `dbus-monitor` watches it. With no daemon on the bus, `notify-send` stops
 //!   after asking for the server's information, so what the monitor can show is
 //!   the call addressed to `org.freedesktop.Notifications` on the session bus and
-//!   the refusal that comes back. Skipped (not failed) when `dbus-daemon` or
-//!   `dbus-monitor` is missing, the same rule the pty tests follow.
+//!   the refusal that comes back. Skipped (not failed) when `dbus-daemon`,
+//!   `dbus-monitor` or `notify-send` is missing, the same rule the pty tests
+//!   follow; the workflow installs all three so this witness runs on the runner.
 
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -233,9 +234,17 @@ struct Bus {
 }
 
 impl Bus {
-    /// `None` when the bus tools are not installed.
+    /// `None` when the bus tools or the client are not installed.
+    ///
+    /// `notify-send` is part of the condition, not an assumption: the route this
+    /// test watches is the one the *shipped* client makes, so with no
+    /// `libnotify-bin` on the machine there is no call to watch and the test
+    /// would fail on the runner for a reason that has nothing to do with the
+    /// code (`cannot run notify-send: No such file or directory`, which is what
+    /// CI said). The workflow installs it so this witness runs there; a
+    /// developer's machine that lacks it skips instead of lying.
     fn start(name: &str) -> Option<Self> {
-        if !have("dbus-daemon") || !have("dbus-monitor") {
+        if !have("dbus-daemon") || !have("dbus-monitor") || !have("notify-send") {
             return None;
         }
         let dir = scratch(&format!("bus-{name}"));
@@ -295,6 +304,14 @@ impl Bus {
             .arg("notify")
             .args(args)
             .env("DBUS_SESSION_BUS_ADDRESS", &self.address)
+            // The card takes its picture from the installed theme, and this test
+            // runs on machines that have no image: the binary's default roots are
+            // `/usr/share/icons/LazyOS`, which exists only on the device, so the
+            // card came out as text and stderr carried "no picture: the LazyOS
+            // theme has no dialog-information.png". Pointing the run at the
+            // checkout's own theme tests the picture path for real instead of
+            // stepping around it.
+            .env("LAZYOS_THEME_ROOTS", theme())
             .env_remove("LAZYOS_UI")
             .output()
             .expect("lazyos runs");
@@ -349,7 +366,9 @@ fn have(tool: &str) -> bool {
 #[test]
 fn the_card_is_addressed_to_the_notification_service_on_the_session_bus() {
     let Some(bus) = Bus::start("route") else {
-        eprintln!("skipped: dbus-daemon or dbus-monitor is not installed");
+        eprintln!(
+            "skipped: dbus-daemon, dbus-monitor or notify-send (libnotify-bin) is not installed"
+        );
         return;
     };
     let (out, transcript) = bus.notify(&["progress", "osd", "40", "Volume", "40%"]);
@@ -358,10 +377,17 @@ fn the_card_is_addressed_to_the_notification_service_on_the_session_bus() {
         Some(3),
         "no daemon answers: the card is refused"
     );
+    let stderr = text(&out.stderr);
     assert!(
-        text(&out.stderr).contains("no notification daemon"),
-        "the refusal is said in words: {}",
-        text(&out.stderr)
+        stderr.contains("no notification daemon"),
+        "the refusal is said in words: {stderr}"
+    );
+    // The picture resolves against the checkout's theme, so a card that came out
+    // text here means the icon path broke - and that failure is silent on the
+    // device, which is the whole reason this is asserted.
+    assert!(
+        !stderr.contains("no picture"),
+        "the card kept its picture: {stderr}"
     );
     assert!(
         transcript.contains("destination=org.freedesktop.Notifications")
