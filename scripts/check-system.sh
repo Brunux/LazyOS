@@ -3246,17 +3246,74 @@ case $_translate_code in
 esac
 
 # Hibernate needs both a disk swap and resume=; without them the helper explains
-# what is missing, which is the correct behaviour, not a failure.
+# what is missing, which is the correct behaviour, not a failure. The size it
+# reads is asked of the helper itself (--status does not hibernate) and compared
+# with the kernel's own table, because /proc/swaps is Filename Type Size Used
+# Priority and reading the Used column - 0 on a swap that is merely idle - once
+# made a working 8 GB partition read as "0 MiB" and refused to hibernate.
 _hib_swap=$(awk 'NR > 1 && $1 !~ /zram/ { print $1 }' /proc/swaps 2>/dev/null | head -1)
 if [ -n "$_hib_swap" ]; then
 	case " $(cat /proc/cmdline) " in
-	*" resume="*) ok "hibernation possible (disk swap $_hib_swap, resume= present)" ;;
+	*" resume="*)
+		# A resume= that names no device is the same failure one boot later: the
+		# image is written to a swap the reboot cannot find, which reads as a cold
+		# boot with the session gone (a relabelled or removed swap card). findfs
+		# understands the specs the manual writes; a major:minor pair is legal for
+		# the kernel but not resolvable here, so it is stated and not judged.
+		_hib_resume=$(tr ' ' '\n' </proc/cmdline | sed -n 's/^resume=//p' | tail -n1)
+		case $_hib_resume in
+		'') fail "the command line has a resume= with an empty value: nothing can resume from it" ;;
+		LABEL=* | UUID=* | PARTUUID=* | PARTLABEL=* | /dev/*)
+			_hib_resume_dev=$(findfs "$_hib_resume" 2>/dev/null ||
+				sudo -n findfs "$_hib_resume" 2>/dev/null || true)
+			if [ -n "$_hib_resume_dev" ]; then
+				ok "hibernation possible (disk swap $_hib_swap, resume=$_hib_resume resolves to $_hib_resume_dev)"
+			else
+				fail "resume=$_hib_resume names no block device: the next boot cannot find the hibernation image (relabel the swap, or rebuild the kernel partition with RESUME=no)"
+			fi
+			;;
+		*) ok "hibernation possible (disk swap $_hib_swap, resume=$_hib_resume present; a major:minor spec is not resolved here)" ;;
+		esac
+		;;
 	*) warn "disk swap $_hib_swap is active but the kernel command line has no resume=: hibernate would not resume" ;;
 	esac
 else
 	skip "no disk swap: hibernation needs a swap labelled lazyos_swap (see sway-hibernate)"
 fi
-[ -x "$HOME/.config/bin/sway-hibernate" ] || fail "bin/sway-hibernate is missing"
+if [ -x "$HOME/.config/bin/sway-hibernate" ]; then
+	ok "bin/sway-hibernate is executable"
+	if [ -n "$_hib_swap" ]; then
+		# The size is asked of the helper and compared with the kernel's own table
+		# *for the device the helper names*: with two disk swaps, the one resume=
+		# points at is the one that has to fit, so the first row of /proc/swaps is
+		# not necessarily the answer. The device is asked too, because a helper
+		# that measured zram would match its own column and still be wrong.
+		_hib_status=$("$HOME/.config/bin/sway-hibernate" --status 2>/dev/null || true)
+		_hib_dev=$(awk -F= '$1 == "swap" { print $2; exit }' <<<"$_hib_status")
+		_hib_says=$(awk -F= '$1 == "swap_kb" { print $2; exit }' <<<"$_hib_status")
+		case $_hib_says in
+		'') fail "bin/sway-hibernate --status printed no swap_kb: the report cannot check the size it reads" ;;
+		*)
+			case $_hib_dev in
+			'') fail "bin/sway-hibernate --status printed no swap device: the size it reads cannot be measured" ;;
+			*zram*) fail "bin/sway-hibernate named the zram swap ($_hib_dev): a resume image cannot go there" ;;
+			*)
+				_hib_kernel=$(awk -v d="$_hib_dev" '$1 == d { print $3; exit }' /proc/swaps 2>/dev/null)
+				case $_hib_kernel in
+				'') fail "bin/sway-hibernate named $_hib_dev, which is not in /proc/swaps" ;;
+				"$_hib_says")
+					ok "sway-hibernate reads the size of $_hib_dev ($((_hib_kernel / 1024)) MiB), not how much of it is in use"
+					;;
+				*) fail "bin/sway-hibernate reports ${_hib_says} kB for $_hib_dev but the kernel reports ${_hib_kernel} kB: it is reading the Used column of /proc/swaps (Filename Type Size Used Priority)" ;;
+				esac
+				;;
+			esac
+			;;
+		esac
+	fi
+else
+	fail "bin/sway-hibernate is missing"
+fi
 
 # Agents: the menu is a script; whether a CLI is installed is informational,
 # because installing one is the menu's own job.

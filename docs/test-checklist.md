@@ -442,6 +442,9 @@ card the system is running from either, whatever their partition tables say.
 | pick it → **The whole card** → the confirmation | a busy card, then a notification with the partition and "priority 10"; `swapon --show` lists it, `blkid -L lazyos_swap` resolves it |
 | `grep lazyos_swap /etc/fstab` | one marked block: `LABEL=lazyos_swap none swap sw,nofail,x-systemd.device-timeout=15s,pri=10 0 0` |
 | **Hibernate** from the power menu (`Alt+Escape`) on the default card (swap on, no `resume=`) | a notification naming the missing `resume=` and the kpart rebuild it needs; the machine stays up, it does not suspend |
+| `sway-hibernate --status` with that fresh swap (nothing has been swapped to it yet) | `swap_kb` is the partition's size in KiB (about 8.4 million for a 8 GiB card), never `0`, and `hibernate=no` only because `resume=no` |
+| rebuild the kpart with `CONFIRM=yes RESUME=yes ~/Dev/LazyOS/scripts/install-kpart.sh` (`05-system.md` § Suspend and hibernate), reboot, **Hibernate** | `--status` says `hibernate=yes`; the card names the partition, the machine powers off, and powering it back on restores the same session |
+| run `CONFIRM=yes ~/Dev/LazyOS/scripts/install-kpart.sh` again without `RESUME=` and reboot | `cat /proc/cmdline` still carries `resume=LABEL=lazyos_swap`: a kernel update does not silently stop the machine resuming |
 | reboot with the card in | `swapon --show` lists it again without touching the menu (priority 10, below zram's 100) |
 | remove the card and reboot | the boot still reaches the session (a swap unit may show as failed only if `nofail` was lost); it waits at most 15 s for the card |
 | run the menu again | the status row (device, size, priority) and **Turn it off**, not the disk picker |

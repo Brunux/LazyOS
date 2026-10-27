@@ -5,11 +5,12 @@
 # its own message instead of a generic failure:
 #
 #   1. the kernel supports it          (/sys/power/state contains "disk")
-#   2. there is a disk swap big enough  (/proc/swaps, not zram - the image needs
-#      to fit; the kernel's default image_size is 2/5 of RAM)
-#   3. the kernel command line has resume=   (otherwise the machine comes back
-#      from a cold boot and the saved session is lost; initramfs-tools resolves
-#      resume=LABEL=... through udev, so a label is enough)
+#   2. there is a disk swap big enough  (/proc/swaps, not zram - the image has
+#      to fit; the kernel's image_size is 2/5 of RAM)
+#   3. the kernel command line has resume=   (otherwise the image is written to
+#      a swap the next boot cannot find, the machine comes back from a cold boot
+#      and the saved session is lost; initramfs-tools resolves resume=LABEL=...
+#      through udev, so a label is enough)
 #
 # The swap is meant to live on the microSD, labelled "lazyos_swap". It has to be a
 # partition (or another block device), not a swap file: resume=LABEL= resolves
@@ -20,7 +21,13 @@
 #   sudo swapon -a
 #
 # and the kernel command line gets `resume=LABEL=lazyos_swap` the next time the
-# kernel partition is built (scripts/make-kpart.sh + scripts/install-kpart.sh).
+# kernel partition is built: `CONFIRM=yes RESUME=yes scripts/install-kpart.sh`
+# does that once, on the machine, and keeps it across later kernel updates.
+#
+#   sway-hibernate            hibernate, or refuse with the reason
+#   sway-hibernate --status   print the three conditions and do nothing; the
+#                             report (check-system.sh) asks this instead of
+#                             re-deriving them, so a wrong reading is caught
 set -eu
 
 # Every message here is a refusal, so one icon names the subject: the card in
@@ -30,27 +37,123 @@ set -eu
 notify() { notify-send -a Hibernate -i system-suspend-hibernate "$@" 2>/dev/null || true; }
 refuse() { notify "$1"; printf 'hibernate: %s\n' "$1" >&2; exit 1; }
 
-if ! grep -qw disk /sys/power/state 2>/dev/null; then
+# The conditions, computed once, so the card a person reads and --status cannot
+# disagree about them.
+#
+# /proc/swaps columns are: Filename Type Size Used Priority.  Size is $3 and
+# Used is $4 - and a swap that is set up but not currently swapping (every
+# freshly created one) reads 0 in Used.  Reading $4 here is how a working 8 GB
+# partition on the microSD was reported as "0 MiB" and refused, so the column
+# that matters is the size, and it is what the image has to fit in.
+KERNEL_OK=no
+if grep -qw disk /sys/power/state 2>/dev/null; then
+	KERNEL_OK=yes
+fi
+
+# The biggest disk swap, not zram: compressed RAM cannot hold a resume image.
+SWAP_DEV=
+SWAP_KB=0
+_swap=$(awk 'NR > 1 && $1 !~ /zram/ { print $3 "\t" $1 }' /proc/swaps 2>/dev/null | sort -rn | head -n1)
+if [ -n "$_swap" ]; then
+	SWAP_KB=${_swap%%	*}
+	SWAP_DEV=${_swap#*	}
+fi
+
+# The image does not go to the biggest swap, it goes to the one resume= names, so
+# when that spec resolves to a swap that is active, *that* partition is the one
+# which has to have room. With the documented layout there is one disk swap and
+# both answers are the same; with two, the old rule silently measured the wrong
+# one. findfs lives in /sbin, which a session's PATH does not carry.
+RESUME_OK=no
+RESUME_SPEC=
+RESUME_BROKEN=no
+for _x in $(cat /proc/cmdline); do
+	case "$_x" in
+	resume=*) RESUME_OK=yes; RESUME_SPEC=${_x#resume=} ;;
+	esac
+done
+if [ "$RESUME_OK" = yes ]; then
+	for _f in /usr/sbin/findfs /sbin/findfs; do
+		[ -x "$_f" ] || continue
+		_dev=$("$_f" "$RESUME_SPEC" 2>/dev/null || true)
+		if [ -z "$_dev" ]; then
+			# A spec findfs understands and cannot resolve is a resume= that
+			# names nothing, which the kernel would only discover at resume
+			# time. An empty value is the same in one fewer step. A major:minor
+			# pair is legal for the kernel and is not judged here.
+			case "$RESUME_SPEC" in
+			'' | LABEL=* | UUID=* | PARTUUID=* | PARTLABEL=* | /dev/*) RESUME_BROKEN=yes ;;
+			esac
+			break
+		fi
+		_kb=$(awk -v d="$_dev" 'NR > 1 && $1 == d { print $3; exit }' /proc/swaps 2>/dev/null || true)
+		if [ -n "$_kb" ]; then
+			SWAP_DEV=$_dev
+			SWAP_KB=$_kb
+		fi
+		break
+	done
+fi
+
+NEED_KB=$(($(awk '/^MemTotal:/ { print $2 }' /proc/meminfo) * 2 / 5))
+
+if [ "${1:-}" = "--status" ]; then
+	printf 'kernel=%s\n' "$KERNEL_OK"
+	printf 'swap=%s\n' "$SWAP_DEV"
+	printf 'swap_kb=%s\n' "$SWAP_KB"
+	printf 'need_kb=%s\n' "$NEED_KB"
+	printf 'resume=%s\n' "$RESUME_OK"
+	printf 'resume_broken=%s\n' "$RESUME_BROKEN"
+	if [ "$KERNEL_OK" = yes ] && [ -n "$SWAP_DEV" ] &&
+		[ "$SWAP_KB" -ge "$NEED_KB" ] && [ "$RESUME_OK" = yes ] &&
+		[ "$RESUME_BROKEN" = no ]; then
+		printf 'hibernate=yes\n'
+	else
+		printf 'hibernate=no\n'
+	fi
+	exit 0
+fi
+
+case "${1:-}" in
+'') ;;
+*) printf 'usage: sway-hibernate [--status]\n' >&2; exit 2 ;;
+esac
+
+if [ "$KERNEL_OK" != yes ]; then
 	refuse "This kernel cannot hibernate (no 'disk' in /sys/power/state)."
 fi
 
-swap=$(awk 'NR > 1 && $1 !~ /zram/ { print $4 "\t" $1 }' /proc/swaps | sort -rn | head -n1)
-[ -n "$swap" ] ||
+[ -n "$SWAP_DEV" ] ||
 	refuse "No swap on disk. Hibernation needs a swap partition (2 GB or more) labelled lazyos_swap, normally on the microSD."
 
-swap_kb=${swap%%	*}
-swap_dev=${swap#*	}
-mem_kb=$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)
-need_kb=$((mem_kb * 2 / 5))
-[ "$swap_kb" -ge "$need_kb" ] ||
-	refuse "The swap on $swap_dev is $((swap_kb / 1024)) MiB; the hibernation image can need about $((need_kb / 1024)) MiB."
+[ "$SWAP_KB" -ge "$NEED_KB" ] ||
+	refuse "The swap on $SWAP_DEV is $((SWAP_KB / 1024)) MiB; the hibernation image can need about $((NEED_KB / 1024)) MiB."
 
-case " $(cat /proc/cmdline) " in
-*" resume="*) ;;
-*)
-	refuse "The kernel command line has no resume=, so a hibernated session could not be restored. Add resume=LABEL=lazyos_swap to devices/google-asurada/kernel-cmdline.conf and rebuild the kernel partition once (scripts/make-kpart.sh, then scripts/install-kpart.sh)."
-	;;
-esac
+if [ "$RESUME_OK" != yes ]; then
+	refuse "The kernel command line has no resume=, so a hibernated session could not be restored. Add it once with CONFIRM=yes RESUME=yes ~/Dev/LazyOS/scripts/install-kpart.sh (it rebuilds the kernel partition and keeps resume= across later kernel updates)."
+fi
 
-notify "Hibernating to $swap_dev"
-exec sudo -n systemctl hibernate
+# resume= is on the command line but names nothing on this machine: a swap card
+# that was relabelled, repartitioned or left at home. The write would succeed and
+# the next boot would come up cold with the session gone, which reads as
+# hibernation losing the work rather than as a command line pointing at a place
+# that no longer exists.
+if [ -z "$RESUME_SPEC" ]; then
+	refuse "The kernel command line has an empty resume=, so a hibernated session could not be restored. Rebuild the kernel partition without it: CONFIRM=yes RESUME=no ~/Dev/LazyOS/scripts/install-kpart.sh."
+fi
+if [ "$RESUME_BROKEN" = yes ]; then
+	_fix='Rebuild'
+	case "$RESUME_SPEC" in
+	LABEL=*) _fix="Relabel that swap (sudo swaplabel -L ${RESUME_SPEC#LABEL=} <device>), or rebuild" ;;
+	esac
+	refuse "The kernel command line says resume=$RESUME_SPEC, but no device carries that name now, so the next boot could not find the hibernation image. $_fix the kernel partition without it: CONFIRM=yes RESUME=no ~/Dev/LazyOS/scripts/install-kpart.sh."
+fi
+
+notify "Hibernating to $SWAP_DEV"
+# `systemctl` answers its refusal on stderr and exits non-zero, and this runs from
+# a key with no terminal: without capturing that line, a systemd that says "Not
+# enough swap space" is the same to a person as the key doing nothing. It replaces
+# the "Hibernating to" card, which is the right order - the last card says what
+# actually happened.
+_out=$(sudo -n systemctl hibernate 2>&1) ||
+	refuse "systemd refused to hibernate: ${_out:-no reason given}"
