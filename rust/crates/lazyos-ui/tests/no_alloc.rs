@@ -14,8 +14,8 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use lazyos_ui::{
-    App, BodyCtx, ColorRole, Design, Header, KeyHint, ListState, Row, Screen, draw_badge,
-    draw_card, draw_gauge, draw_progress,
+    App, BodyCtx, Card, ColorRole, Design, Header, KeyHint, Kind, ListState, Row, Screen,
+    draw_badge, draw_card, draw_gauge, draw_progress,
 };
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -134,4 +134,46 @@ fn a_frame_of_a_cached_list_allocates_at_most_a_constant() {
          instead of copied (docs/optimization.md §13)"
     );
     eprintln!("allocations per frame: {per_frame}");
+
+    // The same bound for a notification card (spec 006): its text is built when
+    // it is made, so a frame copies cells and the progress label is not
+    // formatted again. The glyph is the codepoint (Folder), not the fallback
+    // path, which reads the environment once.
+    let mut card = CardScreen {
+        card: Card::new("Saved")
+            .body("~/Pictures/shot.png")
+            .kind(Kind::Path {
+                dir: false,
+                name: "shot.png",
+            })
+            .progress(40),
+    };
+    let mut app = App::new(Header::new("LazyOS").subtitle("no allocations"))
+        .design(Design::solarized().with_reduced_motion(true))
+        .keybar(vec![KeyHint::new("Esc", "close")])
+        .screen(&mut card);
+    for _ in 0..10 {
+        terminal.draw(|frame| app.render(frame)).unwrap();
+    }
+    let before = ALLOCATIONS.load(Ordering::Relaxed);
+    for _ in 0..FRAMES {
+        terminal.draw(|frame| app.render(frame)).unwrap();
+    }
+    let after = ALLOCATIONS.load(Ordering::Relaxed);
+    let per_frame = (after - before) as f64 / FRAMES as f64;
+    assert!(
+        per_frame <= 2.0,
+        "a card frame allocated {per_frame} times: the card rebuilds its text per frame"
+    );
+    eprintln!("card allocations per frame: {per_frame}");
+}
+
+struct CardScreen {
+    card: Card,
+}
+
+impl Screen for CardScreen {
+    fn draw(&mut self, ctx: &mut BodyCtx) {
+        self.card.render(ctx.area, ctx.buf, ctx.design);
+    }
 }

@@ -3725,6 +3725,74 @@ else
 	skip "no checkout: cannot confirm the commands draw through the shell"
 fi
 
+# Notifications are one card vocabulary (spec 006): the toast mako draws and the
+# panel a window draws come from the same fields, and the picture is what makes
+# a card readable. Three things drop a picture without an error anywhere:
+#
+#  1. a notify-send that names an application (-a) and no icon (-i): the card is
+#     text, and nothing logs it. One awk pass reads every script in ~/.config/bin
+#     and joins the continuation lines of a multi-line call;
+#  2. a name the binary asks for that the LazyOS theme does not draw: mako finds
+#     no file and shows a blank picture. `lazyos --icon-names` is the list the
+#     binary asks for, and the theme is asked for each name with a builtin test;
+#  3. mako's icon-path losing the theme root: every picture is blank, whatever
+#     the names say.
+_card_bare=$(awk '
+	FNR == 1 { buf = "" }
+	/\\$/ { buf = buf $0 " "; next }
+	{ line = buf $0; buf = ""
+	  if (line ~ /notify-send/ && line ~ / -a / && line !~ / -i /) { sub(".*/", "", FILENAME); print FILENAME ":" FNR } }
+' "$HOME"/.config/bin/* 2>/dev/null)
+if [ -z "$_card_bare" ]; then
+	ok "every notify-send in ~/.config/bin that names an app also names a picture (-i)"
+else
+	fail "notify-send without -i (a text-only card that nothing logs): $(tr '\n' ' ' <<<"$_card_bare")"
+fi
+if grep -qsE '^icon-path=([^ ]*:)?/usr/share/icons/LazyOS(:|$)' "$HOME/.config/mako/config"; then
+	ok "mako's icon-path names the LazyOS theme root (a notification draws its picture)"
+else
+	fail "~/.config/mako/config icon-path lost /usr/share/icons/LazyOS: every notification picture is blank"
+fi
+if have lazyos; then
+	_card_help=$(lazyos --help 2>/dev/null)
+	if grep -q '^  notify' <<<"$_card_help"; then
+		ok "lazyos --help lists notify (a card from the command line, with the house rules)"
+	else
+		fail "lazyos --help does not list 'notify': scripts have no way to send a card with a picture"
+	fi
+	_card_names=$(lazyos --icon-names 2>/dev/null)
+	if [ -z "$_card_names" ]; then
+		fail "lazyos --icon-names prints nothing: the notification pictures cannot be checked"
+	else
+		_card_gone=
+		while IFS= read -r _card_name; do
+			[ -n "$_card_name" ] || continue
+			[ -f "/usr/share/icons/LazyOS/48x48/apps/$_card_name.png" ] || _card_gone="$_card_gone $_card_name"
+		done <<<"$_card_names"
+		if [ -z "$_card_gone" ]; then
+			ok "the LazyOS theme draws every picture a card can ask for ($(wc -l <<<"$_card_names") names)"
+		else
+			fail "the LazyOS theme draws no picture for:$_card_gone (a card that asks for it is text, and nothing logs it)"
+		fi
+	fi
+fi
+# A Rust call site that builds a card with no picture is a silent text card. A
+# card has an information icon by default, so only an explicit no_icon() asks for
+# text; the card module (its code and its tests), the integration tests and the
+# notify verb's own `--icon none` are the places that may. Skipped without a
+# checkout, like every grep of the sources here.
+if [ -n "$REPO" ] && [ -d "$REPO/rust/crates" ]; then
+	_card_text=$(grep -rls --include='*.rs' 'no_icon()' "$REPO/rust/crates" 2>/dev/null)
+	_card_text=$(grep -v -e '/lazyos-ui/src/card' -e '/tests/' -e '/lazyos-cli/src/notify\.rs$' <<<"$_card_text")
+	if [ -z "$_card_text" ]; then
+		ok "no Rust call site builds a card without a picture (no_icon() is only asked for explicitly)"
+	else
+		fail "a Rust call site asks for a text-only card: $(tr '\n' ' ' <<<"$_card_text")"
+	fi
+else
+	skip "no checkout: cannot confirm the Rust call sites all draw a picture"
+fi
+
 # ---------------------------------------------------------------------------
 section "The theme engine"
 # ---------------------------------------------------------------------------

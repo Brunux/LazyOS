@@ -130,6 +130,21 @@ yet present in `scripts/` as not implemented.
   widgets draw (the frame's and, since spec 003, the row alphabet's) and `check-system.sh`
   asks the fonts for each one: a glyph no font has is a hole in the frame that logs nothing,
   the same failure the menu alphabet already had in another surface.
+- **A card is one vocabulary for the toast and for the message inside a window** (spec 006).
+  `lazyos_ui::card::Card` has one set of fields (title, body, urgency, picture, progress, group
+  tag, timeout) and two drawings: `send()` posts it to mako as the same `Notify` call `notify-send`
+  makes, with the same hints the shell's OSD and busy cards use, and `render()` draws it as a
+  framed panel in the urgency's colour inside a window. The reason is that a text-only card is
+  invisible in review ("the row worked"), and the agent and task surfaces need the same card inside
+  a window, where a toast cannot be seen by the person reading it. The picture resolves the same
+  way for both: a glyph, then the theme's PNG of the same concept, then text with the reason named
+  (`Card::prepare` returns it, `lazyos notify` prints it). `Card::new` carries an information icon
+  by default, so a call site that wants text has to say `no_icon()`, and `Card::secret()` is the
+  only path for a value a person pastes: its body names the label, never the value, so mako's
+  history cannot keep it. `check-system.sh` fails on a `notify-send` that names an app and no
+  picture, on a name the binary asks for that the theme does not draw, and on mako's `icon-path`
+  losing the theme root. The card goes out through `notify-send` rather than a bus client in the
+  binary: the measured cost of the alternative is in `docs/optimization.md` §14.
 - **A row's picture is a Nerd Font codepoint, and the table behind it is generated**
   (spec 003). `lazyos_ui::glyphs::Glyph` is the handle a command names
   (`Glyph::Bluetooth`), and `scripts/make-glyphs.sh` is where a name becomes a codepoint:
