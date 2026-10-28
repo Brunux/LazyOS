@@ -12,6 +12,7 @@
 //! it ([`MenuScreen::chosen`]) and the caller runs it once the terminal is
 //! restored, which is the order `bar-menu`'s `exec` had.
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -19,9 +20,8 @@ use std::time::Duration;
 use lazyos_ui::app::exit::{ESCAPE, OK};
 use lazyos_ui::widgets::{put, put_trunc};
 use lazyos_ui::{
-    BodyCtx, ColorRole, Confirm, ConfirmAction, Design, Glyph, Header, Input, InputAction,
-    KeyHint, ListAction, ListState, Outcome, Row, Screen, Task, TaskState, TaskView, TextStyle,
-    draw_card,
+    BodyCtx, ColorRole, Confirm, ConfirmAction, Design, Glyph, Header, Input, InputAction, KeyHint,
+    ListAction, ListState, Outcome, Row, Screen, Task, TaskState, TaskView, TextStyle, draw_card,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
@@ -77,6 +77,9 @@ pub struct MenuScreen {
     mode: Mode,
     header: Header,
     keybar: Vec<KeyHint>,
+    /// The rows' height as last drawn: `Screen::key` has no area, and a page
+    /// key needs to know how far a page is.
+    rows_height: Cell<u16>,
     /// Set when the window ends on a choice; the caller acts on it.
     pub chosen: Option<Picked>,
 }
@@ -114,6 +117,7 @@ impl MenuScreen {
             mode,
             header: Header::new("LazyOS"),
             keybar: Vec::new(),
+            rows_height: Cell::new(20),
             chosen: None,
         };
         screen.refresh();
@@ -128,7 +132,10 @@ impl MenuScreen {
                     Surface::Root => "Menu",
                     Surface::Palette => "Palette",
                 },
-                format!("{} rows", self.list.visible_len()),
+                match self.list.visible_len() {
+                    1 => "1 row".to_string(),
+                    n => format!("{n} rows"),
+                },
                 vec![
                     ("Enter", "open"),
                     ("type", "filter"),
@@ -236,21 +243,27 @@ impl MenuScreen {
         };
         let id = format!("ask-{}-{}", super::now(), std::process::id());
         let title = format!("Asking {}", choice.agent.name());
+        // The window's own pid goes with the question: `--ask-run` ends the
+        // agent's group when this process is gone, however it went (Escape,
+        // Alt+Q on the window, a killed foot), not only when it asks nicely.
+        let viewer = std::process::id().to_string();
         let mut task = Task::new(&id, &title, &self.setup.state).with_command(&[
             &self.setup.exe,
             "--ask-run",
             &id,
             choice.agent.bin(),
+            &viewer,
             &question,
         ]);
-        if let Some(runtime) = self.setup.vars.get("XDG_RUNTIME_DIR") {
-            task = task.with_runtime_dir(runtime).with_busy_icon("dialog-question");
-        }
         task.set_stoppable(true);
-        task.add_step(title.clone());
+        // The checklist's one line is the question itself, so the window says
+        // what is being answered while the title says who is answering.
+        task.add_step(format!("\u{203a} {question}"));
+        let env = self.runner_env();
+        let env: Vec<(&str, &str)> = env.iter().map(|(k, v)| (*k, v.as_str())).collect();
         let started = task
             .write_state()
-            .and_then(|_| crate::task_cmd::spawn_runner(&id, &self.setup.exe, &[]));
+            .and_then(|_| crate::task_cmd::spawn_runner(&id, &self.setup.exe, &env));
         self.mode = Mode::Answer(Box::new(match started {
             Ok(()) => Answer::new(task, choice.agent, question),
             Err(error) => Answer::refused(&format!("could not start the question: {error}")),
@@ -258,7 +271,30 @@ impl MenuScreen {
         Outcome::Continue
     }
 
-    fn draw_list(&mut self, ctx: &mut BodyCtx) {
+    /// The environment the runner (and so the agent) gets: the window's own
+    /// view of the session, so the record it reads is the one this window
+    /// wrote and the agent is looked up where this window looked for it. In the
+    /// session these are the process's own values; a test injects others.
+    fn runner_env(&self) -> Vec<(&'static str, String)> {
+        let mut env = Vec::new();
+        if let Some(state_home) = self.setup.state.parent() {
+            env.push(("XDG_STATE_HOME", state_home.display().to_string()));
+        }
+        for key in [
+            "HOME",
+            "PATH",
+            "XDG_RUNTIME_DIR",
+            "XDG_CONFIG_HOME",
+            "XDG_DATA_HOME",
+        ] {
+            if let Some(value) = self.setup.vars.get(key) {
+                env.push((key, value.clone()));
+            }
+        }
+        env
+    }
+
+    fn draw_list(&self, ctx: &mut BodyCtx) {
         let title = match self.setup.surface {
             Surface::Root => "Menu",
             Surface::Palette => "Palette",
@@ -273,7 +309,14 @@ impl MenuScreen {
             filter.width,
             ctx.design.style(TextStyle::Title),
         );
-        let x = put(ctx.buf, x, filter.y, " ", 1, ctx.design.style(TextStyle::Body));
+        let x = put(
+            ctx.buf,
+            x,
+            filter.y,
+            " ",
+            1,
+            ctx.design.style(TextStyle::Body),
+        );
         let room = filter.right().saturating_sub(x);
         if self.list.filter().is_empty() {
             put_trunc(
@@ -293,12 +336,20 @@ impl MenuScreen {
                 room.saturating_sub(1),
                 ctx.design.style(TextStyle::Body),
             );
-            put(ctx.buf, end, filter.y, " ", 1, ctx.design.style(TextStyle::Key));
+            put(
+                ctx.buf,
+                end,
+                filter.y,
+                " ",
+                1,
+                ctx.design.style(TextStyle::Key),
+            );
         }
+        self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
     }
 
-    fn draw_power(&mut self, ctx: &mut BodyCtx) {
+    fn draw_power(&self, ctx: &mut BodyCtx) {
         draw_card(ctx.buf, ctx.area, ctx.design, Some("Power"), true);
         let (filter, rows) = Self::list_layout(ctx.area);
         put_trunc(
@@ -325,13 +376,20 @@ impl MenuScreen {
                 line(
                     ctx.buf,
                     y,
-                    &format!("One question to {}; the answer appears here.", choice.agent.name()),
+                    &format!(
+                        "One question to {}; the answer appears here.",
+                        choice.agent.name()
+                    ),
                     ctx.design.style(TextStyle::Body),
                 );
                 y += 1;
                 let sent = match choice.agent {
-                    Agent::Claude => "Sends your question and nothing else: no files, no tools, no saved session.",
-                    Agent::OpenCode => "Sends your question and nothing else: it runs in an empty directory.",
+                    // What leaves the machine, said before Enter, and short
+                    // enough to be whole in the smallest window (80 columns).
+                    Agent::Claude => {
+                        "Sends the question only: no files, no tools, no saved session."
+                    }
+                    Agent::OpenCode => "Sends the question only, from an empty private directory.",
                 };
                 line(ctx.buf, y, sent, ctx.design.style(TextStyle::Dim));
                 y += 1;
@@ -349,7 +407,7 @@ impl MenuScreen {
             None => line(
                 ctx.buf,
                 y,
-                "No agent with a one-question mode is installed (Claude Code or OpenCode).",
+                "No agent can answer one question: install OpenCode or Claude Code.",
                 ctx.design.style(TextStyle::Danger),
             ),
         }
@@ -363,7 +421,7 @@ impl MenuScreen {
         line(
             ctx.buf,
             inner.y + 6,
-            "Enter asks \u{00b7} Esc goes back \u{00b7} the question costs what the agent's account charges",
+            "Enter asks \u{00b7} Esc goes back \u{00b7} it uses the agent's own account",
             ctx.design.style(TextStyle::Dim),
         );
     }
@@ -371,7 +429,11 @@ impl MenuScreen {
 
 impl Screen for MenuScreen {
     fn draw(&mut self, ctx: &mut BodyCtx) {
-        match &mut self.mode {
+        if let Mode::Answer(answer) = &mut self.mode {
+            answer.draw(ctx);
+            return;
+        }
+        match &self.mode {
             Mode::List => self.draw_list(ctx),
             Mode::Power => self.draw_power(ctx),
             Mode::Confirm(_, confirm) => {
@@ -380,11 +442,8 @@ impl Screen for MenuScreen {
                 self.draw_power(ctx);
                 confirm.render(ctx.area, ctx.buf, ctx.design);
             }
-            Mode::Ask(input) => {
-                let input = input.clone();
-                self.draw_ask(ctx, &input);
-            }
-            Mode::Answer(answer) => answer.draw(ctx),
+            Mode::Ask(input) => self.draw_ask(ctx, input),
+            Mode::Answer(_) => {}
         }
     }
 
@@ -392,7 +451,7 @@ impl Screen for MenuScreen {
         if key.kind != KeyEventKind::Press {
             return Outcome::Continue;
         }
-        let rows_height = |area_height: u16| area_height.saturating_sub(4);
+        let rows_height = self.rows_height.get();
         let outcome = match &mut self.mode {
             Mode::List => {
                 let typed = matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace)
@@ -401,16 +460,19 @@ impl Screen for MenuScreen {
                     self.list.type_filter(key);
                     Outcome::Continue
                 } else {
-                    match self.list.handle(key, rows_height(40), design) {
+                    match self.list.handle(key, rows_height, design) {
                         ListAction::Activated(index) => self.activate(index),
                         _ => Outcome::Continue,
                     }
                 }
             }
+            // Escape steps back one level, and only from the list does it
+            // close the window: a person backing out of a confirm has not
+            // asked for the menu to vanish.
             Mode::Power => match key.code {
                 KeyCode::Esc => {
                     self.mode = Mode::List;
-                    Outcome::Continue
+                    Outcome::Consumed
                 }
                 _ => match self.power.handle(key, 10, design) {
                     ListAction::Activated(index) => {
@@ -435,7 +497,7 @@ impl Screen for MenuScreen {
                     }
                     ConfirmAction::Chosen(_) | ConfirmAction::Cancelled => {
                         self.mode = Mode::Power;
-                        Outcome::Continue
+                        Outcome::Consumed
                     }
                     ConfirmAction::None => Outcome::Continue,
                 }
@@ -451,7 +513,7 @@ impl Screen for MenuScreen {
                         Outcome::Done(ESCAPE)
                     } else {
                         self.mode = Mode::List;
-                        Outcome::Continue
+                        Outcome::Consumed
                     }
                 }
                 _ => Outcome::Continue,
@@ -599,7 +661,11 @@ impl Answer {
         if self.running() {
             vec![("s", "stop"), ("Esc", "stop and close")]
         } else if self.state() == Some(TaskState::Done) {
-            vec![("c", "copy"), ("\u{2191}\u{2193}", "scroll"), ("Esc", "close")]
+            vec![
+                ("c", "copy"),
+                ("\u{2191}\u{2193}", "scroll"),
+                ("Esc", "close"),
+            ]
         } else {
             vec![("Esc", "close")]
         }
@@ -612,11 +678,16 @@ impl Answer {
     /// The viewer polls the runner's record: the task may still be `Queued`
     /// when the window draws first, which `TaskView` alone would never poll.
     fn tick(&mut self) -> Outcome {
-        if let Some(view) = self.view.as_mut()
-            && matches!(view.task().state, TaskState::Queued | TaskState::Running)
-        {
-            let _ = view.task_mut().reload();
-            let _ = view.tick();
+        if let Some(view) = self.view.as_mut() {
+            match view.task().state {
+                TaskState::Queued => {
+                    let _ = view.task_mut().reload();
+                }
+                TaskState::Running => {
+                    let _ = view.tick();
+                }
+                _ => {}
+            }
         }
         Outcome::Continue
     }
@@ -632,6 +703,12 @@ impl Answer {
                     }
                     Outcome::Done(ESCAPE)
                 }
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    if let Some(view) = &self.view {
+                        view.task().request_stop();
+                    }
+                    Outcome::Done(ESCAPE)
+                }
                 _ => match &mut self.view {
                     Some(view) => view.key(key, design),
                     None => Outcome::Continue,
@@ -639,13 +716,13 @@ impl Answer {
             };
         }
         match key.code {
-            KeyCode::Esc | KeyCode::Char('q') => Outcome::Done(
-                if self.state() == Some(TaskState::Done) {
+            KeyCode::Esc | KeyCode::Char('q') => {
+                Outcome::Done(if self.state() == Some(TaskState::Done) {
                     OK
                 } else {
                     ESCAPE
-                },
-            ),
+                })
+            }
             KeyCode::Char('c') if self.state() == Some(TaskState::Done) => {
                 self.message = Some(match lazyos_ui::card::copy_to_clipboard(&self.text()) {
                     Ok(()) => "Copied to the clipboard".to_string(),
@@ -697,14 +774,28 @@ impl Answer {
         }
         let mut y = inner.y;
         let question = format!("\u{203a} {}", self.question);
-        put_trunc(ctx.buf, inner.x, y, &question, width, ctx.design.style(TextStyle::Dim));
+        put_trunc(
+            ctx.buf,
+            inner.x,
+            y,
+            &question,
+            width,
+            ctx.design.style(TextStyle::Dim),
+        );
         y += 2;
         if failed {
             let headline = match self.state() {
                 Some(TaskState::Stopped) => "Stopped before it answered",
                 _ => "No answer",
             };
-            put_trunc(ctx.buf, inner.x, y, headline, width, ctx.design.style(TextStyle::Danger));
+            put_trunc(
+                ctx.buf,
+                inner.x,
+                y,
+                headline,
+                width,
+                ctx.design.style(TextStyle::Danger),
+            );
             put_trunc(
                 ctx.buf,
                 inner.x,
@@ -721,12 +812,21 @@ impl Answer {
             self.wrapped_for = (width, text.len());
             self.scroll = self.scroll.min(self.wrapped.len().saturating_sub(1));
         }
-        let bottom = inner.bottom().saturating_sub(u16::from(self.message.is_some()));
+        let bottom = inner
+            .bottom()
+            .saturating_sub(u16::from(self.message.is_some()));
         for line in self.wrapped.iter().skip(self.scroll) {
             if y >= bottom {
                 break;
             }
-            put(ctx.buf, inner.x, y, line, width, ctx.design.style(TextStyle::Body));
+            put(
+                ctx.buf,
+                inner.x,
+                y,
+                line,
+                width,
+                ctx.design.style(TextStyle::Body),
+            );
             y += 1;
         }
         if let Some(message) = &self.message {

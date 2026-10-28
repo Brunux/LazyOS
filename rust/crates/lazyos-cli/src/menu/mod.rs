@@ -297,7 +297,11 @@ mod tests {
             let mut keys = BTreeSet::new();
             let mut labels = BTreeSet::new();
             for entry in entries(surface, &Context::default()) {
-                assert!(keys.insert(entry.key.clone()), "duplicate key {}", entry.key);
+                assert!(
+                    keys.insert(entry.key.clone()),
+                    "duplicate key {}",
+                    entry.key
+                );
                 assert!(
                     labels.insert(entry.label.clone()),
                     "duplicate label {}",
@@ -371,7 +375,11 @@ mod tests {
                     Program::Session(n) | Program::System(n) => n,
                     Program::Lazyos => "lazyos",
                 };
-                assert!(!name.contains(META) && !name.contains(' '), "{}: {name}", item.key);
+                assert!(
+                    !name.contains(META) && !name.contains(' '),
+                    "{}: {name}",
+                    item.key
+                );
                 assert!(
                     !matches!(name, "sh" | "bash" | "dash" | "zsh"),
                     "{} runs a shell",

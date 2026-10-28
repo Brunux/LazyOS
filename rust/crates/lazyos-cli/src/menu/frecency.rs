@@ -180,7 +180,11 @@ mod tests {
     #[test]
     fn frecency_promotes_after_three() {
         let mut frecency = Frecency::load(scratch("promote"));
-        assert_eq!(top(&frecency, "th"), "theme", "the shorter prefix wins by default");
+        assert_eq!(
+            top(&frecency, "th"),
+            "theme",
+            "the shorter prefix wins by default"
+        );
 
         frecency.record("themes-install", NOW);
         frecency.record("themes-install", NOW);
@@ -235,7 +239,11 @@ mod tests {
         for bytes in [&b"{ not json"[..], b"", b"{\"version\":99,\"entries\":{}}"] {
             std::fs::write(&path, bytes).unwrap();
             let frecency = Frecency::load(&path);
-            assert!(frecency.is_empty(), "{:?} must start empty", String::from_utf8_lossy(bytes));
+            assert!(
+                frecency.is_empty(),
+                "{:?} must start empty",
+                String::from_utf8_lossy(bytes)
+            );
         }
         let frecency = Frecency::load(path.with_file_name("missing.json"));
         assert!(frecency.is_empty());

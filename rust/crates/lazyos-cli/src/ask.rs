@@ -17,8 +17,12 @@
 //!   starts the agent in a process group of its own and kills the group when the
 //!   answer is in, when it is stopped, and when the window closes, so a helper
 //!   the agent started (`opencode serve`) cannot stay behind. Every process of
-//!   that group carries `LAZYOS_ASK=<task id>` in its environment, which is how
-//!   `check-system.sh` finds one that did.
+//!   that group carries `LAZYOS_ASK=<task id>` in its environment, so one that
+//!   left the group (`setsid`) is found by that mark and ended too - and the
+//!   mark is how `check-system.sh` finds one that survived anyway. "The window
+//!   closes" is watched, not reported: the child holds a pidfd on the window's
+//!   process, so Alt+Q on the window or a killed foot ends the question as
+//!   surely as Escape does.
 
 use std::collections::BTreeMap;
 use std::io::{self, Read};
@@ -232,7 +236,10 @@ fn first_line(text: &str) -> Option<String> {
 /// neither (the reason `rofi-agents` extends `PATH` the same way).
 pub fn agent_path(vars: &BTreeMap<String, String>) -> String {
     let home = vars.get("HOME").map(String::as_str).unwrap_or("");
-    let path = vars.get("PATH").map(String::as_str).unwrap_or("/usr/bin:/bin");
+    let path = vars
+        .get("PATH")
+        .map(String::as_str)
+        .unwrap_or("/usr/bin:/bin");
     if home.is_empty() {
         return path.to_string();
     }
@@ -293,9 +300,16 @@ extern "C" fn on_stop(_: libc::c_int) {
 /// Run the agent once and print the answer, one line per line, on stdout -
 /// which is the task's log, and so what the window shows. A failure prints one
 /// `ERROR:` line (the task's error line) and exits 3.
+///
+/// `viewer` is the pid of the window that asked; `0` watches nothing (a
+/// question asked from a script, or a test that owns the lifetime itself).
 pub fn run(args: &[String]) -> i32 {
-    let [id, agent, question] = args else {
-        eprintln!("usage: lazyos --ask-run <task id> <claude|opencode> <question>");
+    let [id, agent, viewer, question] = args else {
+        eprintln!("usage: lazyos --ask-run <task id> <claude|opencode> <viewer pid> <question>");
+        return USAGE;
+    };
+    let Ok(viewer) = viewer.parse::<libc::pid_t>() else {
+        eprintln!("lazyos --ask-run: '{viewer}' is not a pid");
         return USAGE;
     };
     let Some(agent) = Agent::from_bin(agent) else {
@@ -318,7 +332,8 @@ pub fn run(args: &[String]) -> i32 {
             return FAILED;
         }
     };
-    let outcome = ask(agent, id, question, &vars, &dir);
+    let watch = Watch::open(viewer);
+    let outcome = ask(agent, id, question, &vars, &dir, &watch);
     let _ = std::fs::remove_dir_all(&dir);
 
     match outcome {
@@ -348,6 +363,7 @@ fn ask(
     question: &str,
     vars: &BTreeMap<String, String>,
     dir: &Path,
+    watch: &Watch,
 ) -> Asked {
     let argv = argv(agent, question);
     let mut command = Command::new(&argv[0]);
@@ -377,8 +393,9 @@ fn ask(
     let stderr = read_in_background(child.stderr.take());
 
     let status = loop {
-        if STOP.load(Ordering::Relaxed) {
+        if STOP.load(Ordering::Relaxed) || watch.gone() {
             end_group(group);
+            sweep(id);
             let _ = child.wait();
             return Asked::Stopped;
         }
@@ -387,6 +404,7 @@ fn ask(
             Ok(None) => std::thread::sleep(Duration::from_millis(50)),
             Err(error) => {
                 end_group(group);
+                sweep(id);
                 return Asked::Failed(format!("lost the agent: {error}"));
             }
         }
@@ -395,6 +413,7 @@ fn ask(
     // before the pipes are read to the end (a helper holding them open would
     // otherwise keep this process - and the task - waiting).
     end_group(group);
+    sweep(id);
     let stdout = stdout.join().unwrap_or_default();
     let stderr = stderr.join().unwrap_or_default();
 
@@ -443,6 +462,108 @@ fn end_group(group: libc::pid_t) {
     unsafe {
         libc::kill(-group, libc::SIGKILL);
     }
+}
+
+/// The process that asked, held by a pidfd so a reused pid can never stand in
+/// for it: the descriptor refers to that one process and becomes readable when
+/// it exits. A kernel without `pidfd_open` (before 5.3) falls back to asking
+/// `kill(pid, 0)`, which is right in every case but a pid reused within the
+/// 50 ms poll.
+struct Watch {
+    pid: libc::pid_t,
+    fd: Option<libc::c_int>,
+    /// The window was already gone when the watch began.
+    gone_at_start: bool,
+}
+
+impl Watch {
+    fn open(pid: libc::pid_t) -> Self {
+        if pid <= 0 {
+            return Self {
+                pid: 0,
+                fd: None,
+                gone_at_start: false,
+            };
+        }
+        // SAFETY: a plain syscall with an integer argument and no pointers.
+        let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) } as libc::c_int;
+        if fd >= 0 {
+            return Self {
+                pid,
+                fd: Some(fd),
+                gone_at_start: false,
+            };
+        }
+        let gone = io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
+        Self {
+            pid,
+            fd: None,
+            gone_at_start: gone,
+        }
+    }
+
+    fn gone(&self) -> bool {
+        if self.gone_at_start {
+            return true;
+        }
+        match self.fd {
+            Some(fd) => {
+                let mut poll = libc::pollfd {
+                    fd,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
+                // SAFETY: one valid pollfd, a zero timeout.
+                let ready = unsafe { libc::poll(&mut poll, 1, 0) };
+                ready > 0 && poll.revents & libc::POLLIN != 0
+            }
+            // SAFETY: signal 0 only asks whether the process exists.
+            None => self.pid > 0 && unsafe { libc::kill(self.pid, 0) } != 0,
+        }
+    }
+}
+
+impl Drop for Watch {
+    fn drop(&mut self) {
+        if let Some(fd) = self.fd {
+            // SAFETY: the descriptor was opened by `Watch::open` and is closed once.
+            unsafe {
+                libc::close(fd);
+            }
+        }
+    }
+}
+
+/// End every process that still carries this question's mark: a helper that
+/// called `setsid` left the group `end_group` signalled, but it cannot leave
+/// the environment it was started with.
+fn sweep(id: &str) {
+    let mark = format!("LAZYOS_ASK={id}");
+    for pid in marked(&mark) {
+        // SAFETY: a signal to a pid read from /proc a moment ago.
+        unsafe {
+            libc::kill(pid, libc::SIGKILL);
+        }
+    }
+}
+
+/// The pids whose environment holds exactly `mark` (`LAZYOS_ASK=<id>`), read
+/// from `/proc/<pid>/environ`; a process of another user is unreadable and
+/// skipped, which is right - this question started none of them.
+pub fn marked(mark: &str) -> Vec<libc::pid_t> {
+    let me = std::process::id() as libc::pid_t;
+    let Ok(dir) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    dir.filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().to_str()?.parse::<libc::pid_t>().ok())
+        .filter(|&pid| pid != me)
+        .filter(|pid| {
+            std::fs::read(format!("/proc/{pid}/environ"))
+                .map(|env| env.split(|&b| b == 0).any(|var| var == mark.as_bytes()))
+                .unwrap_or(false)
+        })
+        .collect()
 }
 
 /// An empty directory only this user can read, for the agent to run in.
@@ -525,7 +646,11 @@ mod tests {
             assert_eq!(last.trim_start(), question, "the question is one argument");
             match agent {
                 Agent::Claude => {
-                    assert_eq!(argv[argv.len() - 2], "--", "options end before the question")
+                    assert_eq!(
+                        argv[argv.len() - 2],
+                        "--",
+                        "options end before the question"
+                    )
                 }
                 Agent::OpenCode => assert!(
                     !last.starts_with('-'),

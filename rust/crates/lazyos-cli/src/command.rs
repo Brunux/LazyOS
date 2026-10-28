@@ -75,9 +75,11 @@ pub struct CommandSpec {
     /// script still owns the name (they are installed by the spec that ports
     /// it, and `--symlinks` reports only the installed ones).
     pub symlinks: &'static [&'static str],
-    /// The subset of `symlinks` the installer creates **today**. A name whose
-    /// surface has not been ported stays out of this list so the old script
-    /// keeps working; `check-system.sh` validates exactly this set.
+    /// The subset of `symlinks` that resolves to the binary on an image
+    /// **today**: a link in `/usr/bin` the installer creates, or one in
+    /// `~/.config/bin` the UI tree carries in place of the script it replaced.
+    /// A name whose surface has not been ported stays out of this list so the
+    /// old script keeps working; `check-system.sh` validates exactly this set.
     pub installed: &'static [&'static str],
 }
 
@@ -85,11 +87,33 @@ pub struct CommandSpec {
 /// symlink and visible in `--help` at once.
 pub const COMMANDS: &[CommandSpec] = &[
     CommandSpec {
+        // The root menu (spec 007). `bar-menu` is the name Alt+Space and the
+        // bar's menu button have always run; it is a link to this binary in the
+        // UI tree (~/.config/bin), so the binding and the bar did not change.
         path: "menu",
-        summary: "the session menu",
+        summary: "the session menu: open, ai, system, session (spec 007)",
         shape: Shape::Pick,
-        symlinks: &["lazyos-menu"],
-        installed: &["lazyos-menu"],
+        symlinks: &["lazyos-menu", "bar-menu"],
+        installed: &["lazyos-menu", "bar-menu"],
+    },
+    CommandSpec {
+        // Every row the menu has, plus the commands that need no question and
+        // the built-in themes, under the same ranking. Spec 012 adds the
+        // `.desktop` entries and gives it a key.
+        path: "menu palette",
+        summary: "the command palette: every row, ranked as you type (spec 007)",
+        shape: Shape::Pick,
+        symlinks: &[],
+        installed: &[],
+    },
+    CommandSpec {
+        // The Ask strip on its own (the launcher entry): the prompt, with the
+        // words after `ask` already typed.
+        path: "ask",
+        summary: "one question to the default agent, answered in the window (spec 007)",
+        shape: Shape::Pick,
+        symlinks: &[],
+        installed: &[],
     },
     CommandSpec {
         // The palette. `theme set` writes files and prints what it did, so it

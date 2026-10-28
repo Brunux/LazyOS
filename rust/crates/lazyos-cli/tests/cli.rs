@@ -256,15 +256,20 @@ fn without_a_terminal_the_reason_goes_to_stderr() {
 }
 
 #[test]
-fn escape_returns_one_and_draws_the_empty_state() {
+fn escape_returns_one_and_draws_the_root_menu() {
     if !have_script() {
         eprintln!("skipping: script(1) is not installed");
         return;
     }
-    let (text, code) = in_pty(&["menu"], "q", &[("LAZYOS_UI", "1")]);
+    // A lone Escape: the root menu filters as you type, so `q` is a letter
+    // there, not a way out (spec 007).
+    let (text, code) = in_pty(&["menu"], "\x1b", &[("LAZYOS_UI", "1")]);
     assert_eq!(code, 1, "Escape is exit 1; output was {text:?}");
-    assert!(text.contains("the session menu"), "{text:?}");
-    assert!(text.contains("spec 007"), "{text:?}");
+    assert!(
+        text.contains("Terminal"),
+        "the first row is drawn: {text:?}"
+    );
+    assert!(text.contains("type to filter"), "{text:?}");
     assert!(
         text.contains("\x1b[?1049h"),
         "the alternate screen was entered"
@@ -282,7 +287,7 @@ fn a_forced_panic_restores_the_terminal() {
         return;
     }
     let (text, code) = in_pty(
-        &["menu"],
+        &["menu", "files"],
         "",
         &[("LAZYOS_UI", "1"), ("LAZYOS_FORCE_PANIC", "1")],
     );
@@ -322,7 +327,7 @@ fn a_menu_writes_nothing_to_disk() {
         return;
     }
     let home = scratch("home");
-    let (text, code) = in_pty_with(&["menu"], "q", |command| {
+    let (text, code) = in_pty_with(&["menu"], "\x1b", |command| {
         command
             .env("LAZYOS_UI", "1")
             .env("HOME", &home)
