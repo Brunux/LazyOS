@@ -701,7 +701,54 @@ machine with a captcha page; the package would be a command that never works
 here. `check-system.sh` reports the tools this script does need (`curl`, `jq`,
 `wl-paste`) and SKIPs the network probe when the machine is offline.
 
+## A local model
+
+**Alt+Ctrl+M** opens a model that runs on this machine: **Qwen3-1.7B**, four
+cores, **no network and no account**. The window is an ordinary chat - type a
+question, Enter sends it, Ctrl+C stops a long answer - and **Alt+Q** closes it.
+It is also the root menu's **Local model** row, the launcher entry of the same
+name, and `lazyos-model` in a terminal (with several models it asks which one
+with `fzf`).
+
+The weights are **not in the image**: they are 1.2 GB each, and shipping two of
+them would be a third of the disk. `lazyos-model --fetch` downloads the
+recommended one and checks it against a pinned SHA256 before keeping it
+(`~/.config/lazyos/models.sha256`), the way `dictate-model` fetches whisper's;
+`--verify` re-checks the files that are already there. They land in
+`~/.local/share/lazyos/models/`, so a rebuilt image keeps them. From the launcher
+the same command runs in the model window, with the progress bar on screen.
+
+Three measured numbers are the whole configuration, and the wrapper passes them
+so no invocation has to remember them (`lazyos-model --flags` prints them,
+`--bench` re-measures `-t 2/4/8` on the machine; the full table is
+`~/.local/share/lazyos/models/BENCH.md`):
+
+- **four threads, not eight.** llama.cpp asks the kernel for the core count and
+  uses all of it: that measured **6.67 tokens/s**, because the four A55 cores are
+  seven times slower each and drag every barrier. The A76 cluster alone measured
+  **11.19**. `taskset` keeps the desktop off those four cores too, which is why
+  the window that asks the question stays responsive.
+- **Q4_0 rather than Q4_K_M.** The smaller quant pre-fills a prompt at **84.7
+  tokens/s against 46.2**, so a 1800-token question answers in **31 s** instead
+  of 49 s. Q4_K_M is a slightly better model and a noticeably slower one.
+- **a q8_0 KV cache behind flash attention**: 4k of context peaks at **2356 MiB**
+  instead of 2584, which is the difference between fitting next to the session and
+  swapping.
+
+Qwen3 thinks before it answers, and a thinking block is nearly a minute of
+silence at eleven tokens a second, so **reasoning is off** by default; the
+comment at `REASONING=` in `~/.config/bin/lazyos-model` is the switch for
+questions that deserve the wait.
+
+What this machine will not do, so the window does not pretend: the Mali-G57 has
+no compute path here (Panfrost is OpenGL 3.1, PanVK answers *Mali-G57 not
+supported*) and there is no NPU, so nothing is offloaded to the GPU; and with no
+`i8mm` the IQ-quants are out. A 3B model does not fit in 4 GB beside a browser.
+Eleven tokens a second is a paragraph in about ten seconds - fast enough to ask a
+question, too slow to read a page.
+
 ## Text in other languages
+
 
 `fonts-noto-core` is installed, so Arabic, Hebrew, Devanagari, Thai, Armenian,
 Georgian and the rest of Noto's non-CJK families have a face: a file name, a web

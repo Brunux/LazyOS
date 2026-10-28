@@ -2117,6 +2117,46 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   rebuilt. `check-system.sh` checks the manual, `rofi-keys`, the dictation tools,
   the model (SKIP when absent) and the hibernate conditions (SKIP/WARN, never FAIL, plus the
   `--status` size agreement above).
+- **The local model is a runtime configuration, not a build** (`lazyos-model`, `Alt+Ctrl+M`, the
+  root menu's *Local model* row and `org.lazyos.model.desktop`). It runs Qwen3-1.7B from
+  `~/.local/share/lazyos/models/` in foot with `--app-id=lazyos-model`, floated and centred by
+  `config.d/34-local-model.conf` at 1000x700 (997x696 measured on the 1366x912 panel). **forky's
+  `llama.cpp-examples` is the binary and `tools/llama.cpp/` does not exist**: the package already
+  runtime-dispatches to `libggml-cpu-armv8.2` (1867 `sdot`, the kernels this SoC has), and a
+  platform build with `-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16` measured **11.14 against 10.95
+  tok/s** for 396 s of build, so the only reason to revisit is a model architecture newer than
+  forky's snapshot. Three measured numbers are the whole configuration, and each one is a silence
+  if it goes: **`-t 4`** (llama.cpp's default is `nproc` = 8, which puts work on the A55s - 7.8x
+  slower per core - and measured **6.67 tok/s against 11.19**, a cliff the package feels twice
+  because it is built with OpenMP); **Q4_0 rather than Q4_K_M** (repacked dotprod prefill
+  **84.7 against 46.2 tok/s**, so an 1800-token prompt answers in 31 s instead of 49, at 1.14
+  against 1.19 GiB); and **`-fa on` with `-ctk/-ctv q8_0`**, worth **228 MiB** at 4k context
+  (2356 against 2584 MiB peak RSS, against 2544 MiB free with the session up - so f16 KV at 4k does
+  not fit beside a browser). `taskset -c 4-7` is kept but buys **no** throughput (11.19 unpinned
+  against 11.14 pinned): it keeps the desktop off the big cores, and it is skipped on a machine
+  whose `nproc` is under 8 rather than pinning to cores that are not there. `-b/-ub` and a smaller
+  `-c` did **not** move peak RSS; the floor is the 1280 MiB of weights. `-rea off` is the fourth
+  decision: a Qwen3 thinking block is several hundred tokens, i.e. ~45 s of silence at 11 tok/s,
+  so the switch is one line at the top of the script. **The weights are never committed and never
+  built**: `lazyos-model --fetch` downloads the recommended GGUF with `curl` to a `.part` and
+  verifies it against `~/.config/lazyos/models.sha256` before the rename (the hash lives only in
+  the pins file, which is also what `--verify` reads, so a download cannot disagree with the
+  check), the same shape as `dictate-model`. No GPU and no NPU is a fact, not a setting: Panfrost
+  is OpenGL 3.1, PanVK answers *Mali-G57 not supported*, and there is no `i8mm` for the IQ-quants.
+  **A key has no terminal, and `[ -t 0 ]` does not say otherwise**: sway's `exec` inherits the VT
+  the compositor was started on (`/proc/$(pgrep -x sway)/fd/0 -> /dev/tty7`), so the first wrapper
+  believed it was inside a terminal, skipped `foot` and started `llama-cli` reading a prompt from a
+  screen nobody was looking at - the key looked dead. `on_terminal()` is the same predicate
+  `lazyos-profile` already uses (a tty **and** this process is its foreground group, `ps -o tpgid=`
+  equal to `ps -o pgid=`), and both paths are a test: from `swaymsg exec` one `foot` appears with
+  `app_id=lazyos-model` at 997x696, and under `script -qec` (a real pty) no second window opens.
+  Witnesses: `check-system.sh` FAILs on `llama-cli`, the script's execute bit, the pins file, the
+  float rule, the binding, the menu row, the `.desktop` entry and its `dictate-model.png`, on a
+  wrapper that decides "a terminal" with a bare `-t 0`, and on a
+  model that does not match its pin, and WARNs when the flags lose `-t 4` or `-fa on`/q8_0; SKIPs
+  when no model is downloaded. The manual is `04-software.md` § *A local model* (§ *Panels, lock
+  and power* lists the key) and the measurement record is
+  `~/.local/share/lazyos/models/BENCH.md`.
 - **Agents** (`rofi-agents`, Alt+Ctrl+Shift+A = Omarchy's Super+Shift+Ctrl+A) is the local half of
   Omarchy's agents feature: launch (in foot, from `~/Work`, because the agents refuse to remember
   trust in `$HOME`), install (`npm install -g --prefix ~/.local <pkg>` - an explicit prefix, so npm

@@ -96,6 +96,15 @@ translation is copied to the clipboard, and a long one opens in a read window
 with the selection underneath it. `04-software.md` § Translate has the rest: the
 two engines, what happens offline, and why `translate-shell` is not on the card.
 
+**Alt+Ctrl+M is the local model.** It opens a model that runs on this machine -
+no network, no account, one window - and the root menu's AI group carries the
+same window as **Local model**. It runs four threads on purpose: eight measured
+6.67 tokens/s on this chip against 11.19 for four. The weights are not shipped
+(1.2 GB each), so the first use is `lazyos-model --fetch`, which downloads the
+recommended one and checks it against its pin. `04-software.md` § A local model
+has the numbers, what it will not do, and why the answer arrives without a
+thinking block.
+
 **Alt+Ctrl+D is the developer menu**, and it is about your account rather than
 the machine. *Export my profile* packs `~/.ssh`, `~/.gnupg`, the dotfiles and the
 configuration of the tools this image ships into one archive on a disk you pick -
@@ -122,6 +131,7 @@ with `Super+Ctrl`:
 | Alt+Escape | the same power menu (Omarchy's Super+Escape) |
 | Alt+Ctrl+L | lock the screen (the Lock key does the same and then suspends) |
 | Alt+Ctrl+X | dictation on/off (the notification stays while it records; press again to stop) |
+| Alt+Ctrl+M | the local model: Qwen3-1.7B on this machine, offline (see `04-software.md` § A local model) |
 | Alt+Ctrl+Shift+A | agents (launch, accounts, install) |
 | Alt+Ctrl+O | settings: Wi-Fi and Bluetooth radios, night light, do-not-disturb, touchpad, tablet mode, rotation, display arrangement |
 | Alt+Ctrl+Shift+D | the internal panel back on, with nothing on screen: the way out of a black screen (it runs a sway command, not a menu) |

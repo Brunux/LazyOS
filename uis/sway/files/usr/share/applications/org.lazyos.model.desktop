@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Local model
+GenericName=On-device assistant
+Comment=Run a GGUF model on this machine, with the threads and context it measured
+Exec=/home/brunux/.config/bin/lazyos-model
+Icon=dictate-model
+Terminal=false
+Categories=Utility;
+Keywords=ai;llm;model;gguf;local;offline;qwen;
