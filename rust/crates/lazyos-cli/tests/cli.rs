@@ -263,7 +263,14 @@ fn escape_returns_one_and_draws_the_root_menu() {
     }
     // A lone Escape: the root menu filters as you type, so `q` is a letter
     // there, not a way out (spec 007).
-    let (text, code) = in_pty(&["menu"], "\x1b", &[("LAZYOS_UI", "1")]);
+    // Without motion the menu is one frame: the opening sweep repaints cells
+    // over 300 ms and ratatui sends only the changed ones, so on a slow runner a
+    // word the test looks for arrived split across two frames.
+    let (text, code) = in_pty(
+        &["menu"],
+        "\x1b",
+        &[("LAZYOS_UI", "1"), ("LAZYOS_REDUCED_MOTION", "1")],
+    );
     assert_eq!(code, 1, "Escape is exit 1; output was {text:?}");
     assert!(
         text.contains("Terminal"),
