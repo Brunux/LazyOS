@@ -335,4 +335,5 @@ full list.
 
 Everything else lives in the root menu instead of on a key: Places, Media, Time
 zone, Free space, End a process, SSH, DNS, Packages, Colour, Reminders, About and
-the manual. `Alt+Space` then the first letter is usually enough.
+the manual. `Alt+Space` then a few letters of the name is enough: the menu
+filters as you type and Enter opens the best match.
