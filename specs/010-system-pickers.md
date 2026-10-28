@@ -3,9 +3,10 @@
 - **Status**: draft
 - **Phase**: 3
 - **Depends on**: 002, 003, 004, 005, 006
-- **Model**: `opencode-go/kimi-k2.7-code` — many dialogs sharing one shape, each with a
-  destructive edge and a parity test against the shell it replaces. Fallback
-  `opencode-go/claude-haiku-5-5`.
+- **Model**: `claude-sonnet-5-5` (effort `high`) — many dialogs sharing one shape, each with a
+  destructive edge and a parity test against the shell it replaces; the confirm type is the
+  safety, and the tests prove it. Fallback `claude-opus-5-5` (not a cheaper model: the edges are
+  format, swap and power).
 - **Branch**: `spec/010-system-pickers`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §5.7-§5.10, §16 phase 3
 - **Old paths**: `rofi-quick`, `rofi-power`, `rofi-display`, `rofi-swap`, `rofi-format`,

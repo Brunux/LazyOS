@@ -7,7 +7,8 @@
 - **Phase**: after the session framework (the bar itself moves in spec 013)
 - **Depends on**: 001 (`lazyos`, the multi-call binary), 004 (the palette the row is drawn in).
   The row only needs *a* bar that can run a command: waybar today, the framework's bar after 013
-- **Model**: `opencode-go/deepseek-v4.1-flash`
+- **Model**: `claude-sonnet-5-5` — a Marionette client, a bar row and a pinned profile;
+  the loopback-only rule is a test, not a judgement call. Fallback `claude-opus-5-5`.
 - **Branch**: `spec/015-browser-bar`
 - **Plan**: not in `docs/plan-ui.md` §16 (the plan's fourteen specs are the port of the session
   as it is). This is a new idea, recorded here after the maintainer's request of 2026-10-23.

@@ -3,8 +3,9 @@
 - **Status**: draft
 - **Phase**: 3
 - **Depends on**: 001, 002, 003, 005
-- **Model**: `opencode-go/kimi-k2.7-code` — an async walk, a preview pipeline and three
-  different row builders, each with tests. Fallback `opencode-go/gpt-6-luna`.
+- **Model**: `claude-sonnet-5-5` (effort `high`) — an async walk, a preview pipeline and three
+  different row builders, each with tests: dense implementation against a clear shape. Fallback
+  `claude-opus-5-5`.
 - **Branch**: `spec/009-search`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §5.3 (files), §5.4 (find), §5.5 (grep)
 - **Old paths**: `rofi-files`, `lazyos-find` (fzf), `rofi-grep`

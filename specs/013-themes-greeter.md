@@ -3,8 +3,9 @@
 - **Status**: draft
 - **Phase**: 5
 - **Depends on**: 004, 006
-- **Model**: `opencode-go/gpt-6-luna` — palette data across seven themes and generated images,
-  verified by tests; long context and cheap iterations. Fallback `opencode-go/glm-5.3`.
+- **Model**: `claude-sonnet-5-5` (effort `high`) — palette data across seven themes, greeter
+  flags and generated wallpapers verified by tests; the wallpapers are judged by eye, which is
+  why the fallback is `claude-opus-5-5` and not a cheaper model.
 - **Branch**: `spec/013-themes-greeter`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §8 (themes), §8.4 (greeter), §16 phase 5
 

@@ -3,8 +3,9 @@
 - **Status**: draft
 - **Phase**: 4
 - **Depends on**: 001-007, 009
-- **Model**: `opencode-go/gpt-6-luna` — `.desktop` parsing, sway IPC, generated keys and four
-  reference surfaces over a long context. Fallback `opencode-go/kimi-k2.7-code`.
+- **Model**: `claude-sonnet-5-5` (effort `high`) — `.desktop` parsing, sway IPC, generated keys
+  and four reference surfaces over a long context (every current model has 1M tokens at one
+  price, so context no longer picks the model). Fallback `claude-opus-5-5`.
 - **Branch**: `spec/012-launcher-reference`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §5.2 (launcher), §5.12 (reference), §16
   phase 4

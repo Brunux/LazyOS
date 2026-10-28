@@ -3,7 +3,8 @@
 - **Status**: draft
 - **Phase**: N (plan §16)
 - **Depends on**: spec NNN (or "none")
-- **Model**: `opencode-go/<model-id>` — why this model; fallback `opencode-go/<model-id>`
+- **Model**: `claude-<tier>-<version>` (effort) — why this model; fallback `claude-<tier>-<version>`
+  (specs/README.md §6)
 - **Branch**: `spec/NNN-slug`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §N
 - **Old paths**: which of the ~64 scripts and ~55 bindings this replaces or keeps working

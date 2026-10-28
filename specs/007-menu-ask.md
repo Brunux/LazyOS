@@ -3,8 +3,10 @@
 - **Status**: draft
 - **Phase**: 2
 - **Depends on**: 002, 003, 005
-- **Model**: `opencode-go/glm-5.3` — the menu is the session's face: grouping, hierarchy and
-  the first three screens the taste is judged on. Fallback `opencode-go/gpt-6-luna`.
+- **Model**: `claude-opus-5-5` (effort `high`) — the menu is the session's face: grouping,
+  hierarchy and the first three screens the taste is judged on, plus the one rule a mistake here
+  breaks for every later spec (a row is an enum action, never a shell string). Fallback
+  `claude-sonnet-5-5`.
 - **Branch**: `spec/007-menu-ask`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §5.1 (root menu), §5.2 (palette), §13.4
   (Ask strip), §16 phase 2

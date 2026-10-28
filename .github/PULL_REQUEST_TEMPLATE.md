@@ -3,7 +3,8 @@
 <!-- The unit of work. One spec, one branch, one PR (specs/README.md). -->
 
 - Spec: `specs/NNN-slug.md` (number, title)
-- Model that did the work: `opencode-go/…` (the spec's assignment or the documented re-route)
+- Model that did the work: `claude-…`, effort `…`, harness (Claude Code / OpenCode) — the spec's
+  assignment or the documented re-route (specs/README.md §6.3); passed on the first review: yes/no
 - Branch: `spec/NNN-slug`
 
 ## What changed
