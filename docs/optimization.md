@@ -113,7 +113,7 @@ worth more than it costs.
 | 11a | swap policy | no sysctl drop-in; Debian `swappiness=60` | `vm.swappiness=100`, `vfs_cache_pressure=100`, `page-cluster=0`, `watermark_boost_factor=0`, `dirty_bytes=64 MiB`, `dirty_background_bytes=16 MiB` | Swapping into compressed RAM is fast (~1 us on A76), but page-cluster=0 is essential to avoid blowing out the 32 KB L1 cache on Cortex-A55 with 8-page readahead. vfs_cache_pressure=100 allows dropping clean directory cache instead of evicting process memory. |
 | 11b | one zram implementation | image: `zram-tools` (works, `OK swap active: /dev/zram0` in `reports/`) | keep `zram-tools`, or move to `systemd-zram-generator` | The host here has **both**, and `zramswap.service` fails on every boot (`Device or resource busy` → `mkswap: /dev/zram0 is mounted`) while systemd's generator does the work. Exactly one mechanism. `systemd-zram-generator` has one advantage: the swap becomes a real `dev-zram0.swap` unit, which is what `systemd-oomd` needs (11c). Its algorithm/size live in `/etc/systemd/zram-generator.conf`. |
 | 11c | `systemd-oomd` | not installed | install + `ManagedOOMSwap=kill` | PSI is enabled, and on 4 GB the failure mode is "frozen machine", not "process killed". oomd kills a hog by pressure instead of letting the kernel thrash. Note the requirement in 11b: `ManagedOOMSwap=` matches swap *units*. |
-| 11d | zram algorithm/size | `lz4`, 50 % (1.9 GB) | **`zram-size = min(ram, 4096)`**, keep `lz4` (section 12) | Sized to 100% of RAM (3.7 GiB). Measured 3.5:1-4.4:1 ratio; 3.7 GiB uncompressed swap occupies ~1.05 GiB real RAM, keeping the workload completely off the slow microSD card (~1-2 MB/s). Combined with page-cluster=0 and IRQ balancing on CPU2/3, latency is zero. |
+| 11d | zram algorithm/size | `lz4`, 50 % (1.9 GB) | **`zram-size = ram / 2`**, keep `lz4` (section 12) | Back to half of RAM, now as a decision rather than the package default: 1.9 GiB of fast swap costs ~0.44 GiB of real RAM at the measured 4.4:1 and held the captured load (1.4 GB, 72 % of the device) without spilling, and it caps the store at half the machine, because incompressible pages cost 1:1 and an all-of-RAM device could hold 3.7 GiB resident before one page reached the card. Combined with page-cluster=0 and IRQ balancing on CPU2/3, swap-in itself is cheap. |
 | 12 | THP | `[always]` | `transparent_hugepage=madvise` on the command line | `always` + zram on 4 GB wastes memory (a 2 MB fault vs. compressed 4 KB pages) and adds latency spikes; only a handful of workloads want it. Runtime-testable via `/sys/kernel/mm/transparent_hugepage/enabled`. |
 | 13 | I/O scheduler | `mq-deadline` in the image, `kyber` on this host | ship a udev rule (or `elevator=kyber`) | kyber is built for flash: low latency under mixed load instead of deadline's global reordering. Both schedulers are compiled in, so this is a runtime choice. |
 | 14 | IRQ affinity | every IRQ on CPU0 | `irqbalance`, or explicit `smp_affinity` rules for `mmc`, `rtw88_pci`, the i2c EC | eMMC + WiFi + input interrupts all land on the same core the scheduler uses; moving them to another little core (or the big cluster) is free latency. `irqbalance` is packaged (253 kB). |
@@ -605,9 +605,10 @@ Nura ran.
 ## 12. zram sizing - item 11d, measured
 
 The image shipped `zram-size = min(ram / 2, 4096)`, which is `systemd-zram-generator`'s own
-default: 1.9 GiB on this 3.7 GiB machine. The cap decides **when the slow tier starts**, and the
-next tier here is a microSD at ~2 MB/s of random 4 KiB writes, so the cap matters - but both
-extremes are wrong for a different reason, and the value that ships is the middle (section below).
+default: 1.9 GiB on this 3.7 GiB machine. It went to all of RAM for a while on the theory that a
+heavy workload should never reach the card, and it ships at half again. The reasoning is below;
+what makes this section worth keeping is that both values were argued from the same measurement,
+and the measurement is what says the half is enough.
 
 ### What the device does (eMMC install, lz4, `/sys/block/zram0/mm_stat`)
 
@@ -624,14 +625,14 @@ Exchange rate: **0.23 GiB of RAM per GiB of fast tier** for the workload this ma
 if every page were unique. The captured load in section 1 sat at 1.4 GB of 1.948 GB (72 %) - closer
 to the cap than a 4 GB machine should sit, though it never actually spilled, which matters below.
 
-### What is written now: all of RAM with page-cluster=0
+### What is written now: half of RAM with page-cluster=0
 
-`rootfs-setup.sh` writes `zram-size = min(ram, 4096)`, `compression-algorithm = lz4`,
-`swap-priority = 100`: ~3.7 GiB on this machine.
+`rootfs-setup.sh` writes `zram-size = ram / 2`, `compression-algorithm = lz4`,
+`swap-priority = 100`: ~1.9 GiB on this machine.
 
-The full-RAM cap was originally tested and reverted for a perceived latency regression.
-Hardware analysis on the MT8192 (4x A55 LITTLE + 4x A76 BIG) uncovered the actual
-causes of that latency:
+The size is only half of the tuning. A latency regression that was first blamed on the
+capacity, and later on the swap-in path itself, turned out to be three kernel settings;
+hardware analysis on the MT8192 (4x A55 LITTLE + 4x A76 BIG) found them:
 1. `vm.page-cluster = 3` (kernel default) forced the CPU to decompress 8 pages (32 KB) on
    every swap-in. On the in-order Cortex-A55 cores, 32 KB blew out the core's entire
    32 KB L1 data cache. With `vm.page-cluster = 0`, only 4 KB is decompressed (~1 us on A76),
@@ -645,10 +646,23 @@ causes of that latency:
    EC (trackpad/keyboard) when storage traffic rose; moving MMC interrupts to CPU2/3
    completely prevents desktop unresponsiveness.
 
-Capping zram to 2/3 RAM previously forced workloads needing >2.5 GiB of virtual swap to spill
-half a gigabyte into the microSD card (`/dev/mmcblk1p1`) at priority 10, causing massive
-I/O stalls (hundreds of seconds in `/proc/pressure/io`). Sizing zram to all of RAM keeps the
-entire working set in fast compressed memory.
+Capping zram to 2/3 RAM previously forced a workload needing more than 2.5 GiB of virtual swap to
+spill half a gigabyte into the microSD card (`/dev/mmcblk1p1`) at priority 10, with hundreds of
+seconds in `/proc/pressure/io`. That is what any cap does, and half caps it lower than 2/3 did - so
+half is not an argument that nothing spills. It is the trade below, and each line is why the value
+went back down from all of RAM:
+
+* **The measured load fits.** The capture above sat at 1.4 GB of 1.948 GB (72 %) and never spilled,
+  so half of RAM covered the workload this machine actually ran with ~0.5 GiB to spare. That is the
+  reading to repeat before lowering it further.
+* **The other half stays the session's.** zram keeps pages compressed, but pages that do not
+  compress - video, archives, encrypted blobs - cost 1:1, so a device sized to all of RAM can hold
+  3.7 GiB resident, the whole machine, and become the thing that triggers the OOM kill instead of
+  the card that would have absorbed it. At half, the store can never take more than ~1.9 GiB
+  whatever the data looks like.
+* **The overflow has a tier.** The auxiliary swap this port ships sits at priority 10, below zram's
+  100, so compressed RAM is exhausted before a page reaches the card, and a spill shows up as
+  `/proc/pressure/io` instead of as a silent wait.
 
 ### Why `zram-resident-limit` is not used
 
@@ -698,12 +712,12 @@ being inferred from a timing.
 
 ### How to check it took
 
-`cat /sys/block/zram0/disksize` should be within 10 % of two thirds of `MemTotal` (the generator
-rounds to whole MiB), and under the load that produced the 1.4 GB reading `orig_data_size` should
-pass 1 902 MiB while the card's used column in `/proc/swaps` stays 0. `check-system.sh` asks both
-halves - the file and the live device - and flags drift in *either* direction: a smaller device
-spills to the card while RAM is free, and a larger one (a machine still booted on the old `ram`
-device) carries the swap latency this section records.
+`cat /sys/block/zram0/disksize` should be within 10 % of half of `MemTotal` (the generator rounds to
+whole MiB), and under the load that produced the 1.4 GB reading `orig_data_size` should approach the
+1.9 GiB cap while the card's used column in `/proc/swaps` stays 0 - that load is the one the cap was
+chosen for. `check-system.sh` asks both halves, the file and the live device: under half of RAM the
+pages reach the card while RAM is free, and over it (a machine still booted on the old all-of-RAM
+device, or a file edited upwards) has handed the store more of the machine than the trade allows.
 
 ## 13. What the UI framework costs - ratatui, and why not a ratatui-lite
 

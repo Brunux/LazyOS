@@ -1,6 +1,6 @@
 # Spec 004 — The theme engine
 
-- **Status**: in progress
+- **Status**: merged (PR #9)
 - **Phase**: 2
 - **Depends on**: 001
 - **Model**: `opencode-go/deepseek-v4-pro` — a schema, a set of generators, atomic and

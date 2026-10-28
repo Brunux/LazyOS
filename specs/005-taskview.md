@@ -1,6 +1,6 @@
 # Spec 005 — The task surface (TaskView)
 
-- **Status**: in progress
+- **Status**: merged (PR #15)
 - **Phase**: 2
 - **Depends on**: 002
 - **Model**: `opencode-go/kimi-k2.7-code` — a state machine with process control, stop/reattach

@@ -750,17 +750,18 @@ case "$(systemctl list-units --all --no-legend 'dev-zram0.swap' 2>/dev/null)" in
 esac
 
 # The size of the zram device is the one tuning value whose regression is silent in
-# either direction: half or 2/3 of RAM still "works" (it sends pages to the card while RAM
-# is free). Both halves are asked - what the generator will do on the next boot, and
-# what this boot actually got.
+# either direction: under half of RAM it sends pages to the card while RAM is free (the
+# card is ~1-2 MB/s of random writes), and over it the store can hold more of the
+# machine resident than the session can spare (incompressible pages cost 1:1, so an
+# all-of-RAM device can sit on 3.7 GiB before a page reaches the card). Both halves are
+# asked - what the generator will do on the next boot, and what this boot actually got.
 _zrc=/etc/systemd/zram-generator.conf
 if [ -r "$_zrc" ]; then
 	_zrsize=$(awk -F= '/^[[:space:]]*zram-size[[:space:]]*=/ { gsub(/[[:space:]]/, "", $2); print $2; exit }' "$_zrc")
 	case $_zrsize in
-	min\(ram,4096\)|ram) ok "zram-size = $_zrsize (covers all RAM, keeping the workload off the microSD card)" ;;
-	min\(ram\*2/3,4096\)) warn "$_zrc sets 2/3 of RAM: heavy workloads will spill to the microSD card" ;;
-	"") warn "$_zrc sets no zram-size: the packaged min(ram/2, 4096) applies, so the card is reached with RAM still free" ;;
-	*) warn "zram-size = $_zrsize, not min(ram, 4096) (see docs/optimization.md, 'zram sizing')" ;;
+	ram/2|min\(ram/2,4096\)) ok "zram-size = $_zrsize (half of RAM: fast swap, the card as the spillover)" ;;
+	"") warn "$_zrc sets no zram-size: the packaged half-of-RAM default still applies, but the line this image writes is gone" ;;
+	*) warn "zram-size = $_zrsize, not half of RAM (see docs/optimization.md, 'zram sizing')" ;;
 	esac
 	# A limit looks like the valve for incompressible data and is the wrong one: the
 	# store fails with BLK_STS_IOERR and the allocator keeps choosing zram anyway
@@ -770,18 +771,23 @@ if [ -r "$_zrc" ]; then
 		warn "$_zrc sets zram-resident-limit: a limit fails the store (I/O error) instead of handing the page to the card at priority 10"
 	fi
 else
-	warn "no $_zrc: the packaged zram-size default (half of RAM) applies"
+	warn "no $_zrc: zram gets the packaged size and priority (half of RAM, 100), but not lz4"
 fi
-# What this boot really has:
+# What this boot really has. Only a reboot changes it, so the mismatch is named with
+# what it costs rather than as a failed check: a smaller device is the regression
+# (pages reach the card while RAM is free), a larger one is the previous value still
+# running, which leaves the session less memory only in the incompressible case.
 if [ -r /sys/block/zram0/disksize ]; then
 	_zdisk=$(($(cat /sys/block/zram0/disksize) / 1024 / 1024))
 	_zmem=$(($(awk '/^MemTotal:/ { print $2 }' /proc/meminfo) / 1024))
-	_zwant=$_zmem
+	_zwant=$((_zmem / 2))
 	[ "$_zwant" -gt 4096 ] && _zwant=4096
-	if [ "$_zdisk" -ge $((_zwant * 9 / 10)) ]; then
-		ok "zram device is $_zdisk MiB, covering RAM"
+	if [ "$_zdisk" -ge $((_zwant * 9 / 10)) ] && [ "$_zdisk" -le $((_zwant * 11 / 10)) ]; then
+		ok "zram device is $_zdisk MiB, half of RAM"
+	elif [ "$_zdisk" -lt $((_zwant * 9 / 10)) ]; then
+		warn "zram device is $_zdisk MiB, under half of RAM (~$_zwant MiB): pages reach the card while RAM is free"
 	else
-		ok "zram device is $_zdisk MiB (reboot to expand to ~$_zwant MiB)"
+		ok "zram device is $_zdisk MiB, over half of RAM (~$_zwant MiB); reboot to apply the shipped size"
 	fi
 fi
 
