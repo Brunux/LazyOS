@@ -45,6 +45,10 @@ pub mod exit {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
     Continue,
+    /// The screen used the key itself, so the shell must not act on it too:
+    /// Escape that steps a menu back from a confirm is not Escape that closes
+    /// the window (spec 007).
+    Consumed,
     Done(i32),
 }
 
@@ -61,7 +65,8 @@ pub trait Screen {
     fn draw(&mut self, ctx: &mut BodyCtx);
 
     /// The first look at a key. Returning [`Outcome::Continue`] hands it to the
-    /// shell (Escape, Ctrl-C); anything else ends the window.
+    /// shell (Escape, Ctrl-C); [`Outcome::Consumed`] keeps it from the shell;
+    /// [`Outcome::Done`] ends the window.
     ///
     /// The design is passed rather than remembered: the row stride and the bands
     /// come from the density, and a screen that cached its own copy is a hit
@@ -292,6 +297,7 @@ impl<'a> App<'a> {
                 if let Some(screen) = self.screen.as_mut() {
                     match screen.key(key, &self.design) {
                         Outcome::Continue => {}
+                        Outcome::Consumed => return Outcome::Continue,
                         done => return done,
                     }
                 }

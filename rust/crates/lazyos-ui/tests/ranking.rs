@@ -68,7 +68,11 @@ fn ranking_prefers_prefix() {
         "prefix before substring, shorter prefix first; `Time zone` has no `h` after its `t`"
     );
     list.set_filter("tz");
-    assert_eq!(order(&mut list), vec!["Time zone"], "a subsequence still matches");
+    assert_eq!(
+        order(&mut list),
+        vec!["Time zone"],
+        "a subsequence still matches"
+    );
 }
 
 #[test]
@@ -80,7 +84,10 @@ fn every_tier_lands_in_its_place() {
     assert_eq!(Tier::of(&row("theme set"), "set"), Some(Tier::WordPrefix));
     assert_eq!(Tier::of(&row("theme-set"), "set"), Some(Tier::WordPrefix));
     assert_eq!(Tier::of(&row("reset"), "set"), Some(Tier::Substring));
-    assert_eq!(Tier::of(&row("system settings"), "sst"), Some(Tier::Subsequence));
+    assert_eq!(
+        Tier::of(&row("system settings"), "sst"),
+        Some(Tier::Subsequence)
+    );
     assert_eq!(
         Tier::of(&Row::new("Wi-Fi").detail("pick a network"), "network"),
         Some(Tier::Detail),

@@ -176,6 +176,34 @@ fn escape_is_the_shells_and_says_nothing_happened() {
     assert_eq!(app.handle(key(KeyCode::Esc)), Outcome::Done(1));
 }
 
+/// A body with a sub-mode, the way the root menu has its power list: Escape
+/// steps back once, and only the next Escape is the shell's.
+struct Nested {
+    inner: bool,
+}
+
+impl Screen for Nested {
+    fn draw(&mut self, _ctx: &mut BodyCtx) {}
+
+    fn key(&mut self, key: KeyEvent, _design: &Design) -> Outcome {
+        if key.code == KeyCode::Esc && self.inner {
+            self.inner = false;
+            return Outcome::Consumed;
+        }
+        Outcome::Continue
+    }
+}
+
+#[test]
+fn a_consumed_escape_steps_back_instead_of_closing() {
+    let mut nested = Nested { inner: true };
+    let mut app = App::new(Header::new("LazyOS"))
+        .design(Design::solarized().with_reduced_motion(true))
+        .screen(&mut nested);
+    assert_eq!(app.handle(key(KeyCode::Esc)), Outcome::Continue);
+    assert_eq!(app.handle(key(KeyCode::Esc)), Outcome::Done(1));
+}
+
 #[test]
 fn a_release_event_is_not_a_press() {
     // Terminals that report both kinds would otherwise act twice per key.
