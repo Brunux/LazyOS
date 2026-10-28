@@ -1,0 +1,24 @@
+LazyOS · Power                                                  each asks first
+────────────────────────────────────────────────────────────────────────────────
+╭ Power ───────────────────────────────────────────────────────────────────────╮
+│ Each of these ends the session, and asks once more first.                    │
+│                                                                              │
+│ ▍  Log out  back to the greeter                                             │
+│    Reboot  asks first                                                       │
+│   ⏻ Shut down  asks first                                                    │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ [Enter]  choose   [Esc]  back
