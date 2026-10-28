@@ -363,6 +363,11 @@ pub struct Row {
     pub label: String,
     pub detail: Option<String>,
     pub value: Option<String>,
+    /// How strongly a [ranked](ListState::ranked) list prefers this row among
+    /// rows that match a needle equally well (spec 007: frecency). A plain list
+    /// ignores it, and so does a ranked list with an empty needle: the order a
+    /// command gave its rows is the order a person reads them in.
+    pub boost: u32,
 }
 
 impl Row {
@@ -372,7 +377,13 @@ impl Row {
             label: label.into(),
             detail: None,
             value: None,
+            boost: 0,
         }
+    }
+
+    pub fn boost(mut self, boost: u32) -> Self {
+        self.boost = boost;
+        self
     }
 
     /// The row's picture, from the TUI alphabet ([`Glyph`]).
@@ -452,6 +463,118 @@ fn contains_ascii_fold(haystack: &[u8], needle: &[u8]) -> bool {
     }
 }
 
+/// How well a row matches a needle in a [ranked](ListState::ranked) list,
+/// best first. `None` is no match; the variants are ordered so a larger value
+/// is a better match (spec 007: "exact prefix > word prefix > subsequence").
+///
+/// The tiers only ever compare the **label**: a person types the name of the
+/// thing, and a row whose description happens to contain the letters ranks
+/// below every row whose name does - which is `Detail`, the floor, kept so a
+/// ranked list still finds what a plain one finds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Tier {
+    /// The needle is in the detail or the value, not in the label.
+    Detail = 1,
+    /// The label holds the needle's characters in order (`tst` → `theme set`).
+    Subsequence = 2,
+    /// The label contains the needle somewhere else.
+    Substring = 3,
+    /// A word of the label starts with the needle (`set` → `theme set`).
+    WordPrefix = 4,
+    /// The label starts with the needle.
+    Prefix = 5,
+    /// The label is the needle.
+    Exact = 6,
+}
+
+impl Tier {
+    /// The tier `row` reaches for `needle` (already lowercased), or `None`.
+    ///
+    /// Same two paths as the plain filter: an ASCII needle compares bytes and
+    /// allocates nothing, any other needle folds the label once.
+    pub fn of(row: &Row, needle_lower: &str) -> Option<Tier> {
+        if needle_lower.is_empty() {
+            return Some(Tier::Exact);
+        }
+        let ascii = needle_lower.is_ascii();
+        let label = if ascii {
+            label_tier_ascii(row.label.as_bytes(), needle_lower.as_bytes())
+        } else {
+            label_tier_unicode(&row.label.to_lowercase(), needle_lower)
+        };
+        label.or_else(|| {
+            let found = |text: Option<&str>| {
+                text.is_some_and(|text| contains_fold(text, needle_lower, ascii))
+            };
+            (found(row.detail.as_deref()) || found(row.value.as_deref())).then_some(Tier::Detail)
+        })
+    }
+}
+
+fn label_tier_ascii(label: &[u8], needle: &[u8]) -> Option<Tier> {
+    if label.len() == needle.len() && label.eq_ignore_ascii_case(needle) {
+        return Some(Tier::Exact);
+    }
+    if label.len() >= needle.len() && label[..needle.len()].eq_ignore_ascii_case(needle) {
+        return Some(Tier::Prefix);
+    }
+    if label.len() > needle.len() {
+        let first = needle[0].to_ascii_lowercase();
+        let mut substring = false;
+        for start in 1..=label.len() - needle.len() {
+            if label[start].to_ascii_lowercase() != first
+                || !label[start..start + needle.len()].eq_ignore_ascii_case(needle)
+            {
+                continue;
+            }
+            if !label[start - 1].is_ascii_alphanumeric() {
+                return Some(Tier::WordPrefix);
+            }
+            substring = true;
+        }
+        if substring {
+            return Some(Tier::Substring);
+        }
+    }
+    let mut want = needle.iter().map(u8::to_ascii_lowercase).peekable();
+    for byte in label {
+        if want.peek() == Some(&byte.to_ascii_lowercase()) {
+            want.next();
+        }
+    }
+    want.peek().is_none().then_some(Tier::Subsequence)
+}
+
+fn label_tier_unicode(label: &str, needle: &str) -> Option<Tier> {
+    if label == needle {
+        return Some(Tier::Exact);
+    }
+    if label.starts_with(needle) {
+        return Some(Tier::Prefix);
+    }
+    let mut substring = false;
+    for (start, _) in label.match_indices(needle) {
+        let after_boundary = label[..start]
+            .chars()
+            .next_back()
+            .is_none_or(|before| !before.is_alphanumeric());
+        if after_boundary {
+            return Some(Tier::WordPrefix);
+        }
+        substring = true;
+    }
+    if substring {
+        return Some(Tier::Substring);
+    }
+    let mut want = needle.chars().peekable();
+    for ch in label.chars() {
+        if want.peek() == Some(&ch) {
+            want.next();
+        }
+    }
+    want.peek().is_none().then_some(Tier::Subsequence)
+}
+
 /// What the list did with a key, so the command decides what a choice means.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ListAction {
@@ -483,6 +606,15 @@ pub struct ListState {
     /// token (`bt`) does not shift the labels under it.  Computed when the rows
     /// change, from *all* of them: filtering a row out must not move the column.
     glyph_width: u16,
+    /// Order the matches by how well they match (spec 007) instead of keeping
+    /// the rows' own order. Off by default: a file list is in the order the
+    /// directory gave it, a menu or a palette is in the order of the best match.
+    ranked: bool,
+    /// The tier each row reached for the current needle, indexed like `rows`
+    /// (0 = no match). One buffer for the list's life, so ranking a keystroke
+    /// costs no allocation per row - the rule `tests/filter.rs` enforces for
+    /// the plain filter holds for the ranked one too.
+    tiers: Vec<u8>,
 }
 
 impl ListState {
@@ -497,12 +629,34 @@ impl ListState {
             applied: String::new(),
             empty: "nothing here yet".to_string(),
             glyph_width: 0,
+            ranked: false,
+            tiers: Vec::new(),
         }
     }
 
     pub fn with_empty(mut self, text: impl Into<String>) -> Self {
         self.empty = text.into();
         self
+    }
+
+    /// A list that orders its matches: the best [`Tier`] first, then the
+    /// larger [`Row::boost`], then the shorter label, then the rows' own order.
+    ///
+    /// With an empty needle nothing is reordered, so a menu still reads in the
+    /// order its groups were written. This is the one ranking the session has:
+    /// the root menu and the palette both use it (spec 007), and a surface that
+    /// wants another order sets boosts instead of writing a second matcher.
+    pub fn ranked(mut self) -> Self {
+        self.ranked = true;
+        self.tiers.clear();
+        self.tiers.resize(self.rows.len(), 0);
+        self.applied.clear();
+        self.refilter();
+        self
+    }
+
+    pub fn is_ranked(&self) -> bool {
+        self.ranked
     }
 
     pub fn set_rows(&mut self, rows: Vec<Row>) {
@@ -513,6 +667,10 @@ impl ListState {
             .max()
             .unwrap_or(0);
         self.rows = rows;
+        if self.ranked {
+            self.tiers.clear();
+            self.tiers.resize(self.rows.len(), 0);
+        }
         // The visible set belonged to the old rows. Every index is a match
         // again until `refilter` says otherwise, which is what lets its
         // narrowing pass (a `retain`) walk the new list exactly once.
@@ -573,7 +731,36 @@ impl ListState {
             self.needle.len() > self.applied.len() && self.needle.starts_with(&self.applied);
         let rows = &self.rows;
         let needle = &self.needle;
-        if narrowing {
+        if self.ranked && !needle.is_empty() {
+            // Every tier is monotonic in the needle (a row that holds "repo"
+            // as a subsequence holds "rep" too), so narrowing may keep the
+            // visible set here as well; the order is rebuilt either way.
+            let tiers = &mut self.tiers;
+            let mut score = |i: usize| {
+                let tier = Tier::of(&rows[i], needle).map_or(0, |t| t as u8);
+                tiers[i] = tier;
+                tier > 0
+            };
+            if narrowing {
+                self.visible.retain(|&i| score(i));
+            } else {
+                self.visible.clear();
+                self.visible.extend((0..rows.len()).filter(|&i| score(i)));
+            }
+            let tiers = &self.tiers;
+            // Unstable, because the last key is the index: a total order sorts
+            // the same way every time, and `sort_unstable` allocates nothing.
+            self.visible.sort_unstable_by(|&a, &b| {
+                tiers[b]
+                    .cmp(&tiers[a])
+                    .then(rows[b].boost.cmp(&rows[a].boost))
+                    .then(
+                        UnicodeWidthStr::width(rows[a].label.as_str())
+                            .cmp(&UnicodeWidthStr::width(rows[b].label.as_str())),
+                    )
+                    .then(a.cmp(&b))
+            });
+        } else if narrowing {
             self.visible.retain(|&i| rows[i].matches(needle));
         } else {
             self.visible.clear();
@@ -582,7 +769,12 @@ impl ListState {
         }
         self.applied.clear();
         self.applied.push_str(needle);
-        if self.cursor >= self.visible.len() {
+        if self.ranked {
+            // The best match is the first row, and Enter must take it: a cursor
+            // left on the third row by the previous needle would open the
+            // third-best answer to this one.
+            self.cursor = 0;
+        } else if self.cursor >= self.visible.len() {
             self.cursor = self.visible.len().saturating_sub(1);
         }
         self.offset = 0;
@@ -1311,6 +1503,138 @@ impl Confirm {
             x = put(buf, x, row, "  ", 2, design.style(TextStyle::Dim));
         }
         let _ = x;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input
+// ---------------------------------------------------------------------------
+
+/// What a key did to an [`Input`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InputAction {
+    /// Not a key the input uses (the screen may give it to the shell).
+    Ignored,
+    Changed,
+    /// Enter, with text in the field.
+    Submitted,
+    /// Escape: the person did not want to ask after all.
+    Cancelled,
+}
+
+/// One line of text the person types: the Ask strip's question (spec 007), and
+/// later the run prompt (spec 012).
+///
+/// It edits at the end only - the plan's keymap has no Alt chords inside a
+/// window, and a one-line question is typed, not edited in the middle - with
+/// Backspace, `Ctrl+U` (clear) and `Ctrl+W` (the last word). Enter on an empty
+/// field does nothing: a stray Enter must not send an empty question.
+#[derive(Clone, Debug, Default)]
+pub struct Input {
+    text: String,
+}
+
+impl Input {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_text(text: impl Into<String>) -> Self {
+        Self { text: text.into() }
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub fn handle(&mut self, key: KeyEvent) -> InputAction {
+        if key.kind != ratatui::crossterm::event::KeyEventKind::Press {
+            return InputAction::Ignored;
+        }
+        let control = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Esc => InputAction::Cancelled,
+            KeyCode::Enter if self.text.trim().is_empty() => InputAction::Ignored,
+            KeyCode::Enter => InputAction::Submitted,
+            KeyCode::Backspace => {
+                if self.text.pop().is_some() {
+                    InputAction::Changed
+                } else {
+                    InputAction::Ignored
+                }
+            }
+            KeyCode::Char('u') if control => {
+                self.text.clear();
+                InputAction::Changed
+            }
+            KeyCode::Char('w') if control => {
+                let kept = self.text.trim_end().len();
+                let start = self.text[..kept]
+                    .rfind(char::is_whitespace)
+                    .map_or(0, |space| space + 1);
+                self.text.truncate(start);
+                InputAction::Changed
+            }
+            KeyCode::Char(ch) if !control && !key.modifiers.contains(KeyModifiers::ALT) => {
+                self.text.push(ch);
+                InputAction::Changed
+            }
+            _ => InputAction::Ignored,
+        }
+    }
+
+    /// One line: the text, or the dim placeholder, and a block cursor. A text
+    /// wider than the field shows its tail, because the end is where the
+    /// person is typing.
+    pub fn render(&self, area: Rect, buf: &mut Buffer, design: &Design, placeholder: &str) {
+        if area.width < 2 || area.height == 0 {
+            return;
+        }
+        fill(
+            buf,
+            Rect { height: 1, ..area },
+            Style::default()
+                .bg(design.color(ColorRole::Surface))
+                .fg(design.color(ColorRole::Text)),
+        );
+        let room = area.width.saturating_sub(2);
+        let x = area.x + 1;
+        if self.text.is_empty() {
+            put_trunc(
+                buf,
+                x + 1,
+                area.y,
+                placeholder,
+                room.saturating_sub(1),
+                design
+                    .style(TextStyle::Dim)
+                    .bg(design.color(ColorRole::Surface)),
+            );
+            put(buf, x, area.y, " ", 1, design.style(TextStyle::Key));
+            return;
+        }
+        // The tail that fits, measured in cells from the end.
+        let mut start = self.text.len();
+        let mut width = 0u16;
+        for (index, ch) in self.text.char_indices().rev() {
+            let w = UnicodeWidthStr::width(ch.encode_utf8(&mut [0; 4]) as &str) as u16;
+            if width + w + 1 > room {
+                break;
+            }
+            width += w;
+            start = index;
+        }
+        let end = put(
+            buf,
+            x,
+            area.y,
+            &self.text[start..],
+            room,
+            design
+                .style(TextStyle::Body)
+                .bg(design.color(ColorRole::Surface)),
+        );
+        put(buf, end, area.y, " ", 1, design.style(TextStyle::Key));
     }
 }
 
