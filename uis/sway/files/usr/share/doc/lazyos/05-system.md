@@ -39,17 +39,22 @@ machine's tuning:
 * **1000 Hz** timers, full preemption;
 * transparent huge pages set to `madvise` on the command line.
 
-Memory: `zram` provides a **3.7 GB** compressed swap device - sized to all of RAM,
-because the pages it holds are compressed and cost about a quarter of the RAM their
-size suggests (measured here: 427 MB of pages in 98 MB, ~3.5:1 ratio). The full-RAM
-size ensures heavy workloads never spill to the slow microSD card (~1-2 MB/s random
-writes). The previous decompress latency with full-RAM swap was resolved by setting
-`vm.page-cluster = 0` (preventing wasteful 8-page readahead that blew out the 32 KB
-L1 data cache on the Cortex-A55 LITTLE cores), resetting `vm.vfs_cache_pressure = 100`
-to reclaim clean directory cache instead of evicting process memory, and setting
-`vm.watermark_boost_factor = 0` to eliminate premature kswapd churn. Storage
-interrupts (MMC) are routed to CPU2/3 so CPU0 (the input/EC core) is never choked
-by I/O traffic. `systemd-oomd` kills a memory hog at 50 % pressure instead of
+Memory: `zram` provides a **1.9 GB** compressed swap device - half of RAM, and the half
+is the decision, not the package's default. The pages it holds are compressed and cost
+about a quarter of the RAM their size suggests (measured here: 427 MB of pages in
+98 MB, ~4.4:1 ratio), so 1.9 GB of swap spends ~0.44 GB of memory and this machine's
+measured heavy load (1.4 GB) fits inside it. The other half is the session's on
+purpose: data that does not compress - a video, an archive, an encrypted blob - costs
+one byte of RAM per byte of swap, so a device sized to all of RAM could hold 3.7 GB
+resident before a single page reached the card, and that is memory the machine no
+longer has. Past the half, the overflow goes to the auxiliary swap on a card
+(priority 10, below zram's 100). Swapping itself is cheap because
+`vm.page-cluster = 0` decompresses one 4 KB page instead of eight (8-page readahead
+blew out the 32 KB L1 data cache on the Cortex-A55 LITTLE cores),
+`vm.vfs_cache_pressure = 100` reclaims clean directory cache instead of evicting
+process memory, and `vm.watermark_boost_factor = 0` stops premature kswapd churn.
+Storage interrupts (MMC) are routed to CPU2/3 so CPU0 (the input/EC core) is never
+choked by I/O traffic. `systemd-oomd` kills a memory hog at 50 % pressure instead of
 letting the machine freeze. `swapon --show`, `zramctl` and
 `cat /sys/block/zram0/mm_stat` show what is in use.
 

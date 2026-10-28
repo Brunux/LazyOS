@@ -1412,26 +1412,34 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   card spinning with no reason in it. `parted` and `mkfs.ext4` are in `packages/base.list`,
   `mkfs.exfat` comes from `exfatprogs` in `uis/sway/packages.list`, and `check-system.sh` FAILs
   when any of them, the script, or the guard in `lib-rofi.sh` is missing.
-- **zram is sized to all of RAM, with page-cluster=0 and IRQ balancing on MT8192.** `rootfs-setup.sh`
-  writes `zram-size = min(ram, 4096)` (3.7 GiB here), keeping heavy workloads entirely in compressed
-  RAM so pages never spill to the slow microSD card at priority 10 (~1-2 MB/s random writes). The
-  earlier latency regression with a full-RAM cap was tracked to three kernel settings rather than the
-  capacity itself: (1) `vm.page-cluster=3` (the kernel default) decompressed 8 pages (32 KB) on every
-  swap-in, completely blowing out the 32 KB L1 data cache on the in-order Cortex-A55 LITTLE cores;
-  (2) `vm.vfs_cache_pressure=50` hoarded directory/inode caches and forced application memory into swap;
-  and (3) `vm.watermark_boost_factor=15000` triggered premature kswapd churn during allocation bursts.
-  With `vm.page-cluster=0` (single-page decompress, ~1 us on Cortex-A76), `vm.vfs_cache_pressure=100`,
-  `vm.watermark_boost_factor=0`, and `lz4`, swapping into zram is fast and zero-latency. Furthermore,
-  storage interrupts (MMC) are routed away from CPU0 to CPU2/3 (`lazyos-irq-balance`), so heavy disk
-  I/O never starves the ChromeOS EC (keyboard/trackpad) on CPU0. **The resident limit is the trap**:
-  at the limit `zram_can_store_page()` refuses the store and `zram_bio_write` returns `BLK_STS_IOERR`,
-  while the swap allocator picks a device by *slot exhaustion* and not by write success, so it keeps
-  choosing zram (whose nominal slots are free) and keeps failing - the overflow becomes an I/O error on
-  swapped-out data instead of a page handed to the card at priority 10, and the auxiliary swap above
-  would become hibernate-only. Only the nominal cap falls through cleanly. Witnesses: `check-system.sh`
-  reads the file, the live `disksize`, `page-cluster`, `watermark_boost_factor`, `vfs_cache_pressure`,
-  and MMC IRQ routing; the manual paragraph is `05-system.md` § *The kernel*, and the numbers are
-  `docs/optimization.md` § *zram sizing*.
+- **zram is half of RAM, with page-cluster=0 and IRQ balancing on MT8192.** `rootfs-setup.sh`
+  writes `zram-size = ram / 2` (1.9 GiB here), `lz4` and `swap-priority = 100`. Half is the
+  decision, and it is two-sided: the captured heavy load sat at 1.4 GB of the 1.948 GB device
+  (72 %) and never spilled, so the workload this machine has actually run fits with room to spare;
+  and because zram keeps pages compressed but pays 1:1 for the ones that do not compress (video,
+  archives, encrypted blobs), a device sized to all of RAM could hold 3.7 GiB resident - the whole
+  machine - and become the thing that triggers the OOM kill instead of the card that would have
+  absorbed the overflow. At half the store can never take more than ~1.9 GiB whatever the data
+  looks like, and the auxiliary swap on a card (priority 10, below zram's 100) is the tier past it,
+  which is what that partition is for. The latency that once argued for all of RAM was three kernel
+  settings rather than the capacity: (1) `vm.page-cluster=3` (the kernel default) decompressed 8
+  pages (32 KB) on every swap-in, completely blowing out the 32 KB L1 data cache on the in-order
+  Cortex-A55 LITTLE cores; (2) `vm.vfs_cache_pressure=50` hoarded directory/inode caches and forced
+  application memory into swap; and (3) `vm.watermark_boost_factor=15000` triggered premature kswapd
+  churn during allocation bursts. With `vm.page-cluster=0` (single-page decompress, ~1 us on
+  Cortex-A76), `vm.vfs_cache_pressure=100`, `vm.watermark_boost_factor=0`, and `lz4`, swapping into
+  zram is fast. Furthermore, storage interrupts (MMC) are routed away from CPU0 to CPU2/3
+  (`lazyos-irq-balance`), so heavy disk I/O never starves the ChromeOS EC (keyboard/trackpad) on
+  CPU0. **The resident limit is the trap**: at the limit `zram_can_store_page()` refuses the store
+  and `zram_bio_write` returns `BLK_STS_IOERR`, while the swap allocator picks a device by *slot
+  exhaustion* and not by write success, so it keeps choosing zram (whose nominal slots are free)
+  and keeps failing - the overflow becomes an I/O error on swapped-out data instead of a page
+  handed to the card at priority 10, and the auxiliary swap above would become hibernate-only. Only
+  the nominal cap falls through cleanly. Witnesses: `check-system.sh` reads the file and the live
+  `disksize`, both against half of `MemTotal` and naming which direction the size missed, plus
+  `page-cluster`, `watermark_boost_factor`, `vfs_cache_pressure`, and MMC IRQ routing; the manual
+  paragraph is `05-system.md` § *The kernel*, and the numbers are `docs/optimization.md` § *zram
+  sizing*.
 - **Auxiliary swap turns a card into extra memory, and it shares Format's list on purpose.**
   `rofi-swap` (Places, the row before Format a disk, and the root menu's *system* section) picks a
   disk, then how much of it - the whole card first, then 2/4/8 GiB only when they fit with 64 MiB of

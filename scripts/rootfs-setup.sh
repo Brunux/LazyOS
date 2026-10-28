@@ -165,21 +165,34 @@ echo "%sudo ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/99-$USERNAME
 chmod 440 /etc/sudoers.d/99-$USERNAME
 
 log "System tuning for this device (see docs/optimization.md)"
-# zram: swap in compressed RAM. systemd-zram-generator reads this file, and two of
-# the three lines are not the package's defaults on purpose.
+# zram: swap in compressed RAM. systemd-zram-generator reads this file, and the
+# three lines are this port's decision, so their reasons travel into the image.
 #
-# zram-size = min(ram, 4096), i.e. 3.7 GiB on this machine.
-# Sizing zram to all of RAM ensures memory-heavy workloads never spill to the
-# slow microSD card at priority 10 (~1-2 MB/s random writes). The previous
-# latency concern with a full-RAM cap was caused by:
-# 1) vm.page-cluster=3 reading ahead 8 pages (32 KB), which blew out the 32 KB
-#    L1 data cache on the Cortex-A55 LITTLE cores on every swap-in;
-# 2) vm.vfs_cache_pressure=50 hoarding directory/inode caches and forcing anon
-#    memory into swap;
-# 3) vm.watermark_boost_factor=15000 triggering premature kswapd churn.
-# With page-cluster=0, vfs_cache_pressure=100, watermark_boost_factor=0, and
-# lz4 compression (~1 us decompress on A76), swapping into zram is fast and
-# zero-latency, keeping the entire workload off the microSD card.
+# zram-size = ram / 2, i.e. 1.9 GiB on this machine.
+# The size is the capacity of the *swap*, not of the memory it spends: pages enter
+# uncompressed and are kept compressed, and this machine measured 4.4:1 resident
+# (427 MiB of pages in 97.7 MiB, docs/optimization.md section 12). Half of RAM
+# therefore gives 1.9 GiB of fast swap for about 0.44 GiB of memory, which held the
+# measured heavy load (1.4 GB of a 1.9 GB device, 72 %) without spilling - and it
+# bounds the other end, which is what half was chosen for: pages that do not compress
+# (already-compressed media, encrypted blobs) cost 1:1, so a device sized to all of
+# RAM could hold 3.7 GiB resident, the whole machine, before one page reached the
+# card. At half, the store can never take more than the other half leaves free.
+# The overflow past the cap goes to the auxiliary swap at priority 10 (a card, ~1-2
+# MB/s of random writes), which is the tier that partition exists for.
+#
+# The three kernel settings below are why a cap of any size is usable at all - with
+# the kernel's own defaults the swap-in path itself was the latency:
+# 1) vm.page-cluster=3 read ahead 8 pages (32 KB), which blew out the 32 KB L1 data
+#    cache of the Cortex-A55 LITTLE cores on every swap-in; 0 decompresses one 4 KB
+#    page (~1 us on an A76) and leaves the cache alone;
+# 2) vm.vfs_cache_pressure=50 hoarded directory/inode caches and forced application
+#    memory into swap; 100 reclaims the clean cache first;
+# 3) vm.watermark_boost_factor=15000 started kswapd churn during allocation bursts; 0
+#    stops it.
+# Plus lz4 (~1 us decompress on an A76, and no zstd trade on the in-order A55s) and
+# the MMC interrupts moved off CPU0 (lazyos-irq-balance), so swap-in never competes
+# with the ChromeOS EC that reads the keyboard.
 #
 # No zram-resident-limit, deliberately. It reads like the valve for incompressible
 # data, but a limit fails the store with BLK_STS_IOERR (zram_bio_write) and the swap
@@ -196,7 +209,7 @@ log "System tuning for this device (see docs/optimization.md)"
 install -d /etc/systemd
 cat >/etc/systemd/zram-generator.conf <<'EOF'
 [zram0]
-zram-size = min(ram, 4096)
+zram-size = ram / 2
 compression-algorithm = lz4
 swap-priority = 100
 EOF
