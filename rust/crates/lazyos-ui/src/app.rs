@@ -92,6 +92,14 @@ pub trait Screen {
         None
     }
 
+    /// The top band, for a screen whose subject changes while it is open: the
+    /// root menu becomes the power list, then a question to an agent, and the
+    /// header has to say which (spec 007 marks the Ask strip `AI` there). A
+    /// screen with no header of its own keeps the one set on [`App`].
+    fn header(&self) -> Option<&Header> {
+        None
+    }
+
     /// How often the loop should wake this screen while nothing else happens.
     /// `None` means event-driven only; a running task wakes at 10 fps for its
     /// spinner and its stop timeout.
@@ -251,7 +259,12 @@ impl<'a> App<'a> {
             width: area.width,
             height: keybar_height,
         };
-        draw_header(frame.buffer_mut(), header, &self.design, &self.header);
+        let band = self
+            .screen
+            .as_ref()
+            .and_then(|s| s.header())
+            .unwrap_or(&self.header);
+        draw_header(frame.buffer_mut(), header, &self.design, band);
         self.body_area = body;
         if let Some(screen) = self.screen.as_mut() {
             let mut ctx = BodyCtx {
