@@ -52,6 +52,17 @@ info()    { printf '  ----  %s\n' "$*"; }
 section() { printf '\n%s==> %s%s\n' "$C_HEAD" "$*" "$C_OFF"; }
 have()    { command -v "$1" >/dev/null 2>&1; }
 
+# The root menu's rows (spec 007), from the binary's own table: one line per row,
+# `key<TAB>group<TAB>label<TAB>what it runs`. `bar-menu` is a link to `lazyos` now,
+# so grepping that file would match strings inside an executable and prove
+# nothing; the checks that ask "does the root menu reach X" read this instead.
+# Empty when the binary is missing, which the framework section reports.
+MENU_ROWS=$(lazyos menu --rows 2>/dev/null || :)
+# menu_runs WORDS: some root-menu row runs exactly WORDS (`rofi-agents --default`).
+menu_runs() { awk -F'\t' -v want="$1" '$4 == want { found = 1 } END { exit !found }' <<<"$MENU_ROWS"; }
+# menu_label LABEL: some root-menu row is called exactly LABEL.
+menu_label() { awk -F'\t' -v want="$1" '$3 == want { found = 1 } END { exit !found }' <<<"$MENU_ROWS"; }
+
 # A session started by greetd does not necessarily export the sbin directories,
 # and several tools this report needs live there (swapon, findfs, blkid, iw,
 # tuigreet). Fix the PATH once here instead of discovering each of them as a
@@ -1856,10 +1867,10 @@ if [ -x "$HOME/.config/bin/lazyos-profile" ]; then
 fi
 
 # Three places reach the menu and one is enough to lose: the root menu's row
-# (bar-menu), the key (24-keys.conf) and the launcher entry (whose Exec is a
-# $HOME script, so its execute bit is also part of it).
+# (`lazyos menu --rows`), the key (24-keys.conf) and the launcher entry (whose
+# Exec is a $HOME script, so its execute bit is also part of it).
 _dev_reach=ok
-grep -qs 'rofi-dev' "$HOME/.config/bin/bar-menu" || _dev_reach=
+menu_runs rofi-dev || _dev_reach=
 grep -rqs 'Ctrl+d exec .*rofi-dev' /etc/sway/config.d/ || _dev_reach=
 [ -r /usr/share/applications/org.lazyos.dev.desktop ] || _dev_reach=
 if [ -n "$_dev_reach" ]; then
@@ -2066,9 +2077,9 @@ esac
 # is what is asked for, not the `case` arm: an arm whose row is gone leaves a menu
 # that looks unchanged and an install nobody can reach (the dead-row check below
 # covers the opposite direction).
-grep -qs "'Install LazyOS'" "$HOME/.config/bin/bar-menu" &&
+menu_label 'Install LazyOS' && menu_runs rofi-install &&
 	ok "root menu has the Install LazyOS row" ||
-	fail "bin/bar-menu has no Install LazyOS row: the install menu is only reachable by typing its name"
+	fail "the root menu has no Install LazyOS row: the install menu is only reachable by typing its name"
 if grep -qs -- '--app-id=lazyos-install' "$HOME/.config/bin/lazyos-install-log" 2>/dev/null; then
 	if grep -qs 'app_id="lazyos-install"' /etc/sway/config.d/31-install.conf 2>/dev/null; then
 		ok "the install log opens in a floated foot window (app-id lazyos-install)"
@@ -2125,8 +2136,8 @@ grep -qs 'Alt+Ctrl+T' /usr/share/doc/lazyos/03-shortcuts.md ||
 	fail "03-shortcuts.md does not name Alt+Ctrl+T (the only place the translate key is taught)"
 
 # Every menu behind the root menu is a rofi-* script. A missing one is the
-# quietest failure in the session: the row is still listed (bar-menu draws it
-# from a static list) and choosing it does nothing at all.
+# quietest failure in the session: the row is still listed (the menu draws it
+# from a static table) and choosing it does nothing at all.
 _missing_menus=""
 for _s in rofi-quick rofi-notify rofi-clean rofi-kill rofi-tz rofi-places \
 	rofi-media rofi-calc rofi-layout rofi-power rofi-about rofi-dns \
@@ -2198,35 +2209,30 @@ fi
 # 02-rofi.md sends a reader to the root menu for DNS, Packages, Colour, About and
 # Reminders. A row that goes missing is a documented keypress that answers
 # nothing - Colour was the one that had neither the row nor the `case` arm.
-if [ -r "$HOME/.config/bin/bar-menu" ]; then
+if [ -n "$MENU_ROWS" ]; then
 	_root_missing=
 	for _m in rofi-dns rofi-pkg rofi-color rofi-about rofi-remind rofi-swap; do
-		grep -qs "$_m" "$HOME/.config/bin/bar-menu" || _root_missing="$_root_missing ${_m#rofi-}"
+		menu_runs "$_m" || _root_missing="$_root_missing ${_m#rofi-}"
 	done
 	[ -z "$_root_missing" ] &&
 		ok "root menu reaches DNS, Packages, Colour, About, Reminders and Auxiliary swap" ||
-		fail "root menu has no entry for:$_root_missing (bar-menu)"
+		fail "root menu has no entry for:$_root_missing (lazyos menu --rows)"
 fi
 
-# A row and its `case` arm are two halves of one entry; a row whose key has no
-# arm closes the list and does nothing. Keys are the last word of a ui_row line,
-# and the arms are indented inside the `case`. A row whose key is followed by a
-# colour passes `"$UI_RED"` as its last word, so that one is read from the field
-# before it - the earlier version took $NF always, which reported the Power row
-# as dead, and matched arms only at column 0, which reported every row as dead.
-if [ -r "$HOME/.config/bin/bar-menu" ]; then
-	_dead_rows=$(awk '
-		/^[[:space:]]*ui_row / {
-			k = $NF
-			if (k ~ /^\$|^"\$/) k = $(NF - 1)
-			gsub(/"/, "", k)
-			rows[k] = 1
-		}
-		/^[[:space:]]*[a-z][a-z-]*\)/ { k = $1; sub(/\).*/, "", k); arms[k] = 1 }
-		END { for (k in rows) if (!(k in arms)) printf "%s ", k }' \
-		"$HOME/.config/bin/bar-menu")
-	[ -z "$_dead_rows" ] && ok "every root-menu row has an action" ||
-		warn "root-menu rows with no action: $_dead_rows"
+# A root-menu row cannot lack an action any more - it is an enum in the table
+# (spec 007), and a test refuses one without a program - but the program it
+# names can still be missing from this machine, and then the row closes the
+# menu and nothing opens. The first word of each row's command is a session
+# script or a program on PATH; `menu:*` is something the menu does itself.
+if [ -n "$MENU_ROWS" ]; then
+	_dead_rows=
+	while IFS='	' read -r _key _ _ _runs; do
+		_prog=${_runs%% *}
+		case $_prog in menu:*|'') continue ;; esac
+		[ -x "$HOME/.config/bin/$_prog" ] || have "$_prog" || _dead_rows="$_dead_rows $_key($_prog)"
+	done <<<"$MENU_ROWS"
+	[ -z "$_dead_rows" ] && ok "every root-menu row runs a program that is installed" ||
+		fail "root-menu rows whose program is missing (the row does nothing):$_dead_rows"
 fi
 
 # The key view draws one picture per row by name, and a dropped flag makes the
@@ -2364,9 +2370,9 @@ fi
 grep -qs 'rofi-vnc' "$HOME/.config/bin/rofi-quick" &&
 	ok "Settings carries the Share this screen row" ||
 	fail "rofi-quick has no Share this screen row: the only way in would be the root menu"
-grep -qs 'rofi-vnc' "$HOME/.config/bin/bar-menu" &&
+menu_runs rofi-vnc &&
 	ok "the root menu reaches Share this screen" ||
-	fail "bar-menu has no Share this screen row"
+	fail "the root menu has no Share this screen row"
 # The bar's eye is a module over a state file, so the two halves that can be
 # dropped are its place in modules-right (the module then never runs) and the
 # .empty rule (a card stays on the bar saying nothing).  A missing .empty is a
@@ -2891,10 +2897,10 @@ if [ -r /usr/share/icons/LazyOS/48x48/apps/camera-web.png ]; then
 else
 	fail "the LazyOS theme has no camera-web.png: the Camera launcher row is a hole"
 fi
-if grep -qs 'lazyos-camera' "$HOME/.config/bin/bar-menu"; then
+if menu_runs lazyos-camera; then
 	ok "the root menu carries the Camera row (Alt+Space)"
 else
-	fail "bar-menu lost its Camera row: Alt+Space cannot open the webcam"
+	fail "the root menu lost its Camera row: Alt+Space cannot open the webcam"
 fi
 # The camera portal is a different road to the same device, and this image has
 # no backend that implements it: the only portal backend here is the wlr one
@@ -3373,9 +3379,45 @@ if grep -qs -- '--default' "$HOME/.config/bin/rofi-agents"; then
 else
 	fail "bin/rofi-agents lost --default: the AI group's Agent session row does nothing"
 fi
-grep -qs 'rofi-agents" --default' "$HOME/.config/bin/bar-menu" &&
+menu_runs 'rofi-agents --default' &&
 	ok "the root menu's AI group starts a session with the default agent" ||
-	fail "bar-menu lost the Agent session row: its AI group can only open the list"
+	fail "the root menu lost the Agent session row: its AI group can only open the list"
+
+# The Ask strip (spec 007) runs the agent once, in a process group of its own,
+# and ends the group - and anything that left it - when the answer is in or the
+# window closes. Every process it starts carries LAZYOS_ASK=<question id> in its
+# environment, so one that outlived its question is findable: a process with the
+# mark whose `lazyos --ask-run <id>` is no longer running is an agent (or an
+# `opencode serve`) left resident by a question nobody is waiting for. The
+# environments readable here are this user's, which are the only ones the strip
+# can start.
+_ask_live=
+for _ask_cmd in /proc/[0-9]*/cmdline; do
+	# The redirect sits inside the silenced group: a process that exits between
+	# the glob and the read makes the shell itself complain, not tr.
+	_ask_argv=$({ tr '\0' ' ' <"$_ask_cmd"; } 2>/dev/null) || continue
+	case " $_ask_argv" in
+	*" --ask-run "*)
+		_ask_id=${_ask_argv#* --ask-run }
+		_ask_live="$_ask_live ${_ask_id%% *}"
+		;;
+	esac
+done
+_ask_stray=
+for _ask_env in /proc/[0-9]*/environ; do
+	_ask_vars=$({ tr '\0' '\n' <"$_ask_env"; } 2>/dev/null) || continue
+	_ask_mark=$(grep -m1 '^LAZYOS_ASK=' <<<"$_ask_vars") || continue
+	_ask_id=${_ask_mark#LAZYOS_ASK=}
+	case " $_ask_live " in *" $_ask_id "*) continue ;; esac
+	_ask_pid=${_ask_env#/proc/}
+	_ask_pid=${_ask_pid%/environ}
+	_ask_stray="$_ask_stray $_ask_pid($(cat "/proc/$_ask_pid/comm" 2>/dev/null))"
+done
+if [ -z "$_ask_stray" ]; then
+	ok "no agent outlived an Ask question (no LAZYOS_ASK process without its --ask-run)"
+else
+	fail "an Ask question left processes behind:$_ask_stray (kill them; the strip should have)"
+fi
 
 # The session's own launcher entries. They are the only way to reach the bar's
 # panels and the session actions by typing, and a missing one is invisible: the
@@ -3383,7 +3425,7 @@ grep -qs 'rofi-agents" --default' "$HOME/.config/bin/bar-menu" &&
 # checked apart because it is the one the brand owns: its name is the mark's.
 _missing_desktop=""
 for _d in wifi wifi-nmtui bluetooth audio-output power lock suspend \
-	screenshot-area capture lazygit tmux files emoji clipboard about menu install; do
+	screenshot-area capture lazygit tmux files emoji clipboard about menu ask install; do
 	[ -r "/usr/share/applications/org.lazyos.$_d.desktop" ] || _missing_desktop="$_missing_desktop $_d"
 done
 [ -r /usr/share/applications/org.lazyos.screensaver.desktop ] ||
@@ -3526,14 +3568,18 @@ if have lazyos; then
 	if [ -n "$_fw_links" ]; then
 		while IFS='	' read -r _fw_name _fw_path; do
 			[ -n "$_fw_name" ] || continue
-			if [ -L "/usr/bin/$_fw_name" ] && [ -x "/usr/bin/$_fw_name" ]; then
+			# The installer makes the /usr/bin names; a ported script's old name
+			# (bar-menu) is a link the UI tree carries in ~/.config/bin instead.
+			_fw_at=/usr/bin/$_fw_name
+			[ -e "$_fw_at" ] || [ -L "$_fw_at" ] || _fw_at=$HOME/.config/bin/$_fw_name
+			if [ -L "$_fw_at" ] && [ "$(readlink -f "$_fw_at")" = /usr/bin/lazyos ]; then
 				if grep -q "^  $_fw_path" <<<"$_fw_help"; then
-					ok "/usr/bin/$_fw_name -> lazyos $_fw_path"
+					ok "$_fw_at -> lazyos $_fw_path"
 				else
-					fail "/usr/bin/$_fw_name points at '$_fw_path', which --help does not list"
+					fail "$_fw_at points at '$_fw_path', which --help does not list"
 				fi
 			else
-				fail "/usr/bin/$_fw_name is missing or does not resolve to the lazyos binary"
+				fail "$_fw_name is missing from /usr/bin and ~/.config/bin, or does not resolve to the lazyos binary"
 			fi
 		done <<<"$_fw_links"
 	fi
@@ -3546,6 +3592,44 @@ if have lazyos; then
 		ok "lazyos --help lists task attach (the task surface reattaches by id)"
 	else
 		fail "lazyos --help does not list 'task attach': a closed task window cannot be reopened"
+	fi
+
+	# Spec 007: the root menu is the binary's table now, and `bar-menu` (what
+	# Alt+Space and the bar's button run) is a link to it. Three things can go
+	# missing without an error: the command, a row the old rofi menu had (the
+	# list below is bar-menu's keys, in its order, from its last version), and
+	# the Ask row this spec adds. A lost row is a documented keypress that
+	# answers nothing, so each one is a FAIL, named.
+	if grep -q '^  ask ' <<<"$_fw_help"; then
+		ok "lazyos --help lists ask (one question to the default agent)"
+	else
+		fail "lazyos --help does not list 'ask': the Ask launcher entry opens nothing"
+	fi
+	if [ -z "$MENU_ROWS" ]; then
+		fail "lazyos menu --rows printed nothing: the root menu cannot be compared with bar-menu"
+	else
+		_menu_lost=
+		for _menu_key in terminal files files-window grep places capture camera download \
+			settings learn keys calc emoji clip password ssh agent agents dictate wifi qr \
+			dns bt audio media notify vnc tz clean swap install kill pkg dev colour about \
+			remind lock screensaver suspend hibernate power; do
+			grep -q "^$_menu_key	" <<<"$MENU_ROWS" || _menu_lost="$_menu_lost $_menu_key"
+		done
+		if [ -z "$_menu_lost" ]; then
+			ok "the root menu keeps every row bar-menu had ($(wc -l <<<"$MENU_ROWS") rows, four groups)"
+		else
+			fail "the root menu lost rows bar-menu had:$_menu_lost"
+		fi
+		if menu_runs menu:ask; then
+			ok "the root menu has the Ask row (ai group)"
+		else
+			fail "the root menu has no Ask row: a question to the agent needs a terminal again"
+		fi
+	fi
+	if [ "$(readlink -f "$HOME/.config/bin/bar-menu" 2>/dev/null)" = "/usr/bin/lazyos" ]; then
+		ok "~/.config/bin/bar-menu is the framework's root menu (Alt+Space, the bar's button)"
+	else
+		fail "~/.config/bin/bar-menu is not a link to /usr/bin/lazyos: Alt+Space opens something else"
 	fi
 
 	# The other direction: a link someone made by hand, pointing at the

@@ -13,7 +13,9 @@
 # check-system.sh validates: a name whose `check-system.sh` line must resolve,
 # and whose command must be in `--help`.
 # The ~64 old names under ~/.config/bin join it one spec at a time, because each
-# one replaces a script that still has to work until its surface is ported.
+# one replaces a script that still has to work until its surface is ported; those
+# links are in the UI tree (bar-menu since spec 007), not made here, and
+# check-system.sh accepts an installed name in either place.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 

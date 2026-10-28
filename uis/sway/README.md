@@ -54,7 +54,7 @@ and on `Alt+D`, waybar and the foot terminal.
 | `home/.config/lazyos/screensaver.txt` | The LazyOS art the idle screen loops: the wordmark, the caption and the arcade line. |
 | `home/.config/bin/lazyos-screensaver` | Launches the idle screen and is also the program that runs inside it (see **The idle screen**). |
 | `home/.config/bin/sway-lock` | Locks the session and waits for swaylock's readiness line; stops the idle screen first (see **The idle screen**). |
-| `home/.config/bin/bar-*` | The menus the bar opens on click: `bar-menu`, `bar-net`, `bar-bt`, `bar-key`, `bar-audio`, `bar-updates`, `bar-power`, plus the shared `bar-pick`. |
+| `home/.config/bin/bar-*` | The menus the bar opens on click: `bar-menu` (a link to `/usr/bin/lazyos`: the root menu is the framework's since spec 007), `bar-net`, `bar-bt`, `bar-key`, `bar-audio`, `bar-updates`, `bar-power`, plus the shared `bar-pick`. |
 | `home/.config/workstyle/config.toml` | Icon map for workstyle (see below). |
 | `home/Pictures/Wallpapers/lazyos.png` | The desktop wallpaper, rendered from `brand/wallpaper.svg` and referenced by `etc/sway/config`. |
 | `home/Pictures/Wallpapers/mountains.jpg` | The lock screen's photograph, referenced by `bin/sway-lock`. |
