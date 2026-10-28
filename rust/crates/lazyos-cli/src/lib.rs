@@ -245,17 +245,18 @@ fn query(resolved: &Resolved) -> Option<i32> {
         "menu palette" => menu::Surface::Palette,
         _ => return None,
     };
-    // `key<TAB>group<TAB>label`, in the order the menu draws them. The table
-    // alone, not this machine's context: the check compares rows, and a row's
-    // detail (which agent it starts) is not part of what it is.
+    // `key<TAB>group<TAB>label<TAB>runs`, in the order the menu draws them.
+    // The table alone, not this machine's context: the check compares rows,
+    // and a row's detail (which agent it starts) is not part of what it is.
     let mut out = io::stdout();
     for entry in menu::entries(surface, &menu::Context::default()) {
         let _ = writeln!(
             out,
-            "{}\t{}\t{}",
+            "{}\t{}\t{}\t{}",
             entry.key,
             entry.group.label(),
-            entry.label
+            entry.label,
+            menu::runs(entry.action)
         );
     }
     Some(EXIT_OK)

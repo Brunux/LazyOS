@@ -190,6 +190,31 @@ pub fn argv(choice: Choice, vars: &BTreeMap<String, String>, exe: &str) -> Optio
     }
 }
 
+/// What a row runs, in the words `check-system.sh` matches (`menu --rows`):
+/// the program by its bare name - a session script or one from `PATH` - and
+/// its literal words, `~` for the home directory, and `menu:<what>` for an
+/// action the menu does in its own window.
+pub fn runs(choice: Choice) -> String {
+    match choice {
+        Choice::Theme(slug) => format!("lazyos theme set {slug}"),
+        Choice::Table(Action::Run { program, args }) => {
+            let mut words = vec![match program {
+                Program::Session(name) | Program::System(name) => name,
+                Program::Lazyos => "lazyos",
+            }];
+            words.extend(args.iter().map(|arg| match arg {
+                Arg::Lit(text) => text,
+                Arg::Home => "~",
+            }));
+            words.join(" ")
+        }
+        Choice::Table(Action::Password) => "menu:password".to_string(),
+        Choice::Table(Action::Ask) => "menu:ask".to_string(),
+        Choice::Table(Action::Power) => "menu:power".to_string(),
+        Choice::Table(Action::Session(action)) => format!("menu:{action:?}").to_lowercase(),
+    }
+}
+
 /// Start `argv` detached from the window: a new session (`setsid`), no
 /// terminal, the home directory as its working directory. The window closes
 /// right after, and a SIGHUP from the closing `foot` must not reach the
@@ -435,6 +460,21 @@ mod tests {
         for key in ["password", "ask", "power"] {
             assert_eq!(argv(get(key), &v, "/usr/bin/lazyos"), None, "{key}");
         }
+    }
+
+    #[test]
+    fn rows_say_what_they_run_in_the_words_the_check_matches() {
+        let rows = entries(Surface::Palette, &Context::default());
+        let runs_of = |key: &str| runs(rows.iter().find(|e| e.key == key).unwrap().action);
+        assert_eq!(runs_of("dev"), "rofi-dev");
+        assert_eq!(runs_of("agent"), "rofi-agents --default");
+        assert_eq!(runs_of("files-window"), "favnyr ~");
+        assert_eq!(runs_of("ssh"), "rofi -show ssh");
+        assert_eq!(runs_of("theme-next"), "lazyos theme next");
+        assert_eq!(runs_of("theme-nord"), "lazyos theme set nord");
+        assert_eq!(runs_of("ask"), "menu:ask");
+        assert_eq!(runs_of("power"), "menu:power");
+        assert_eq!(runs_of("password"), "menu:password");
     }
 
     #[test]

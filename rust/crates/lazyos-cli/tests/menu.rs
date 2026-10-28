@@ -669,5 +669,13 @@ fn rows_lists_the_table_without_a_window() {
     assert_eq!(keys.first(), Some(&"terminal"));
     assert!(keys.contains(&"ask"));
     assert_eq!(keys.last(), Some(&"power"));
-    assert!(text.lines().any(|l| l == "ask\tai\tAsk"), "{text}");
+    assert!(
+        text.lines().any(|l| l == "ask\tai\tAsk\tmenu:ask"),
+        "{text}"
+    );
+    assert!(
+        text.lines()
+            .any(|l| l == "agent\tai\tAgent session\trofi-agents --default"),
+        "{text}"
+    );
 }
