@@ -3,8 +3,9 @@
 - **Status**: draft
 - **Phase**: 3
 - **Depends on**: 002, 003, 005, 006
-- **Model**: `opencode-go/claude-haiku-5-5` — a fixed shape repeated over ten surfaces, with
-  fixtures and a handful of small parsers. Fallback `opencode-go/minimax-m3.1-flash`.
+- **Model**: `claude-haiku-5-5` — a fixed shape repeated over ten surfaces, with fixtures and a
+  handful of small parsers, after 009/010 have set the pattern; spec 006 showed Haiku 5.5 carries
+  a well-shaped surface in this repository. Fallback `claude-sonnet-5-5`.
 - **Branch**: `spec/011-media-pickers`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §5.8-§5.10, §16 phase 3
 - **Old paths**: `rofi-media`, `rofi-notify`, `rofi-clip`, `rofi-emoji`, `rofi-capture`,

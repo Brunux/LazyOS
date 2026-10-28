@@ -6,7 +6,7 @@ finished. The plan is the map; a spec is one leg of the trip.
 
 Nothing here replaces the plan. Every spec links to the plan section it implements and adds only
 the decisions a builder needs: scope, acceptance criteria, the three witnesses, the tests, and
-which model builds it.
+which model builds it (§6).
 
 ## 1. Why specs
 
@@ -90,43 +90,80 @@ crate (`tests/fixtures/`) and are committed.
 
 ## 6. Model routing
 
-`opencode go` serves the models below. The assignment in each spec is a **starting hypothesis**
-based on the shape of the work and the price, not on a benchmark run against this repository.
-Each PR records the model that actually did the work and whether the acceptance criteria and
-tests passed on the first review; two failed attempts on a spec re-route it, and the table is
-revised by that record rather than by marketing.
+Specs are built with **Claude models** (the API IDs below). They were built with `opencode go`
+until spec 006; that record stays in each merged spec and PR, and §6.4 keeps what it taught. The
+IDs are the same whatever runs them: Claude Code (`claude --model claude-sonnet-5-5`), or OpenCode
+with the Anthropic provider (`anthropic/claude-sonnet-5-5`). The PR names the harness as well as
+the model.
 
-| Model | `opencode-go/…` | $/M in–out | Good at (route here for) |
-|---|---|---|---|
-| DeepSeek V4 Pro (New) | `deepseek-v4-pro` | 0.66–1.98 | architecture, protocol surfaces, cross-crate design |
-| Kimi K2.7 Code | `kimi-k2.7-code` | 0.95–4.00 | dense implementation with tests, state machines |
-| GLM-5.3 | `glm-5.3` | 1.40–4.40 | visual/taste work, layout judgement |
-| GPT-6 Luna | `gpt-6-luna` | 0.10–0.50 (272k tier 0.20–0.75) | repo-wide sweeps, data tables, long context, docs+witnesses |
-| Claude Haiku 5.5 | `claude-haiku-5-5` | 0.10–0.50 | small mechanical ports, repetitive fixtures |
-| MiniMax M3.1 Flash | `minimax-m3.1-flash` | 0.15–0.60 | bulk repetition where tests already exist |
-| MiMo-V2.6-Flash | `mimo-v2.6-flash` | 0.14–0.28 | cheapest bulk edits |
+### 6.1 The models
 
-Reserve `gemini-4-argon-contributor` ($4–20) and `grok-4.7` ($2–6) for a spec that has already
-defeated two cheaper models. `beam-free` is not used for committed work (no cost signal, no
-reproducible assignment).
+| Model | ID | $/M in–out | Batch in–out | Route here for |
+|---|---|---|---|---|
+| Claude Fable 5.1 | `claude-fable-5-1` | 10–50 | 5–25 | **escalation only**: a spec that has defeated two attempts on Opus |
+| Claude Opus 5.5 | `claude-opus-5-5` | 4–20 | 2–10 | architecture, security and protocol boundaries, destructive or irreversible actions, the session's taste |
+| Claude Sonnet 5.5 | `claude-sonnet-5-5` | 2–10 | 1–5 | dense implementation with tests: parsers, IPC, async pipelines, state machines, many dialogs of one shape |
+| Claude Haiku 5.5 | `claude-haiku-5-5` | 0.10–0.50 (prompt ≤ 100k) · 0.50–2.50 (> 100k) | half | a fixed shape repeated where the pattern and tests already exist, fixtures, golden regeneration |
+
+Prices are Anthropic's list prices (platform.claude.com/docs/en/about-claude/pricing,
+2026-10-28); every model has a 1M-token context at one price, except Haiku's tier.
+
+**Haiku's tier is the one that applies here.** A session that loads `AGENTS.md` (~58k tokens) and
+`docs/plan-ui.md` (~11k) is past 100k as soon as it reads the crate it changes, so budget Haiku at
+0.50–2.50: still a quarter of Sonnet, and the right price for 011-shaped work.
+
+**Effort** is part of the assignment. Opus defaults to `medium` and Sonnet to `high`; a spec that
+names an effort is built at that effort, and the PR says so. `xhigh` is reserved for a security
+boundary (008).
+
+### 6.2 Assignments
 
 | Spec | Work shape | Primary | Fallback |
 |---|---|---|---|
-| 001 core | architecture + small code | `deepseek-v4-pro` | `kimi-k2.7-code` |
-| 002 design system | visual taste + widgets | `glm-5.3` | `kimi-k2.7-code` |
-| 003 glyphs | data table + font verification | `gpt-6-luna` | `claude-haiku-5-5` |
-| 004 themes | schema + generators + idempotence | `deepseek-v4-pro` | `glm-5.3` |
-| 005 TaskView | state machine + snapshots | `kimi-k2.7-code` | `deepseek-v4-pro` |
-| 006 notifications | small, mechanical | `claude-haiku-5-5` | `minimax-m3.1-flash` |
-| 007 menu + Ask | taste + ranking | `glm-5.3` | `gpt-6-luna` |
-| 008 MCP | protocol + security tiers | `deepseek-v4-pro` | `kimi-k2.7-code` |
-| 009 search family | async walk + preview | `kimi-k2.7-code` | `gpt-6-luna` |
-| 010 system pickers | many small dialogs + tests | `kimi-k2.7-code` | `claude-haiku-5-5` |
-| 011 media pickers | repetition over a fixed shape | `claude-haiku-5-5` | `minimax-m3.1-flash` |
-| 012 launcher/reference | parsing + IPC + many surfaces | `gpt-6-luna` | `kimi-k2.7-code` |
-| 013 themes + greeter | palette data + generated files | `gpt-6-luna` | `glm-5.3` |
-| 014 perf + witnesses | measurement + repo sweep | `deepseek-v4-pro` | `gpt-6-luna` |
-| 015 browser bar | protocol client + profile/data | `deepseek-v4.1-flash` | `kimi-k2.7-code` |
+| 001 core | — merged (`opencode-go/deepseek-v4-pro`) | — | — |
+| 002 design system | — merged (`opencode-go/glm-5.3`) | — | — |
+| 003 glyphs | — merged (`opencode-go/gpt-6-luna`) | — | — |
+| 004 themes | criteria met, hardware report filed; waits for the maintainer | — | — |
+| 005 TaskView | — merged (`opencode-go/kimi-k2.7-code`) | — | — |
+| 006 notifications | code merged; three observations on the Hayato remain | the maintainer, on the device | — |
+| 007 menu + Ask | taste + ranking + enum dispatch + a child's lifetime | `claude-opus-5-5` (high) | `claude-sonnet-5-5` |
+| 008 MCP | protocol + security tiers | `claude-opus-5-5` (xhigh) | `claude-fable-5-1` |
+| 009 search family | async walk + preview | `claude-sonnet-5-5` (high) | `claude-opus-5-5` |
+| 010 system pickers | many dialogs, destructive edges, parity tests | `claude-sonnet-5-5` (high) | `claude-opus-5-5` |
+| 011 media pickers | repetition over a fixed shape | `claude-haiku-5-5` | `claude-sonnet-5-5` |
+| 012 launcher/reference | parsing + IPC + many surfaces | `claude-sonnet-5-5` (high) | `claude-opus-5-5` |
+| 013 themes + greeter | palette data + generated wallpapers judged by eye | `claude-sonnet-5-5` (high) | `claude-opus-5-5` |
+| 014 perf + witnesses | budget harness + sweep + the closure | `claude-opus-5-5` (high) | `claude-sonnet-5-5` |
+| 015 browser bar | protocol client + profile/data | `claude-sonnet-5-5` | `claude-opus-5-5` |
+
+The assignment is still a **starting hypothesis**: each PR records the model, the effort, the
+harness and whether the criteria and tests passed on the first review, and the table is revised
+by that record.
+
+### 6.3 Re-routing
+
+- **Two failed attempts re-route the spec one tier up** (Haiku → Sonnet → Opus → Fable), never
+  down: a spec that failed on a model failed on the shape of the work, and a cheaper model has
+  less room for it.
+- **A usage limit is not a failure.** The spec resumes on the same model later, or on the same
+  model through the API; it is not handed to another model mid-spec.
+- **Haiku is never a fallback for a destructive edge** (format, swap, power, the MCP tiers), even
+  when the rest of the spec is repetitive.
+
+### 6.4 What the `opencode go` record taught
+
+| Spec | Assigned | Built by | Note |
+|---|---|---|---|
+| 001 | deepseek-v4-pro | same | no re-route |
+| 002 | glm-5.3 | same | no re-route |
+| 003 | gpt-6-luna | same | measured the spec's own premise false, and recorded it |
+| 004 | deepseek-v4-pro | deepseek-v4.1-flash | re-routed before the work |
+| 005 | kimi-k2.7-code | kimi, then deepseek-v4.1-flash | **usage limit** mid-spec (runner, criteria pass) |
+| 006 | claude-haiku-5-5 | Haiku, then deepseek-v4.1-flash | **usage limit** after all five commits (rebase, verification) |
+
+Two of the last three specs changed model mid-flight for a reason that had nothing to do with the
+work, so their "first review" result describes two models at once. That is the reason for §6.3's
+second rule, and part of the reason for the migration.
 
 ## 7. CI
 
@@ -155,7 +192,7 @@ specs.
 | 004 | [`004-theme-engine.md`](004-theme-engine.md) — `theme.toml` and the generators | 2 | in progress |
 | 005 | [`005-taskview.md`](005-taskview.md) — the task surface | 2 | merged |
 | 006 | [`006-notifications.md`](006-notifications.md) — cards and icons | 2 | in progress |
-| 007 | [`007-menu-ask.md`](007-menu-ask.md) — root menu, palette, Ask strip | 2 | draft |
+| 007 | [`007-menu-ask.md`](007-menu-ask.md) — root menu, palette, Ask strip | 2 | approved |
 | 008 | [`008-mcp.md`](008-mcp.md) — `lazyos mcp` and the OpenCode contract | 2 | draft |
 | 009 | [`009-search.md`](009-search.md) — files, find, grep | 3 | draft |
 | 010 | [`010-system-pickers.md`](010-system-pickers.md) — system dialogs | 3 | draft |

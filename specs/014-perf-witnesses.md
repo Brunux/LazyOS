@@ -3,9 +3,10 @@
 - **Status**: draft
 - **Phase**: 5-6
 - **Depends on**: 007-013
-- **Model**: `opencode-go/deepseek-v4-pro` — budget design, measurement harness and a repo-wide
-  sweep of check-system/manual/AGENTS that must stay consistent. Fallback
-  `opencode-go/gpt-6-luna`.
+- **Model**: `claude-opus-5-5` (effort `high`) — budget design, a measurement harness, a
+  repo-wide sweep of check-system/manual/AGENTS that must stay consistent, and the closure that
+  removes rofi and mako from the image (the one irreversible step of the port). Fallback
+  `claude-sonnet-5-5`.
 - **Branch**: `spec/014-perf-witnesses`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §14 (budget), §15 (witnesses), §16 phase 5
 - **Old paths**: the remaining rofi/mako entries in `uis/sway/packages.list` and the scripts
