@@ -25,9 +25,8 @@
 # the installed fonts about.  A glyph no font draws is a tofu box in the pill,
 # and nothing logs it.
 
-# foot windows that are not a shell: the file search, the first-boot card and
+# foot windows that are not a shell: the first-boot card and
 # the popup terminals the bar opens (a log, the apt updater, nmtui, the QR code).
-"lazyos-find" = "\uf002"       # f002 UI_I_SEARCH
 "lazyos-welcome" = "\uf05a"    # f05a UI_I_INFO
 "popup" = "\uf120"             # f120 UI_I_TERM
 

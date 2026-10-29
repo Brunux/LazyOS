@@ -46,8 +46,17 @@ fn the_binary_does_not_mention_the_frame_type() {
 fn the_binary_asks_the_shell_for_the_window() {
     // The positive side of the same rule: the menu is an `App` with a `Screen`,
     // so the next command has a shape to copy.
+    // The screens live beside the commands that open them (`menu/`, `files/`),
+    // so the whole source tree is the place to look.
     let lib = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs")).unwrap();
     assert!(lib.contains("App::new"));
-    assert!(lib.contains("impl Screen for"));
-    assert!(lib.contains("app.run("));
+    assert!(lib.contains(".run(terminal)"));
+    let screens = sources(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"))
+        .into_iter()
+        .filter(|file| fs::read_to_string(file).is_ok_and(|text| text.contains("impl Screen for")))
+        .count();
+    assert!(
+        screens >= 3,
+        "the commands implement Screen ({screens} files do)"
+    );
 }

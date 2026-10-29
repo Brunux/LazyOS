@@ -25,3 +25,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # The Ask answer is wrapped to the card's width in cells, not bytes.
 unicode-width = "0.2"
+# `png` only: the one format the preview decodes is the thumbnail cache
+# (`lazyos-thumbnail` writes PNG). A codec is opt-in (optimization.md §13).
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+ratatui-image = { version = "11.1.0", default-features = false, features = ["crossterm"] }

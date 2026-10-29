@@ -1,0 +1,24 @@
+Files · ~/src                                       0 dirs · 0 files · ### free
+────────────────────────────────────────────────────────────────────────────────
+╭ Files ───────────────────────────────────────────────────────────────────────╮
+│ type to filter, or a path - Enter opens it                                  │
+│                                                                              │
+│▍  ..  parent directory                                                      │
+│   hidden files  hidden - Enter shows them                                   │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ [Enter]  open   [Tab]  actions   [Bksp]  up   [Ctrl+H]  dotfiles   [Esc]  close

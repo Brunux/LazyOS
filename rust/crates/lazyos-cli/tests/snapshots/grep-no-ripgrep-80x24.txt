@@ -1,0 +1,24 @@
+Search inside files
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+     ╭ Search inside files ───────────────────────────────────────────────╮
+     │ ripgrep is not installed (package ripgrep)                         │
+     │ it is what searches inside the files                               │
+     │                                                                    │
+     │                                                                    │
+     ╰────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+ [Enter]  try again   [Esc]  close

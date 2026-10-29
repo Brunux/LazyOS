@@ -690,6 +690,24 @@ fn every_act_has_a_subcommand() {
             }
             Maps::Session(name) => {
                 let path = bin_dir.join(name);
+                // A ported script is a link to the binary (spec 007, 009): it
+                // is real when it points there and the table resolves its name.
+                if let Ok(target) = fs::read_link(&path) {
+                    assert_eq!(
+                        target,
+                        Path::new("/usr/bin/lazyos"),
+                        "{}: {name} links somewhere else",
+                        tool.name
+                    );
+                    assert!(
+                        lazyos_cli::command::COMMANDS
+                            .iter()
+                            .any(|spec| spec.installed.contains(&name)),
+                        "{}: {name} is a link the command table does not install",
+                        tool.name
+                    );
+                    continue;
+                }
                 let mode = fs::metadata(&path)
                     .unwrap_or_else(|_| {
                         panic!("{}: {} is not in the image", tool.name, path.display())
