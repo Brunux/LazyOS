@@ -1,6 +1,9 @@
 # Spec 009 — The three search questions: files, find, grep
 
-- **Status**: draft
+- **Status**: approved (2026-10-29: the three old scripts become links to the binary in this
+  PR, `lazyos-view` becomes `lazyos open` behind a link rather than a generated script, and the
+  work is built on `claude-opus-5-5` - one tier above the assignment, recorded as a deviation for
+  §6.2 rather than a re-route)
 - **Phase**: 3
 - **Depends on**: 001, 002, 003, 005
 - **Model**: `claude-sonnet-5-5` (effort `high`) — an async walk, a preview pipeline and three
@@ -8,7 +11,10 @@
   `claude-opus-5-5`.
 - **Branch**: `spec/009-search`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §5.3 (files), §5.4 (find), §5.5 (grep)
-- **Old paths**: `rofi-files`, `lazyos-find` (fzf), `rofi-grep`
+- **Old paths**: `rofi-files`, `lazyos-find` (fzf), `rofi-grep` and `lazyos-view`, each a link to
+  `/usr/bin/lazyos` in `~/.config/bin` from this PR on (the bar-menu shape of spec 007), so the
+  bindings, `org.lazyos.files.desktop`, `org.lazyos.view.desktop` and the `xdg-open` shim keep
+  their paths
 
 ## Problem
 
@@ -32,9 +38,11 @@ and a grep match opens a `less` that cannot seek a pipe.
   Enter opens the file **at the line** in a viewer that can seek (the framework's own log
   pane), not `bat | less`.
 - **One opener table** in the crate: extension → action, used by all three and by spec 012's
-  double-click; the shell `lazyos-view` is generated from it until it is deleted.
+  double-click; `lazyos open PATH` applies it, and `lazyos-view` is a link to the binary that
+  resolves to that command, so there is no second copy to keep in step.
 
-**Out:** the file manager window (pcmanfm stays), the thumbnail generator itself (the existing
+**Out:** the file manager window (favnyr stays, and its double click reaches `lazyos open`
+through `org.lazyos.view.desktop`), the thumbnail generator itself (the existing
 `lazyos-thumbnail` is reused), clipboard actions (spec 011).
 
 ## Design
@@ -60,8 +68,8 @@ and a grep match opens a `less` that cannot seek a pipe.
 - [ ] Grep: a match opens at its line highlighted; an invalid regex reports ripgrep's own
       message; the walk stops on Esc.
 - [ ] witness: `scripts/check-system.sh` FAILs when `fd`/`rg`/the opener binary is missing,
-      when the three subcommands are absent, when the opener table and the shell `lazyos-view`
-      disagree, and when the preview cache is not writable.
+      when the three subcommands are absent, when `lazyos-view` or one of the three old scripts
+      is not a link to the binary, and when the preview cache is not writable.
 - [ ] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/02-rofi.md` explains the
       three surfaces and when to use which.
 - [ ] witness: an `AGENTS.md` bullet says the opener table is one table and the preview is the
