@@ -9,7 +9,10 @@
 //! lazyos menu            the session menu     (spec 007)
 //! lazyos menu palette    every row, ranked    (spec 007; 012 adds the apps)
 //! lazyos ask [question]  one question to the default agent (spec 007)
-//! lazyos menu files      the file browser     (spec 009: the real one)
+//! lazyos menu files      the file list         (spec 009)
+//! lazyos menu find       every file, as it walks (spec 009)
+//! lazyos menu grep       inside the files      (spec 009)
+//! lazyos open PATH       the one opener        (spec 009)
 //! lazyos --help          the table above, from the same data check-system reads
 //! lazyos --version       the repository's VERSION, compiled in
 //! ```
@@ -20,6 +23,7 @@
 
 pub mod ask;
 pub mod command;
+pub mod files;
 pub mod host;
 pub mod mcp;
 pub mod menu;
@@ -34,14 +38,11 @@ use std::collections::BTreeMap;
 use std::io::{self, Write};
 use std::time::Duration;
 
-use lazyos_ui::app::exit::{ESCAPE as EXIT_ESCAPE, FAILED as EXIT_FAILED};
+use lazyos_ui::app::exit::FAILED as EXIT_FAILED;
 use lazyos_ui::app::exit::{OK as EXIT_OK, USAGE as EXIT_USAGE};
-use lazyos_ui::{
-    App, BodyCtx, Design, EmptyScreen, FailureScreen, Header, KeyHint, Outcome, Screen,
-};
+use lazyos_ui::{App, Design, FailureScreen, Header, KeyHint, Screen};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
 use command::{COMMANDS, ResolveError, Resolved};
 use host::{Env, Launch};
@@ -279,6 +280,7 @@ fn run_direct(resolved: &Resolved) -> i32 {
         "notify" => notify::run(resolved),
         "mcp" => mcp::run(resolved),
         "task stop" => task_cmd::stop(resolved),
+        "open" => open_path(resolved),
         other => {
             eprintln!("lazyos {other}: this command has no direct handler");
             EXIT_USAGE
@@ -302,6 +304,12 @@ fn run_inline(resolved: &Resolved) -> i32 {
         }
     };
     let design = Design::for_session(std::env::var("XDG_RUNTIME_DIR").ok().as_deref());
+    // The one place a panic can be forced on purpose: the acceptance test sets
+    // `LAZYOS_FORCE_PANIC=1` to prove the hook restores the cursor and the
+    // alternate screen, so it has to happen while the terminal is in UI mode.
+    if std::env::var_os("LAZYOS_FORCE_PANIC").is_some() {
+        panic!("LAZYOS_FORCE_PANIC: the frame's panic path");
+    }
 
     let code = match execute(resolved, &mut terminal, &design) {
         Ok(code) => code,
@@ -325,7 +333,9 @@ fn execute(
         "menu" => session_menu(resolved, terminal, design, menu::Surface::Root),
         "menu palette" => session_menu(resolved, terminal, design, menu::Surface::Palette),
         "ask" => session_menu(resolved, terminal, design, menu::Surface::Root),
-        "menu files" => empty_menu(resolved, terminal, design, "the file browser", "spec 009"),
+        "menu files" => files_menu(resolved, terminal, design),
+        "menu find" => find_menu(resolved, terminal, design),
+        "menu grep" => grep_menu(resolved, terminal, design),
         "task attach" => task_cmd::attach(resolved, terminal, design),
         other => Err(Failure::new(
             format!("`{other}` is in the table but has no implementation"),
@@ -478,59 +488,207 @@ fn act(picked: menu::screen::Picked, state: &std::path::Path, home: &str) -> Res
     }
 }
 
-/// The empty state spec 001 ships for a surface whose spec has not landed: it
-/// proves the host, the frame and the keys, and writes nothing.
-fn empty_menu(
-    resolved: &Resolved,
+/// `lazyos open PATH` (`lazyos-view`): the opener table for one path, and the
+/// program it names takes this process's place, the way the script's `exec`
+/// did - GIO and `xdg-open` see the viewer, not a launcher that exited.
+fn open_path(resolved: &Resolved) -> i32 {
+    let usage = || {
+        eprintln!("usage: lazyos open PATH   (or lazyos-view PATH, or a file:// URI)");
+        EXIT_USAGE
+    };
+    let words: Vec<&String> = resolved
+        .args
+        .iter()
+        .filter(|a| a.as_str() != "--")
+        .collect();
+    let [arg] = words.as_slice() else {
+        return usage();
+    };
+    let cwd = std::env::current_dir().unwrap_or_else(|_| "/".into());
+    let Some(path) = files::open::path_from_arg(arg, &cwd) else {
+        return usage();
+    };
+    let tools = files::open::System::from_env();
+    match files::open::plan(&path, files::open::is_text(&path), &tools) {
+        Ok(plan) => {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
+            if plan.image_hint {
+                files::image_hint(&home);
+            }
+            use std::os::unix::process::CommandExt;
+            let error = std::process::Command::new(&plan.argv[0])
+                .args(&plan.argv[1..])
+                .exec();
+            files::refuse(&path, &format!("Could not start {}: {error}", plan.argv[0]));
+            EXIT_FAILED
+        }
+        Err(refusal) => {
+            files::refuse(&path, refusal.message());
+            EXIT_FAILED
+        }
+    }
+}
+
+/// The session's home and state, for the three file surfaces.
+fn file_paths() -> Result<(std::path::PathBuf, std::path::PathBuf), Failure> {
+    let vars: BTreeMap<String, String> = std::env::vars().collect();
+    let paths = paths::Paths::resolve(&vars).map_err(|error| {
+        Failure::new("cannot find the session state directory", error.to_string())
+    })?;
+    let home = vars
+        .get("HOME")
+        .map(std::path::PathBuf::from)
+        .ok_or_else(|| Failure::new("HOME is not set", "the file surfaces start there"))?;
+    Ok((home, paths.state))
+}
+
+/// One directory argument, after the flags a surface accepts.
+fn dir_arg(
+    given: Option<&String>,
+    home: &std::path::Path,
+) -> Result<Option<std::path::PathBuf>, Failure> {
+    let Some(given) = given else { return Ok(None) };
+    let path = if given == "~" {
+        home.to_path_buf()
+    } else if let Some(rest) = given.strip_prefix("~/") {
+        home.join(rest)
+    } else {
+        std::env::current_dir()
+            .unwrap_or_else(|_| "/".into())
+            .join(given)
+    };
+    match std::fs::canonicalize(&path) {
+        Ok(dir) if dir.is_dir() => Ok(Some(dir)),
+        _ => Err(Failure::new(
+            format!("{} is not a folder", path.display()),
+            "give a folder, or nothing to start where you were",
+        )),
+    }
+}
+
+fn run_screen(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     design: &Design,
     title: &str,
-    arrives: &str,
+    screen: &mut dyn Screen,
 ) -> Result<i32, Failure> {
-    if let Some(extra) = resolved.args.first() {
-        return Err(Failure::new(
-            format!("`{extra}` is not something this menu knows"),
-            format!("try: lazyos {}", resolved.spec.path),
-        ));
-    }
-    let hint = format!("{arrives} - Esc closes");
-    let mut screen = EmptyMenu {
-        inner: EmptyScreen::new(title, hint),
-    };
-    let mut app = App::new(Header::new("LazyOS").subtitle(title))
+    App::new(Header::new(title.to_string()))
         .design(design.clone())
-        .keybar(vec![
-            KeyHint::new("Esc", "close"),
-            KeyHint::new("q", "close"),
-        ])
-        .screen(&mut screen);
-    app.run(terminal)
+        .screen(screen)
+        .run(terminal)
         .map_err(|error| Failure::new("the terminal stopped answering", error.to_string()))
 }
 
-/// An empty surface's body, and the one place a panic can be forced on purpose.
-///
-/// The acceptance test sets `LAZYOS_FORCE_PANIC=1` to prove the hook restores
-/// the cursor and the alternate screen; the panic has to happen while the
-/// terminal is in UI mode, which is what drawing the body is.
-struct EmptyMenu {
-    inner: EmptyScreen,
+/// `lazyos menu files [--hidden] [--search] [DIR]` (`rofi-files`).
+fn files_menu(
+    resolved: &Resolved,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    design: &Design,
+) -> Result<i32, Failure> {
+    let (home, state) = file_paths()?;
+    let (mut hidden, mut search, mut dir) = (false, false, None);
+    let mut words = resolved.args.iter();
+    while let Some(word) = words.next() {
+        match word.as_str() {
+            "--hidden" => hidden = true,
+            "--search" => search = true,
+            "--" => dir = words.next(),
+            flag if flag.starts_with('-') => {
+                return Err(Failure::new(
+                    format!("`{flag}` is not something this list knows"),
+                    "try: lazyos menu files [--hidden] [--search] [DIR]",
+                ));
+            }
+            _ => dir = Some(word),
+        }
+    }
+    let memory = state.join("files-last");
+    let mode = if search {
+        files::browse::Mode::Search
+    } else {
+        files::browse::Mode::Browse
+    };
+    let given = dir_arg(dir, &home)?;
+    let start = match mode {
+        files::browse::Mode::Search => home.clone(),
+        files::browse::Mode::Browse => files::browse::start_dir(given.as_deref(), &memory, &home),
+    };
+    if mode == files::browse::Mode::Browse {
+        files::browse::remember(&memory, &start);
+    }
+    let setup = files::browse::Setup {
+        dir: start,
+        mode,
+        hidden,
+        home: home.clone(),
+        memory,
+        path_var: std::env::var("PATH").unwrap_or_default(),
+    };
+    let mut screen =
+        files::browse::FilesScreen::new(setup, Some(files::preview::Previewer::for_session(&home)));
+    let code = run_screen(terminal, design, "Files", &mut screen)?;
+    Ok(files::finish(
+        screen.chosen.take(),
+        code,
+        &home.display().to_string(),
+    ))
 }
 
-impl Screen for EmptyMenu {
-    fn draw(&mut self, ctx: &mut BodyCtx) {
-        if std::env::var_os("LAZYOS_FORCE_PANIC").is_some() {
-            panic!("LAZYOS_FORCE_PANIC: the frame's panic path");
-        }
-        self.inner.draw(ctx)
+/// `lazyos menu find [DIR]` (`lazyos-find`, Search+Shift).
+fn find_menu(
+    resolved: &Resolved,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    design: &Design,
+) -> Result<i32, Failure> {
+    let (home, _) = file_paths()?;
+    let words: Vec<&String> = resolved
+        .args
+        .iter()
+        .filter(|a| a.as_str() != "--")
+        .collect();
+    if words.len() > 1 || words.first().is_some_and(|w| w.starts_with('-')) {
+        return Err(Failure::new(
+            "lazyos menu find takes one folder",
+            "try: lazyos menu find [DIR]",
+        ));
     }
+    let root = dir_arg(words.first().copied(), &home)?.unwrap_or_else(|| home.clone());
+    let path = std::env::var("PATH").unwrap_or_default();
+    let fd = files::browse::fd_program(&path);
+    let mut screen = files::find::FindScreen::new(
+        root,
+        home.clone(),
+        fd,
+        Some(files::preview::Previewer::for_session(&home)),
+    );
+    let code = run_screen(terminal, design, "Find", &mut screen)?;
+    let chosen = screen.chosen.take();
+    // The walk ends with the window, before anything is opened.
+    drop(screen);
+    Ok(files::finish(chosen, code, &home.display().to_string()))
+}
 
-    fn key(&mut self, key: KeyEvent, design: &Design) -> Outcome {
-        if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
-            return Outcome::Done(EXIT_ESCAPE);
-        }
-        self.inner.key(key, design)
-    }
+/// `lazyos menu grep [TEXT]` (`rofi-grep`, Alt+Ctrl+G).
+fn grep_menu(
+    resolved: &Resolved,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    design: &Design,
+) -> Result<i32, Failure> {
+    let (home, _) = file_paths()?;
+    let words: Vec<&str> = resolved
+        .args
+        .iter()
+        .map(String::as_str)
+        .filter(|a| *a != "--")
+        .collect();
+    let query = (!words.is_empty()).then(|| words.join(" "));
+    let path = std::env::var("PATH").unwrap_or_default();
+    let rg = files::open::on_path(&path, "rg").then(|| "rg".to_string());
+    let mut screen = files::grep::GrepScreen::new(home.clone(), home.clone(), rg, query);
+    let code = run_screen(terminal, design, "Search inside files", &mut screen)?;
+    let chosen = screen.chosen.take();
+    drop(screen);
+    Ok(files::finish(chosen, code, &home.display().to_string()))
 }
 
 /// The error card: what failed, and the one thing to try next.

@@ -289,6 +289,47 @@ yet present in `scripts/` as not implemented.
   bring an async runtime into a binary that has none. `task_start` waits for spec 010,
   which gives a task an allow-listed program; the manual is `07-agents.md` § *The desktop
   the agent can drive*.
+- **The three file questions are one binary with one opener table, and the preview is
+  the picture** (spec 009). `lazyos menu files` (`rofi-files`: a folder, or `--search`'s
+  newest 500), `menu find` (`lazyos-find`: every file, filtered while `fd` walks) and
+  `menu grep` (`rofi-grep`: ripgrep, a match opened at its line) replace the three
+  scripts, and `lazyos open` replaces `lazyos-view`; all four names are links to
+  `/usr/bin/lazyos` in `~/.config/bin`, so the keys, the `.desktop` entries,
+  `mimeapps.list`, `xdg-open` and every script that opens a folder kept their paths.
+  The later bullets about `rofi-files`, `lazyos-find` and `rofi-grep` describe the
+  scripts this replaced; their rules are what the table and the screens keep.
+  **One table** (`lazyos-cli/src/files/open.rs`): extension → family → glyph, theme
+  icon, thumbnail and program, decided in the scripts' order (papers before the NUL
+  test, a picture - an SVG too - before it, `bat` for text, `mpv` for video, the
+  browser for the rest), because the old arrangement was three copies kept in step by
+  hand and a difference between them was a file that opened one way from the list and
+  another from a double click. **The preview is the picture**: a row is a Nerd Font
+  glyph, and the pane beside the list is where a file is *seen* - the XDG large
+  thumbnail (256 px, made once by `lazyos-thumbnail` into `~/.cache/thumbnails/large`,
+  drawn at most twice its size because `Resize::Fit` alone drew it as a stamp and a
+  stretched 128 px one was a blur), a text excerpt with control characters dropped, a
+  folder's names, or the facts. **The terminal is asked how to draw it once, on the UI
+  thread, before the first frame**: `CSI 16 t` and `CSI c` with `poll` and a 300 ms
+  deadline, sixel when attribute 4 is there and half blocks otherwise
+  (`LAZYOS_PICTURES=halfblocks|off` decides without asking). `ratatui-image`'s own
+  query reads stdin in a thread that outlives its timeout, and in a pty that did not
+  answer that thread read the Escape meant for the window, which then waited for ever
+  (traced: the thread's `read(0)` got `\x1b`, the main loop's blocked) - so the library
+  draws and this binary asks. The walk sends each path over a **bounded** channel the
+  moment it is read, never held for a batch (a batched first version showed 256 of
+  301 paths while `fd` paused), into `ListState::extend_rows`, which filters only the
+  new rows and keeps the cursor on its row; measured on the build host with the real
+  `fd`, a 100,000-file tree painted its first row in 12.6 ms (release) and finished
+  in 103 ms, and a keystroke over all of it cost 1-67 ms. **Each window owns its
+  child**: `fd` and `rg` are killed and reaped when the window or the search ends, so
+  Escape needs no `pkill` pattern. The row actions are **Tab**: in the session sway
+  binds `Alt+1` to workspace 1 and foot asks for no shortcut inhibitor, so the key rofi
+  used never reaches a framework window (it is still accepted where it does). Grep
+  opens a match in the window with the line marked and in view, which is what
+  `bat | less +N` could not do. `check-system.sh` FAILs when a name is not the link,
+  when a command is missing from `--help` or a link from `--symlinks`, when `fd` or
+  `rg` is gone and when the thumbnail cache cannot be written; the manual is
+  `02-rofi.md` § *Browsing files*.
 - **Work ships as a spec, one branch and one PR each.** [`specs/`](specs/README.md) turns
   [`docs/plan-ui.md`](docs/plan-ui.md) §16 into 14 mergeable specs, each naming its scope,
   acceptance criteria, three witnesses, tests and the `opencode go` model that builds it. The

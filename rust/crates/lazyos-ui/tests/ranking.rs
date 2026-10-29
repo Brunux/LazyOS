@@ -219,3 +219,41 @@ fn ranking_does_not_allocate_per_row() {
         "a ranked keystroke over 5,000 rows allocated {large_typing}/{large_back} times"
     );
 }
+
+/// Rows that stream in (spec 009's walk) are filtered as they arrive, and the
+/// row under the cursor stays under it: a batch must not move a person's place.
+#[test]
+fn rows_that_arrive_later_are_filtered_and_keep_the_cursor() {
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    let design = lazyos_ui::Design::solarized();
+    let down = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
+
+    let mut plain = ListState::new();
+    plain.set_rows(vec![Row::new("a.txt"), Row::new("b.rs"), Row::new("c.txt")]);
+    plain.handle(down, 10, &design);
+    plain.set_filter("txt");
+    assert_eq!(plain.selected().unwrap().label, "c.txt");
+    plain.extend_rows(vec![Row::new("d.rs"), Row::new("e.txt")]);
+    assert_eq!(
+        plain.visible_len(),
+        3,
+        "only the new row that matches joins"
+    );
+    assert_eq!(plain.selected().unwrap().label, "c.txt");
+
+    let mut ranked = ListState::new().ranked();
+    ranked.set_rows(vec![Row::new("src/notes.md"), Row::new("a/notes-old.md")]);
+    ranked.set_filter("notes");
+    ranked.handle(down, 10, &design);
+    let before = ranked.selected().unwrap().label.clone();
+    // A better match arrives: it ranks first, and the cursor follows its row.
+    ranked.extend_rows(vec![Row::new("notes"), Row::new("unrelated")]);
+    assert_eq!(ranked.visible_len(), 3);
+    assert_eq!(ranked.selected().unwrap().label, before);
+    ranked.set_cursor(0);
+    assert_eq!(
+        ranked.selected().unwrap().label,
+        "notes",
+        "the exact match is first"
+    );
+}

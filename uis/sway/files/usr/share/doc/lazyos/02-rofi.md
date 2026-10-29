@@ -11,8 +11,8 @@ daemon).
 | **Alt+Shift+D** | `rofi -show run` | every executable in `$PATH`. **Enter** runs it, **Shift+Enter** runs it in foot |
 | **Alt+Space** | `lazyos menu` (`bar-menu`) | the root menu: what opens something, the AI rows (Ask among them), the system panels, and the session actions - type to narrow it |
 | **Alt+Ctrl+K** | `rofi-keys` | every key binding this session defines, parsed from `/etc/sway` and `~/.config/sway`. Enter copies the command |
-| **Alt+Ctrl+F** | `rofi-files` | the filesystem: directories first, sizes and dates dimmed. Enter opens a directory or reads a text file in foot; the dotfiles are one row away |
-| **Alt+Ctrl+G** | `rofi-grep` | **search inside the files**: ripgrep over your home, one row per match; Enter opens the file at that line |
+| **Alt+Ctrl+F** | `lazyos menu files` (`rofi-files`) | the filesystem with a preview beside it: directories first, sizes and dates dimmed. Enter opens a directory or the file; the dotfiles are Ctrl+H away |
+| **Alt+Ctrl+G** | `lazyos menu grep` (`rofi-grep`) | **search inside the files**: ripgrep over your home, one row per match; Enter opens the file at that line, in the same window |
 | **Alt+Ctrl+D** | `rofi-dev` | **developer**: export your profile (keys, configs, package list) into an encrypted archive on a disk, restore one, or save a diagnostics bundle |
 | **Download** (root menu, launcher) | `rofi-download` | a link - or the one in the clipboard - kept in `~/Downloads`, as a video or as audio |
 | **Alt+Ctrl+C** | `rofi-capture` | **capture**: a screenshot (screen, area or window), annotate it, read the text or a QR code out of a region, and start or stop a recording |
@@ -204,92 +204,91 @@ on it stops a stoppable task the same way **s** does.
 
 ## Browsing files
 
-`rofi-files` (Alt+Ctrl+F, "Files" in the root menu and the launcher) is a shell
-script over `rofi -dmenu`, because rofi 2.0 has no filebrowser mode:
+Three keys ask three different questions about your files, and each one is a
+window of the session framework (`lazyos`) with the list on the left and a
+**preview** on the right once the window is wide enough:
 
-* **every row has an icon**: a 32 px picture of the file (a photo, a video's
-  frame, a PDF's first page) where one can be decoded and a glyph from the
-  system's icon theme where it cannot - a folder, a text file, a page, a
-  document, an archive, an executable, a song - so the names line up under one
+| Key | Asks | Answers with |
+|---|---|---|
+| **Alt+Ctrl+F** | *what is in this folder?* | one folder at a time, where you left it |
+| **Alt+Search** | *which file was it?* | the newest 500 files of your home, filtered as you type |
+| **Search+Shift** | *I will know it when I see it* | every file under your home, filtered while it is still being found |
+| **Alt+Ctrl+G** | *where did I write this?* | every line that matches, opened at that line |
+
+Use the first when you know where to look, the second for something you made
+or downloaded lately, the third when the name is half remembered or very old,
+and the last when you remember a word *inside* the file and not its name.
+
+**The list** (`lazyos menu files`, the old name `rofi-files` still works):
+
+* **every row has a picture** from the session's alphabet - a folder, a page, a
+  picture, a film, an archive, a program - so the names line up under one
   column and the list says what things are before you read them;
-* directories come first, in cyan and with a trailing `/`; then files, with the
-  size and the date in the dim colour; a symlink to a directory navigates like a
-  directory, and a broken one says so (with a warning icon);
-* **Enter** opens a directory (the listing reopens there), reads a text file with
-  `bat` (paged, in the terminal's own solarized colours, `BAT_THEME=ansi`, inside
-  the floated `popup` window), opens a **document** (PDF, DjVu, a comic) in
-  **papers** - a reader with search, zoom, printing and annotations, not a
-  browser tab - draws an **image** with **imv** on the GPU (zoom, pan, rotate,
-  and the arrow keys walk the folder; `chafa`'s sixels in a foot window are the
-  fallback when imv gets no graphics context), and plays a **video** with **mpv**
-  in its own window (seek, subtitles, sound; press `q` to close it). A `.deb` or
-  anything else binary asks Firefox to open it, which is a download prompt -
-  still an answer;
-* the first row is `↑ parent directory`, and the last one toggles the dotfiles
-  (hidden ones are out of the way until asked for);
-* typing filters the list; a path that matches no row is taken literally, so
-  `/etc/sway/config.d` or `~/notes.md` can be typed and opened with
-  **Ctrl+Return** (or plain Enter once nothing matches);
-* the line under the prompt says where you are, how many directories and files
-  are there and how much space is left.
+* directories come first with a trailing `/`, then files with their size and
+  day in the dim colour; a link to a directory is a directory, and a broken one
+  says so; the first row is the parent, the last one the dotfiles (also
+  **Ctrl+H**), and **Backspace** with nothing typed goes up a level;
+* typing filters it, upper or lower case alike; a path that matches no row is
+  taken literally, so `/etc/sway/config.d` or `~/notes.md` can be typed and
+  opened with Enter;
+* **the preview** shows a picture, a video's frame or a PDF's first page as a
+  picture (sixel in foot, half blocks in a terminal that cannot draw them), the
+  first lines of a text file, the names in a folder, or what can be said about
+  anything else - its kind, size, date and permissions. A picture is made once
+  by `lazyos-thumbnail` into `~/.cache/thumbnails/large` and never again; while
+  it is being made the pane says so;
+* the header says where you are, how many folders and files there are and how
+  much space is left.
+
+**Enter opens with the program that fits** - the same table for the list, the
+walk, the search inside files, a double click in the window manager and
+`xdg-open` (`lazyos open`, the old name `lazyos-view`): text is read with `bat`
+in the floated popup (paged, in the terminal's own colours), a **document**
+(PDF, DjVu, a comic) opens in **papers**, a **picture** in **imv** (zoom, pan,
+rotate, the arrow keys walk the folder; `chafa`'s sixels when imv cannot
+start), a **video** in **mpv**, and a `.deb` or anything else binary asks
+Firefox, which is a download prompt - still an answer.
 
 **It opens where you left it.** The first time, Files starts in your home
-directory; after that it starts in the directory you were last browsing, and
-opening a file - from a row or from the file search - remembers that file's
-folder instead, so the next **Alt+Ctrl+F** is already where the file lives. The
-memory is one line in `~/.local/state/lazyos/files-last` (under `$XDG_STATE_HOME`
-when that is set); deleting the file sends the browser back to your home
-directory. The file search itself still searches all of `$HOME` and does not move
-that memory.
+directory; after that it starts in the folder you were last browsing, and
+opening a file remembers that file's folder instead. The memory is one line in
+`~/.local/state/lazyos/files-last`; deleting it sends the list back home.
+Alt+Search always searches all of your home and does not move that memory.
 
-**Alt+1 acts on the row instead of opening it.** Enter *opens* what is under the
-cursor; Alt+1 asks what else can be done with it, and the list offers only what
-fits: a directory can be measured (`du -sh`, as a card with the stop button) and
-packed into `name.tar.xz` next to itself, an archive unpacked into a folder named
-after it, a disk image mounted through `udisksctl` and opened in the browser, a
-video or a song converted with ffmpeg (MP4, or MP3 for the sound alone), and any
-row can be copied as a path or opened in a terminal. Nothing is touched until you
-pick something, an existing name is refused rather than overwritten, and every
-long action is a `busy` card with the bar's spinner - with the stop button where
-stopping is safe (a killed `mkfs` would leave a disk that looks formatted).
+**Tab acts on the row instead of opening it.** It opens the actions menu for
+that file or folder: measure a folder, pack it into `name.tar.xz`, unpack an
+archive, mount a disk image, convert a video or a song, copy the path, open a
+terminal there. Nothing is touched until you pick something, an existing name
+is refused rather than overwritten, and the long ones are `busy` cards with the
+bar's spinner. (In the rofi list this was **Alt+1**; inside the session sway
+keeps Alt+1 for workspace 1, so the window never hears it - it still works in a
+terminal outside sway.)
 
-**Alt+Search: the files, not the launcher.** Alt+Search (and
-`rofi-files --search`) opens one list of every file under your home directory,
-newest first, filtered as you type: type `notes` and the row list narrows to the
-notes; Enter opens the choice exactly as the browser does. It is one `fd` run
-capped at 500 matches with the caches and build directories left out
-(`.cache`, `.git`, `node_modules`, `.local/share/containers`), so it is instant
-even on a home directory with hundreds of thousands of files - if a query is too
-broad, type one more letter rather than scrolling. The dotfiles are still one row
-away, and Escape closes it without opening anything. With `fd` missing the
-script says so and opens the browser instead.
+**Alt+Search: which file was it.** One list of the newest 500 files under your
+home (the caches and build trees left out: `.cache`, `.git`, `node_modules`,
+`.local/share/containers`), newest first and filtered as you type; Enter opens
+the choice exactly like a row of the folder list. Without `fd` the window says
+which package is missing instead of showing an empty list.
 
-**Search+Shift: the same files, in a terminal.** The 500-row cap is the list's
-trade - it is what makes it open like a menu - so the question "where is the file
-I would recognise but cannot name" has a different answer: `lazyos-find` streams
-the whole tree through `fd` into `fzf`, with the same four exclusions and the
-dotfiles included, a preview pane on the right (text read with `bat`, a picture
-or a PDF page decoded once and drawn with `chafa`) and Enter handing the choice
-to the same opener a double click in the window uses. Nothing is capped, the
-prompt is up before the walk is finished, **Ctrl+Y** copies the chosen path, and
-Escape closes it. Both keys are one process while their window is open and
-nothing afterwards.
+**Search+Shift: every file, while it is found.** The walk (`lazyos menu find`,
+the old name `lazyos-find`) has no cap: `fd` walks the whole tree under your
+home - dotfiles included, the same four trees left out - and the rows appear as
+it finds them, so you can type before it is done and the best match rises to
+the top (a name, a word of it, or its letters in order: `nts` finds `notes.md`).
+The first rows are up in milliseconds even on a home of a hundred thousand
+files. **Ctrl+Y** copies the selected path, and **Escape stops the walk** and
+closes the window - nothing keeps walking after it.
 
-**Alt+Ctrl+G: the text inside the files.** The two keys above answer "which file
-was it" from the name. `rofi-grep` answers the other question - "where did I write
-this" - by running `ripgrep` over the same home directory and listing a row per
-match: the matching **text** on the row (which is what tells two matches apart),
-`path:line` in the dim colour, and Enter opening the file in `bat` scrolled to
-that line. bat colours the match and writes the page to a real temporary file,
-and `less -R +N` opens that file at the line - `-R` keeps the colours bat wrote,
-and the file is removed when the window closes. A pipe would be the obvious
-shape and is the one that does not work: `less` cannot seek it, and the old
-`bat | less +N` answered "Cannot seek to line number N" instead of showing the
-match. It is bounded like the
-list: three matches per file, the same four trees left out, binaries dropped by
-ripgrep itself, and 400 rows - type one more word to narrow it. A pattern ripgrep
-cannot read says so in ripgrep's own words, and the walk is a `busy` card with the
-stop button.
+**Alt+Ctrl+G: the text inside the files.** `lazyos menu grep` (the old name
+`rofi-grep`) asks for a word or a pattern, runs `ripgrep` over your home and
+lists one row per match: the matching **text** on the row, which is what tells
+two matches apart, and `path:line` beside it. Enter opens the file **at that
+line, in the same window**, with the line marked and in view; PageUp/PageDown
+move through it, **o** opens it with its program, and Escape goes back to the
+matches. It is bounded like the list - three matches per file, 400 rows, the
+same four trees left out - so type one more word to narrow a wide search. A
+pattern ripgrep cannot read is answered in ripgrep's own words, and Escape
+while it is still searching stops it.
 
 `xdg-open` exists too (`/usr/local/bin/xdg-open`, two dozen lines): a URL goes to
 Firefox, and a path goes to the same rule table a double click in the window uses

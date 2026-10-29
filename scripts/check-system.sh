@@ -1600,10 +1600,10 @@ fi
 
 # The Search key is the launcher and Alt+Search is the file search; they used to
 # be the other way around, so a key that goes back to the other menu no longer
-# does what the manual says. The file search needs all three halves asked for:
-# the --search mode of bin/rofi-files (without it the key exits with a usage
-# error and looks dead) and both press paths of the chord (keyd turns Alt-first
-# into F20; the release binding catches Search-first).
+# does what the manual says. The file search needs both press paths of the
+# chord (keyd turns Alt-first into F20; the release binding catches
+# Search-first); the --search mode itself is the binary's (spec 009, checked
+# with the other file surfaces below).
 if grep -qs 'Super_L exec .*\$launcher' "$HOME/.config/sway/config"; then
 	ok "the Search key opens the applications launcher (\$launcher)"
 else
@@ -1615,8 +1615,6 @@ if grep -qs 'F20 exec .*rofi-files --search' "$HOME/.config/sway/config" &&
 else
 	fail "Alt+Search is missing its F20 press binding or its Super_L+Mod1 release fallback in ~/.config/sway/config"
 fi
-grep -qs -- '--search)' "$HOME/.config/bin/rofi-files" ||
-	fail "bin/rofi-files has no --search mode: Alt+Search exits with a usage error"
 
 # Alt+D stays the launcher even though the Search key opens the same menu: an
 # overlay that unbinds it takes away the launcher key that does not go through
@@ -1629,20 +1627,50 @@ fi
 grep -qs 'bindsym \$mod+d exec' /etc/sway/config.d/19-launcher.conf ||
 	fail "/etc/sway/config.d/19-launcher.conf has no \$mod+d binding: Alt+d has nothing to run"
 
-# The file search needs fd; without it rofi-files says so and browses $HOME instead,
-# which looks like a search that found nothing.
+# The three search questions and the opener are the binary (spec 009): the
+# list (Alt+Ctrl+F, Alt+Search), the walk (Search+Shift), the text inside the
+# files (Alt+Ctrl+G) and what a double click or xdg-open runs. The old script
+# names are links to /usr/bin/lazyos, so the keys did not change - and a name
+# that is a script again, or a link to something else, is the old surface
+# back with a different opener table. Grepping a link to an ELF would match
+# strings in the binary and prove nothing, so the binary is asked instead:
+# `--help` lists the commands and `--symlinks` the links it installs.
+_fs_help=$(lazyos --help 2>/dev/null || :)
+_fs_links=$(lazyos --symlinks 2>/dev/null || :)
+for _fs in "rofi-files:menu files" "lazyos-find:menu find" "rofi-grep:menu grep" "lazyos-view:open"; do
+	_fs_name=${_fs%%:*}
+	_fs_cmd=${_fs#*:}
+	if ! grep -q "^  $_fs_cmd  " <<<"$_fs_help"; then
+		fail "lazyos has no \`$_fs_cmd\` (lazyos --help): $_fs_name has nothing to run"
+	elif [ "$(readlink -f "$HOME/.config/bin/$_fs_name" 2>/dev/null)" != /usr/bin/lazyos ]; then
+		fail "~/.config/bin/$_fs_name is not a link to /usr/bin/lazyos: the old script, or nothing, answers it"
+	elif ! grep -q "^$_fs_name	$_fs_cmd\$" <<<"$_fs_links"; then
+		fail "lazyos --symlinks does not install $_fs_name -> $_fs_cmd"
+	else
+		ok "$_fs_name is \`lazyos $_fs_cmd\` (spec 009)"
+	fi
+done
+# The walk and the list's --search need fd; without it both say so in the
+# window, which still reads as a search that found nothing.
 if have fd || have fdfind; then
-	ok "file search available (fd), which rofi-files --search runs"
+	ok "file search available (fd), which the list's --search and the walk run"
 else
-	fail "fd is missing (package fd-find): rofi-files --search falls back to browsing"
+	fail "fd is missing (package fd-find): Alt+Search and Search+Shift have nothing to walk with"
+fi
+# The preview's pictures are the XDG large thumbnails (256 px). A cache that
+# cannot be written is a pane that says "making the thumbnail" for ever.
+# The report changes nothing, so a cache that does not exist yet is judged by
+# the nearest folder that does: the thumbnailer creates the rest.
+_fs_cache="${XDG_CACHE_HOME:-$HOME/.cache}/thumbnails/large"
+_fs_dir=$_fs_cache
+while [ ! -d "$_fs_dir" ] && [ "$_fs_dir" != / ]; do _fs_dir=$(dirname "$_fs_dir"); done
+if [ -w "$_fs_dir" ]; then
+	ok "the preview's thumbnail cache is writable ($_fs_cache)"
+else
+	fail "$_fs_cache is not writable: the file preview can never show a picture"
 fi
 
-# The terminal file search (Search+Shift) asks the same question with fzf:
-# lazyos-find streams fd into fzf and hands the choice to lazyos-view. There are
-# four separate ways for that key to look dead - no binding, a script without its
-# executable bit, no fzf, no opener - and the fzf one is a FAIL rather than a
-# warning because a missing filter is an *empty list*: the window opens, prints
-# nothing, and reads as "no such file" instead of as a missing package.
+# Search+Shift is the walk: every file under $HOME, filtered while fd runs.
 if grep -qs 'Super_L+Shift exec .*lazyos-find' "$HOME/.config/sway/config"; then
 	ok "Search+Shift opens the terminal file search (lazyos-find)"
 else
@@ -1653,26 +1681,11 @@ if grep -qs '^leftmeta = f20$' /etc/keyd/default.conf; then
 else
 	fail "/etc/keyd/default.conf does not map leftmeta = f20: holding Alt and tapping Search does nothing"
 fi
-if [ -x "$HOME/.config/bin/lazyos-find" ]; then
-	ok "terminal file search (lazyos-find) is executable"
-else
-	fail "bin/lazyos-find is missing or not executable: Search+Shift opens a foot window that closes at once"
-fi
-if have fzf; then
-	ok "fzf present, which the terminal file search filters with"
-else
-	fail "fzf is missing (package fzf): Search+Shift lists nothing"
-fi
-# Its notifications carry the search glyph, and a name mako cannot resolve draws
-# no picture at all: the card is text-only with no log line.
-[ -r /usr/share/icons/LazyOS/48x48/apps/system-search.png ] ||
-	warn "the LazyOS theme has no system-search icon: lazyos-find's notifications are text-only"
 
 # Search inside files (Alt+Ctrl+G) is the other half of the file search (Alt+Search):
-# rofi-files finds a file by its name, rofi-grep by what is written in it. Two
-# things take it away and neither says so - a missing binding (the key does
-# nothing) or a missing ripgrep (the menu opens, refuses, and reads as "no
-# matches").
+# the list finds a file by its name, grep by what is written in it. Two things
+# take it away and neither says so - a missing binding (the key does nothing)
+# or a missing ripgrep (the window says so, and it reads as "no matches").
 if grep -rqs 'Ctrl+g exec .*rofi-grep' /etc/sway/config.d/; then
 	ok "Alt+Ctrl+G searches inside the files (rofi-grep)"
 else
@@ -1680,15 +1693,6 @@ else
 fi
 have rg && ok "ripgrep present, which the search inside files runs" ||
 	fail "ripgrep is missing (package ripgrep): Alt+Ctrl+G finds nothing"
-# Enter opens the match at its line. less cannot seek a pipe, so bat writes the
-# page to a real file; piping bat into less answered "Cannot seek to line number
-# N" and left the match below the screen.
-if grep -qs 'lazyos-grep.XXXXXX' "$HOME/.config/bin/rofi-grep" &&
-	grep -qs 'less -R "+$1" "$2"' "$HOME/.config/bin/rofi-grep"; then
-	ok "a match opens at its line (less seeks a real page file)"
-else
-	warn "bin/rofi-grep no longer gives less a seekable file: the page starts at the top"
-fi
 
 # Download (the root menu and the launcher) is yt-dlp plus the two things that
 # make it useful: ffmpeg to merge a video stream with its audio, and node as the
@@ -1717,26 +1721,9 @@ done
 [ -z "$_missing_home" ] && ok "the home folders are there (Documents, Downloads, Music, Videos)" ||
 	warn "home folders missing:$_missing_home (rootfs-setup.sh creates them; a download recreates Downloads)"
 
-# Alt+1 in the file browser is rofi's -kb-custom-1 and needs two halves: the flag
-# in rofi-files and bin/rofi-file-actions behind it. Without the flag rofi exits 0
-# and Enter's action runs instead - the row opens when the person asked to act on
-# it - which is silent.
-if grep -qs -- '-kb-custom-1 Alt+1' "$HOME/.config/bin/rofi-files"; then
-	ok "the file browser passes Alt+1 through to rofi (-kb-custom-1)"
-else
-	warn "bin/rofi-files no longer passes -kb-custom-1 Alt+1: Alt+1 opens the row instead of acting on it"
-fi
-# The browser remembers the last directory in $XDG_STATE_HOME/lazyos/files-last.
-# Two edits make it silently forget: dropping the state path (every Alt+Ctrl+F
-# starts in $HOME again) or removing the --search guard (a search overwrites the
-# memory, so the browser goes home after it).
-if grep -qs 'files-last' "$HOME/.config/bin/rofi-files" &&
-	grep -qs 'XDG_STATE_HOME' "$HOME/.config/bin/rofi-files" &&
-	grep -qs 'from_search' "$HOME/.config/bin/rofi-files"; then
-	ok "the file browser remembers its directory (\$XDG_STATE_HOME/lazyos/files-last)"
-else
-	warn "bin/rofi-files has no files-last memory: every Alt+Ctrl+F starts in \$HOME"
-fi
+# The file list's Tab (Alt+1 where it arrives) hands the row to
+# bin/rofi-file-actions, which is still a script: without it the key says the
+# actions menu did not start.
 _missing_actions=""
 for _c in tar unzip ffmpeg udisksctl; do have "$_c" || _missing_actions="$_missing_actions $_c"; done
 [ -x "$HOME/.config/bin/rofi-file-actions" ] || _missing_actions="$_missing_actions bin/rofi-file-actions"
@@ -2818,10 +2805,6 @@ if [ -x "$HOME/.config/bin/lazyos-image-hint" ]; then
 else
 	fail "bin/lazyos-image-hint is missing or not executable: imv opens with no key hint"
 fi
-for _f in rofi-files lazyos-view; do
-	grep -qs 'lazyos-image-hint' "$HOME/.config/bin/$_f" ||
-		warn "bin/$_f no longer calls lazyos-image-hint: pictures opened that way get no hint"
-done
 # mpv-mpris is a plugin file, not a program, so nothing else notices it: without
 # it the film plays and playerctl, the Media menu and the bar see no player.
 if [ -r /etc/mpv/scripts/mpris.so ]; then
@@ -2831,15 +2814,6 @@ else
 fi
 if [ -d "$HOME/.cache/thumbnails" ] && [ ! -w "$HOME/.cache/thumbnails" ]; then
 	warn "$HOME/.cache/thumbnails is not writable: every picture is decoded again on every listing"
-fi
-# And the browser has to keep asking: an edit that drops the flag or the
-# thumbnail:// suffix makes the list silently text-only.
-if [ -r "$HOME/.config/bin/rofi-files" ] &&
-	grep -qs -- '-show-icons' "$HOME/.config/bin/rofi-files" &&
-	grep -qs 'thumbnail://' "$HOME/.config/bin/rofi-files"; then
-	ok "rofi-files asks rofi for thumbnails (-show-icons and thumbnail://)"
-else
-	warn "rofi-files no longer passes -show-icons/thumbnail://: the file list shows no pictures"
 fi
 
 # A video is mpv's job: chafa only draws stills and answers a container with

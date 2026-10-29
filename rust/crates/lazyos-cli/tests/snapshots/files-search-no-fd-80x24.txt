@@ -1,0 +1,24 @@
+Files · Search fd is missing (package fd-find): there is nothing to search with
+────────────────────────────────────────────────────────────────────────────────
+╭ Search ──────────────────────────────────────────────────────────────────────╮
+│ type to filter, or a path - Enter opens it                                  │
+│                                                                              │
+│ fd is missing (package fd-find): there is nothing to search with             │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ [Enter]  open   [Tab]  actions   [Bksp]  up   [Ctrl+H]  dotfiles   [Esc]  close

@@ -192,7 +192,7 @@ EPUB, a `.deb`, or anything whose own viewer is missing.
   about.
 * `xdg-open` exists (`/usr/local/bin/xdg-open`, two dozen lines): a URL goes to
   Firefox, and a path goes to the same rule table a double click in favnyr uses
-  (`lazyos-view`), so a file opened from a script lands where it would land from
+  (`lazyos open`, linked as `lazyos-view`), so a file opened from a script lands where it would land from
   the desktop. That is what foot's ctrl+click and the command-line tools that
   print a URL call - there is no desktop portal in this image.
 * It is a normal Wayland client here (no Xwayland needed), and its icon is its
@@ -208,7 +208,7 @@ running after the list closes. It seeks, shows subtitles, follows the screen's
 refresh rate and takes the keyboard while its window has the focus - `q` quits,
 `space` pauses, the arrow keys seek, `f` goes fullscreen.
 
-It is deliberately plain: `rofi-files` starts it with `--no-config`, so nothing
+It is deliberately plain: the file list starts it with `--no-config`, so nothing
 in `~/.config/mpv` (a shader, a GUI driver, a profile copied from another
 machine) changes what a click does - write that file if you want to, but the
 session's behaviour does not depend on it. A still picture does not start mpv:
@@ -381,7 +381,7 @@ one: tile it, move it to another workspace, close it with **Alt+Q**.
   decides, and it names the same programs the list does: a document (PDF, DjVu, a
   comic) goes to `papers`, a directory to favnyr, a page or a `.deb` to Firefox,
   and text, pictures and video to `org.lazyos.view.desktop` ->
-  `~/.config/bin/lazyos-view`, which is the rule table `rofi-files` follows (text
+  `~/.config/bin/lazyos-view` (`lazyos open`), the one table the file list follows too (text
   in `bat`, a picture in `imv` - sixels in a foot window when imv cannot start - a
   video in `mpv`, an EPUB in Firefox; the list reads an HTML file as text where a
   double click opens the page). There is no desktop portal in this image, so those

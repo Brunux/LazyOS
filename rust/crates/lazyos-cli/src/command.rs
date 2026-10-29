@@ -136,14 +136,40 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
-        // The file browser (`rofi-files` today). Its own spec ports the
-        // surface; until then both paths show the same empty state, which is
-        // what keeps "one handler" true from the first commit.
+        // The file list (spec 009). `rofi-files` is a link to this binary in
+        // the UI tree, so Alt+Ctrl+F, Alt+Search (`--search`), the launcher
+        // entry and the scripts that open a folder did not change.
         path: "menu files",
-        summary: "browse files (spec 009)",
+        summary: "browse a folder with a preview, or --search the newest files (spec 009)",
         shape: Shape::Pick,
         symlinks: &["rofi-files"],
-        installed: &[],
+        installed: &["rofi-files"],
+    },
+    CommandSpec {
+        // The uncapped walk with a preview (Search+Shift), where fzf was.
+        path: "menu find",
+        summary: "every file under a folder, filtered while it walks (spec 009)",
+        shape: Shape::Pick,
+        symlinks: &["lazyos-find"],
+        installed: &["lazyos-find"],
+    },
+    CommandSpec {
+        // ripgrep over the home folder (Alt+Ctrl+G); a match opens at its line.
+        path: "menu grep",
+        summary: "search inside the files; a match opens at its line (spec 009)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-grep"],
+        installed: &["rofi-grep"],
+    },
+    CommandSpec {
+        // The opener table applied to one path: what a double click in favnyr
+        // (org.lazyos.view.desktop), xdg-open and every list run. It starts
+        // the viewer and opens no window of its own.
+        path: "open",
+        summary: "open a file with the program that fits it (spec 009)",
+        shape: Shape::Direct,
+        symlinks: &["lazyos-view"],
+        installed: &["lazyos-view"],
     },
     CommandSpec {
         // The desktop as MCP tools for an agent (spec 008): a stdio server an
