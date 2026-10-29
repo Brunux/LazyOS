@@ -194,7 +194,7 @@ specs.
 | 005 | [`005-taskview.md`](005-taskview.md) — the task surface | 2 | merged |
 | 006 | [`006-notifications.md`](006-notifications.md) — cards and icons | 2 | merged |
 | 007 | [`007-menu-ask.md`](007-menu-ask.md) — root menu, palette, Ask strip | 2 | in progress |
-| 008 | [`008-mcp.md`](008-mcp.md) — `lazyos mcp` and the OpenCode contract | 2 | approved |
+| 008 | [`008-mcp.md`](008-mcp.md) — `lazyos mcp` and the OpenCode contract | 2 | in progress |
 | 009 | [`009-search.md`](009-search.md) — files, find, grep | 3 | draft |
 | 010 | [`010-system-pickers.md`](010-system-pickers.md) — system dialogs | 3 | draft |
 | 011 | [`011-media-pickers.md`](011-media-pickers.md) — media and utilities | 3 | draft |
