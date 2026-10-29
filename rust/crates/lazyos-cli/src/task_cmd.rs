@@ -8,7 +8,7 @@ use std::io;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use lazyos_ui::app::exit::{FAILED, OK};
+use lazyos_ui::app::exit::{ESCAPE, FAILED, OK, USAGE};
 use lazyos_ui::{App, Design, Header, Task, TaskState, TaskView};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
@@ -56,6 +56,64 @@ pub fn attach(
         .screen(&mut view);
     app.run(terminal)
         .map_err(|error| Failure::new("the terminal stopped answering", error.to_string()))
+}
+
+/// `lazyos task stop <id>`: write the stop request a viewer writes, for a task
+/// that is running and whose record says it may be stopped. The runner owns the
+/// child and forwards the stop (SIGINT, then SIGTERM); this command never sends
+/// a signal itself. Exit 0 requested, 1 nothing to stop (not running), 2 usage,
+/// 3 refused or unreadable, with the reason on stderr.
+pub fn stop(resolved: &Resolved) -> i32 {
+    let id = match resolved.args.as_slice() {
+        [id] if valid_id(id) => id.clone(),
+        _ => {
+            eprintln!("usage: lazyos task stop <id>   (an id from the task directory)");
+            return USAGE;
+        }
+    };
+    let paths = match Paths::from_process() {
+        Ok(paths) => paths,
+        Err(error) => {
+            eprintln!("lazyos task stop: {error}");
+            return FAILED;
+        }
+    };
+    match Task::load(&id, &paths.state) {
+        Ok(Some(task)) => {
+            if !task.stoppable {
+                eprintln!(
+                    "lazyos task stop: '{id}' cannot be stopped (its record says so: a half-done step would be worse than the wait)"
+                );
+                return FAILED;
+            }
+            if task.state != TaskState::Running {
+                println!("'{id}' is not running ({:?}); nothing to stop", task.state);
+                return ESCAPE;
+            }
+            task.request_stop();
+            println!("stop requested for '{id}' ({})", task.title);
+            OK
+        }
+        Ok(None) => {
+            eprintln!("lazyos task stop: no task '{id}'");
+            FAILED
+        }
+        Err(error) => {
+            eprintln!("lazyos task stop: '{id}' could not be read: {error}");
+            FAILED
+        }
+    }
+}
+
+/// A task id names a file in the task directory, so it is one path component
+/// of plain characters: never `..`, never a `/`.
+pub fn valid_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 96
+        && !id.starts_with(['.', '-'])
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
 /// The headless runner: the process that actually owns the task's child.

@@ -255,6 +255,40 @@ yet present in `scripts/` as not implemented.
   stop file only works when the window lives long enough to write it. `check-system.sh` FAILs on
   a process with the mark whose `--ask-run` is gone. No server, no streaming, no conversation:
   that is a later spec.
+- **The agent drives the desktop through a manifest, and the manifest is the witness that
+  the AI proposes and the person confirms** (spec 008). `lazyos mcp` is an MCP server in
+  the same binary (stdio, `Shape::Direct`, no window), registered for OpenCode in
+  `~/.config/opencode/opencode.json` and explained to it by `~/.config/opencode/AGENTS.md`,
+  the global rules file OpenCode reads in every session. Its 18 tools are a table in
+  `lazyos-mcp/src/manifest.rs` with four tiers: **read** (status, windows, screenshot,
+  packages, the system report, clipboard, tasks), **act** (visible and reversible: the menu
+  with a filter typed, a task's window or its stop, the theme, a card, a viewer), **propose**
+  (install, format, swap, power) and **refuse** (`run`, `*_apply`, `kpart_write`,
+  `partition_write`, `profile_*`). A refused name in the table is a **build error** (a const
+  assertion), not a test that someone can skip; at run time it is answered `-32602` with the
+  menu to point the person at, and logged. **A propose tool opens the real gated window** -
+  `rofi-install`, `rofi-format`, `rofi-swap`, or `lazyos menu --power ACTION` (the confirm
+  with Cancel selected and the list's cursor on that action) - and returns "proposed"
+  without the answer, with a 30 s cooldown so an agent cannot stack confirmations: a second,
+  agent-shaped confirmation would be one more question the person learns to click through,
+  while the window that already guards the action is the one they know. Nothing goes
+  through a shell (each tool maps to this binary's words, a session script or a reader with
+  a timeout), every argument is checked against its schema before a handler sees it (closed
+  objects, lengths in characters, no control characters, and a schema keyword the validator
+  does not know is refused rather than skipped), and the names use `_` because providers
+  accept only `[A-Za-z0-9_-]` in a tool name. **A screenshot is the screen, private windows
+  included**, so it is four fixed `0600` slots in a `0700` directory of the server's own
+  under `$XDG_RUNTIME_DIR`, removed at the end of input and on SIGTERM/SIGINT/SIGHUP, and
+  swept by the next server after a SIGKILL; the call log (`mcp.log`, `0600`) records the
+  tool and its outcome, never the arguments. The manifest version is a hash of the rows
+  (name, tier, schema, limit, mapping), `--tools` prints it and the instructions file pins
+  it, so `check-system.sh` FAILs when the two drift, when a refused name or tier is served,
+  when the handshake does not list every tool, when a propose window is not executable and
+  when the registration is gone. The protocol is hand-written over `serde_json` rather than
+  `rmcp`: the subset is initialize, tools and resources over stdio lines, and an SDK would
+  bring an async runtime into a binary that has none. `task_start` waits for spec 010,
+  which gives a task an allow-listed program; the manual is `07-agents.md` § *The desktop
+  the agent can drive*.
 - **Work ships as a spec, one branch and one PR each.** [`specs/`](specs/README.md) turns
   [`docs/plan-ui.md`](docs/plan-ui.md) §16 into 14 mergeable specs, each naming its scope,
   acceptance criteria, three witnesses, tests and the `opencode go` model that builds it. The

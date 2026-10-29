@@ -72,6 +72,46 @@ its platform binary, so the menu's install line passes `--allow-scripts=<package
 (and without it the CLI answers *postinstall script was not run* while `command -v`
 finds it happily). Bumping the pinned version is `tools/opencode/README.md`.
 
+## The desktop the agent can drive
+
+OpenCode starts with this desktop's own tools: `~/.config/opencode/opencode.json`
+registers `lazyos mcp`, an MCP server inside the `lazyos` binary, and
+`~/.config/opencode/AGENTS.md` tells the agent the rules in every session. There
+are three kinds of tool, and the line between them is a promise this machine makes
+to the person sitting at it: **the AI proposes, you confirm.**
+
+| Kind | What the agent can do | Tools |
+|---|---|---|
+| **read** | look, and change nothing | the status (battery, memory, disk, theme), the windows, a **screenshot**, the installed packages, the system report, the clipboard, the recent tasks |
+| **act** | things you can see and undo | open the menu with a filter typed, open or stop a task, switch the theme, send a card, open a file in its viewer |
+| **propose** | open the window where **you** decide | Install LazyOS, Format a disk, Auxiliary swap, and log out / reboot / shut down |
+
+A proposal is the real window, exactly as if you had opened it: Format a disk's list
+and its Cancel-first question, the install's typed disk name, the power confirm with
+**Cancel** selected. The agent is told only that the window is open, never what
+you answered, and the same proposal cannot be repeated for 30 seconds - so an agent
+cannot drown you in confirmations.
+
+**What the agent cannot do, at all.** There is no tool that runs a command, applies
+a format or an install, writes a partition or the kernel partition, ends the
+session or touches your profile archive. Those names are refused by the server and
+the binary will not even build with one in its table; `check-system.sh` asks the
+installed binary the same question. The agent still has its own shell - that is
+what a coding agent is - but the desktop's destructive work stays yours.
+
+Three things are worth knowing:
+
+* **A screenshot is what the agent sees, private windows included.** It is kept in
+  a private directory under `/run/user/<uid>` and deleted when the session ends;
+  close what you would not show a person before asking about the screen.
+* **The clipboard is readable** (`clipboard_read`). A password you copied a minute
+  ago is in it; the agent is told to quote it only when you asked.
+* **Every call is logged** in `~/.local/state/lazyos/mcp.log` (time, tool, kind,
+  outcome, milliseconds - never the arguments), so "what did it do?" has an answer.
+
+`lazyos mcp --tools` prints the table the agent sees, and its first line's version
+is the one `AGENTS.md` names; when they differ, `check-system.sh` says so.
+
 ## Accounts
 
 Claude Code and Codex both support an alternative configuration directory -

@@ -11,6 +11,7 @@ name = "lazyos"
 path = "src/main.rs"
 
 [dependencies]
+lazyos-mcp = { path = "../lazyos-mcp" }
 lazyos-theme = { path = "../lazyos-theme" }
 lazyos-ui = { path = "../lazyos-ui" }
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }

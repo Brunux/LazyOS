@@ -1,0 +1,19 @@
+# lazyos-mcp manifest m-8fb2464cc9b93288 (18 tools; tier, name, schema, limit, maps to)
+read	desktop_status	e240b68bb4dbf676	-	internal
+read	desktop_screenshot	707cec26dedef23a	12/min	grim
+read	desktop_windows	e240b68bb4dbf676	-	swaymsg
+read	theme_current	e240b68bb4dbf676	-	lazyos theme current
+read	packages_installed	3de3eef5ddc86adf	-	dpkg-query
+read	system_report	e240b68bb4dbf676	1/60s	check-system.sh
+read	clipboard_read	e240b68bb4dbf676	-	wl-paste
+read	task_list	e240b68bb4dbf676	-	internal
+act	menu_open	83bf750bce5abc11	-	lazyos menu
+act	task_open	5565ee0523437aa8	-	lazyos task attach
+act	task_stop	5565ee0523437aa8	-	lazyos task stop
+act	theme_set	5604d16db36bd915	4/min	lazyos theme set
+act	notify_send	9cdfe99c6a593057	3/min	lazyos notify send
+act	view_open	5750e867f80de9f4	10/min	~/.config/bin/lazyos-view
+propose	install_propose	e240b68bb4dbf676	1/30s	~/.config/bin/rofi-install
+propose	format_propose	e240b68bb4dbf676	1/30s	~/.config/bin/rofi-format
+propose	swap_propose	e240b68bb4dbf676	1/30s	~/.config/bin/rofi-swap
+propose	power_propose	7d516d98556d1a2c	1/30s	lazyos menu --power

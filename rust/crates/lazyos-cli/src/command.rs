@@ -146,6 +146,26 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // The desktop as MCP tools for an agent (spec 008): a stdio server an
+        // OpenCode session starts and ends, so it opens no window and keeps
+        // nothing running. `--tools` prints the manifest check-system reads.
+        path: "mcp",
+        summary: "the desktop's tools for an agent, over stdio; --tools prints the manifest (spec 008)",
+        shape: Shape::Direct,
+        symlinks: &[],
+        installed: &[],
+    },
+    CommandSpec {
+        // Ask a running task to stop, the way its window's `s` does: only a
+        // task whose record says it is stoppable (spec 005), and never by
+        // signalling a process this command does not own.
+        path: "task stop",
+        summary: "ask a running, stoppable task to stop (spec 005/008)",
+        shape: Shape::Direct,
+        symlinks: &[],
+        installed: &[],
+    },
+    CommandSpec {
         // The task surface: reattach to a slow action that outlives a toast.
         path: "task attach",
         summary: "reattach to a running or finished task (spec 005)",

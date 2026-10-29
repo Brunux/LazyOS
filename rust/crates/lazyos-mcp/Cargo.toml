@@ -1,0 +1,13 @@
+[package]
+name = "lazyos-mcp"
+# The version the server reports is the repository's VERSION, handed in by the
+# binary; this one only satisfies cargo and never ships.
+version = "0.0.0"
+edition = "2024"
+description = "The MCP surface of the LazyOS desktop: protocol, tool manifest, validator (spec 008)"
+
+[dependencies]
+# The protocol is JSON-RPC lines; serde_json is already in the tree through
+# lazyos-ui, so the server adds no crate to the build (no async runtime, no
+# schema derive - see the spec's Design for why rmcp is not used).
+serde_json = "1.0"

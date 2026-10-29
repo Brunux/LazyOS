@@ -4020,6 +4020,125 @@ for _theme_key in "theme next" "theme wallpaper next"; do
 done
 
 # ---------------------------------------------------------------------------
+section "The agent's tools (lazyos mcp)"
+# ---------------------------------------------------------------------------
+# `lazyos mcp` (spec 008) is the desktop an agent can drive, and the manifest
+# is the witness of the one rule that matters: the AI proposes, the person
+# confirms. An apply-level tool (run a command, format, install, write a
+# partition, end the session) is never listed - the table refuses one at build
+# time, and this report asks the binary on the device the same question, because
+# the binary is what an agent actually talks to. The handshake is
+# initialize + tools/list over a pipe: neither is a tool call, so nothing is
+# run and nothing is logged.
+_mcp_refused="run format_apply install_apply swap_apply power_apply kpart_write partition_write"
+if have lazyos; then
+	if _mcp_tools=$(lazyos mcp --tools 2>&1); then
+		_mcp_version=$(lazyos mcp --version 2>/dev/null || :)
+		_mcp_head=$(head -n 1 <<<"$_mcp_tools")
+		_mcp_count=$(awk -F'\t' 'NR > 1 && NF >= 5 { n++ } END { print n + 0 }' <<<"$_mcp_tools")
+		ok "lazyos mcp serves $_mcp_count tools, manifest $_mcp_version"
+		case "$_mcp_head" in
+		*" $_mcp_version "*) ;;
+		*) fail "lazyos mcp --tools and --version disagree ($_mcp_head / $_mcp_version)" ;;
+		esac
+		_mcp_bad=$(awk -F'\t' 'NR > 1 && $1 !~ /^(read|act|propose)$/ { print $1 ":" $2 }' <<<"$_mcp_tools")
+		for _mcp_name in $_mcp_refused; do
+			grep -q "	$_mcp_name	" <<<"$_mcp_tools" && _mcp_bad="$_mcp_bad $_mcp_name"
+		done
+		grep -q "	profile_" <<<"$_mcp_tools" && _mcp_bad="$_mcp_bad profile_*"
+		if [ -z "$_mcp_bad" ]; then
+			ok "no apply-level tool is exposed (every tool is read, act or propose)"
+		else
+			fail "lazyos mcp exposes a tool it must refuse:$(tr '\n' ' ' <<<" $_mcp_bad")"
+		fi
+
+		# The protocol itself, not only the table: a server that prints its
+		# manifest and then cannot answer a client is a registration that
+		# OpenCode drops with one log line.
+		_mcp_reply=$(printf '%s\n' \
+			'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"check-system","version":"1"}}}' \
+			'{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+			'{"jsonrpc":"2.0","id":2,"method":"tools/list"}' |
+			timeout 10 lazyos mcp 2>/dev/null) || _mcp_reply=
+		_mcp_listed=$(grep -o '"name":"[a-z_]*"' <<<"$_mcp_reply" | grep -cv '"name":"lazyos"') || :
+		if [ "${_mcp_listed:-0}" -eq "$_mcp_count" ]; then
+			ok "lazyos mcp answers initialize and tools/list ($_mcp_listed tools)"
+		else
+			fail "lazyos mcp did not answer the handshake with its $_mcp_count tools (got ${_mcp_listed:-0})"
+		fi
+
+		# A propose tool is the real gated window, so the window has to exist:
+		# a missing script makes the proposal an error the agent reads as
+		# "the person refused".
+		_mcp_gate=
+		for _mcp_script in $(awk -F'\t' 'NR > 1 { print $5 }' <<<"$_mcp_tools" | sed -n 's|^~/\.config/bin/||p'); do
+			[ -x "$HOME/.config/bin/$_mcp_script" ] || _mcp_gate="$_mcp_gate $_mcp_script"
+		done
+		if [ -z "$_mcp_gate" ]; then
+			ok "every window a tool opens is installed and executable"
+		else
+			fail "a tool opens a window that is missing or not executable:$_mcp_gate"
+		fi
+	else
+		fail "lazyos mcp --tools failed: the agent has no desktop tools ($(head -n 1 <<<"$_mcp_tools"))"
+		_mcp_version=
+	fi
+else
+	skip "no lazyos binary: the agent's tools are not installed"
+	_mcp_version=
+fi
+
+# The registration and the instructions. OpenCode starts a local server from
+# opencode.json, and reads ~/.config/opencode/AGENTS.md in every session; the
+# file pins the manifest it describes, so a binary with other tools makes this
+# line fail instead of the agent being told about tools that are not there.
+_mcp_conf="$HOME/.config/opencode/opencode.json"
+if [ ! -r "$_mcp_conf" ]; then
+	fail "~/.config/opencode/opencode.json is missing: OpenCode does not start lazyos mcp"
+elif ! have jq; then
+	skip "no jq: cannot read the OpenCode registration"
+elif [ "$(jq -c '.mcp.lazyos | [.type, .command, (.enabled // true)]' "$_mcp_conf" 2>/dev/null)" = '["local",["lazyos","mcp"],true]' ]; then
+	ok "OpenCode registers lazyos mcp as a local server"
+else
+	fail "opencode.json has no enabled local mcp.lazyos running [\"lazyos\",\"mcp\"]"
+fi
+_mcp_rules="$HOME/.config/opencode/AGENTS.md"
+_mcp_pin=$(sed -n 's/^lazyos-mcp manifest: //p' "$_mcp_rules" 2>/dev/null | head -n 1)
+if [ -z "$_mcp_pin" ]; then
+	fail "~/.config/opencode/AGENTS.md is missing or names no manifest: the agent is not told the rules"
+elif [ -z "$_mcp_version" ]; then
+	skip "cannot compare the agent's instructions with a manifest (no server)"
+elif [ "$_mcp_pin" = "$_mcp_version" ]; then
+	ok "the agent's instructions describe this manifest ($_mcp_pin)"
+else
+	fail "~/.config/opencode/AGENTS.md describes $_mcp_pin, the binary serves $_mcp_version"
+fi
+
+# The manual is where a person learns what the agent may do on their desktop;
+# without the section the tiers are a rule only the agent was told.
+if grep -qs '^## The desktop the agent can drive' /usr/share/doc/lazyos/07-agents.md; then
+	ok "07-agents.md explains what the agent can read, do and only propose"
+else
+	warn "07-agents.md lost § The desktop the agent can drive (the tiers are undocumented on the device)"
+fi
+
+# A screenshot is the screen, private windows included, so it lives in a 0700
+# directory of the server's own and goes when the server does; a SIGKILL is the
+# one exit that cannot clean, and the next server sweeps it. A directory whose
+# server is gone and that nobody has swept yet is pictures nobody is using.
+_mcp_stale=
+for _mcp_dir in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/lazyos-mcp-[0-9]*; do
+	[ -d "$_mcp_dir" ] || continue
+	_mcp_pid=${_mcp_dir##*lazyos-mcp-}
+	[ -d "/proc/$_mcp_pid" ] || _mcp_stale="$_mcp_stale $(basename "$_mcp_dir")"
+done
+if [ -z "$_mcp_stale" ]; then
+	ok "no screenshot outlived the server that took it"
+else
+	warn "screenshots left by a server that is gone:$_mcp_stale (the next lazyos mcp removes them)"
+fi
+
+# ---------------------------------------------------------------------------
 section "The brand"
 # ---------------------------------------------------------------------------
 # /etc/os-release is Debian's symlink to /usr/lib/os-release, and base-files

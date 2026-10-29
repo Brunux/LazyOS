@@ -718,6 +718,7 @@ checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 name = "lazyos-cli"
 version = "0.0.0"
 dependencies = [
+ "lazyos-mcp",
  "lazyos-theme",
  "lazyos-ui",
  "libc",
@@ -725,6 +726,13 @@ dependencies = [
  "serde",
  "serde_json",
  "unicode-width",
+]
+
+[[package]]
+name = "lazyos-mcp"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

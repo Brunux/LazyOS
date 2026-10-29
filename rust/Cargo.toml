@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/lazyos-cli",
+    "crates/lazyos-mcp",
     "crates/lazyos-theme",
     "crates/lazyos-ui",
     "crates/spike-sixel",
