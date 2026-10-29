@@ -93,15 +93,38 @@ fn in_pty_with(args: &[&str], input: &str, configure: impl FnOnce(&mut Command))
         .stderr(Stdio::piped());
     configure(&mut spawn);
     let mut child = spawn.spawn().expect("script should start");
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(input.as_bytes())
-        .unwrap();
-    drop(child.stdin.take());
+    // Type only once the program has taken the screen: a key that reaches the
+    // pty before raw mode is in the line discipline's cooked buffer (echoed as
+    // `^[`), and the program then waits for ever for a key it never gets. On a
+    // loaded machine the binary starts late enough for that to happen.
+    let mut stdout = child.stdout.take().unwrap();
+    let (seen, taken) = std::sync::mpsc::channel();
+    let reader = std::thread::spawn(move || {
+        use std::io::Read;
+        let mut all = Vec::new();
+        let mut chunk = [0u8; 4096];
+        let mut told = false;
+        loop {
+            match stdout.read(&mut chunk) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => all.extend_from_slice(&chunk[..n]),
+            }
+            if !told && all.windows(8).any(|w| w == b"\x1b[?1049h") {
+                told = true;
+                let _ = seen.send(());
+            }
+        }
+        all
+    });
+    // A program that never draws (a usage error, a panic before the screen)
+    // still gets its input after the ceiling, so the test ends either way.
+    let _ = taken.recv_timeout(Duration::from_secs(10));
+    let mut stdin = child.stdin.take().unwrap();
+    let _ = stdin.write_all(input.as_bytes());
+    drop(stdin);
     let output = child.wait_with_output().unwrap();
-    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stdout = reader.join().unwrap();
+    let mut text = String::from_utf8_lossy(&stdout).into_owned();
     text.push_str(&String::from_utf8_lossy(&output.stderr));
     (text, output.status.code().unwrap_or(-1))
 }
