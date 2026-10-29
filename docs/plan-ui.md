@@ -367,6 +367,9 @@ surface uses. Two standard interfaces, zero changes to OpenCode itself:
 
 Every tool is a thin wrapper over the same mode handler the menus call — one implementation
 per action, never a second copy. Tiers per §13.2; "visual result" is what the person sees.
+The names below are the concepts; the served names use `_` (`desktop_status`), because the
+model providers accept `[A-Za-z0-9_-]` in a tool name (spec 008), and phase 2 ships the cut
+spec 008 lists.
 
 **Desktop & windows**
 
@@ -476,8 +479,9 @@ per action, never a second copy. Tiers per §13.2; "visual result" is what the p
 | Tool | Tier | Why |
 |---|---|---|
 | `install.open` | propose | opens the gated task window; the typed token is still typed by the person |
-| `session.suspend` / `reboot` / `shutdown` | refuse | power menu only — an AI must not end the session |
-| `format.*` / `swap.*` | refuse | disk menus only; the tool names the menu |
+| `power.propose` (log out / reboot / shut down) | propose | the Power confirm opens with Cancel selected; an AI never ends the session, the person's second answer does (spec 008: propose, not refuse) |
+| `format.propose` / `swap.propose` | propose | the disk menu opens; its list and its Cancel-first question are the gate (spec 008) |
+| `format.apply` / `swap.apply` / `power.apply` | refuse | never exposed; the apply step lives in the menu |
 | `profile.*` | refuse | the passphrase is the person's, read on their terminal |
 | `run <cmd>` | **not exposed** | the agent's own shell session is its command line; no second exec surface |
 
