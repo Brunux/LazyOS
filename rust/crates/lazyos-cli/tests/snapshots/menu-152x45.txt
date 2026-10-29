@@ -1,4 +1,4 @@
-LazyOS · Menu                                                                                                                                   43 rows
+LazyOS · Menu                                                                                                                                   44 rows
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ╭ Menu ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │  type to filter: a name, a word of it, or `system`                                                                                                  │
@@ -23,6 +23,7 @@ LazyOS · Menu                                                                  
 │       Ask  one question, the answer here                                                                                                       ai   │
 │       Agents  Claude Code, Codex and the others                                                                                                ai   │
 │       Dictation  speak, and it is typed                                                                                                        ai   │
+│       Local model  a 1.7B model, offline, on four cores                                                                                        ai   │
 │   wifi Wi-Fi  pick a network                                                                                                                system   │
 │   qr   QR code  this network, or any text                                                                                                   system   │
 │       DNS  the resolver this connection uses                                                                                               system   │
@@ -40,6 +41,5 @@ LazyOS · Menu                                                                  
 │       Developer  profile export and restore, diagnostics                                                                                   system   │
 │       Colour  the hex of a pixel, and the palette                                                                                          system   │
 │       About  kernel, uptime, memory, battery                                                                                               system   │
-│       Reminders  be told about it later                                                                                                   session   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close

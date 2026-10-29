@@ -212,48 +212,49 @@ yet present in `scripts/` as not implemented.
   screensaver's profile (it carries the brand's cyan) and the GTK stylesheets (they are the
   session's, not a terminal's palette).
 - **A menu row is an enum action, never a shell string, and the root menu is that table** (spec
-  007). `lazyos-cli/src/menu/table.rs` is `bar-menu` as data - its 42 rows, its four groups
-  (`open`, `ai`, `system`, `session`) and its order, plus **Ask** - and each row's `Action` is a
-  `Program` (a session script, a program on `PATH`, or this binary) with literal words, or one of
-  four things the menu does in its own window (Password, Ask, Power, and the session action a
-  confirm returns). Nothing in the table is ever handed to a shell, so a label, a detail or a
-  future row read from data cannot become a command line, and
-  `action_never_contains_a_shell_metacharacter` refuses a row that would need one; the row runs
-  with `setsid` after the terminal is restored, the order `bar-menu`'s `exec` had. **`bar-menu` is
-  a link to `/usr/bin/lazyos`** in `~/.config/bin`, so Alt+Space, the bar's button and
-  `org.lazyos.menu.desktop` did not change, and `--symlinks` lists it as installed - the
-  framework check accepts a name in `/usr/bin` *or* `~/.config/bin`. Because the old script is
-  gone, every `check-system.sh` line that grepped it for a row (Developer, Install, Camera, Share
-  this screen, Agent session, the five menus `02-rofi.md` sends people to) reads **`lazyos menu
-  --rows`** instead (`key<TAB>group<TAB>label<TAB>what it runs`, printed before the host so it
-  never opens a window): grepping a link to an ELF would match strings in the binary and prove
-  nothing. The rows are compared with bar-menu's keys, an Ask row must exist, and every row's
-  program must be installed - "a row with no action" cannot be written any more, but "a row whose
-  program is missing" still does nothing. **The one ranking** is `ListState::ranked` (exact,
-  prefix, word prefix, substring, subsequence, then the detail/value floor; then frecency; then
-  the shorter label), shared by the menu and the palette; an empty needle keeps the groups'
-  order. **Frecency** (`~/.local/state/lazyos/frecency.json`, 200 entries) is written on a launch
-  and never on a look, boosts a row only from its **third** launch (one mistaken Enter must not
-  reorder the menu), and an unreadable file starts empty. **Escape steps back** (confirm → power
-  list → menu) through `Outcome::Consumed`, which keeps a key from the shell: before it, Escape on
-  a confirm was also the shell's Escape and closed the window. Power's three rows sit behind a
-  `Confirm` whose first answer is Cancel. **The Ask strip runs the agent once and owns its whole
-  lifetime.** The default the Agents menu marks answers when it is Claude Code (`claude -p
-  --output-format json --tools "" --disallowedTools mcp__* --no-session-persistence -- Q`) or
-  OpenCode (`opencode run --format json Q`), otherwise OpenCode, and the prompt says which before
-  Enter; the question is one argument (a test sends `$HOME; rm -rf ~` and reads it back
-  verbatim) and the agent runs in an empty `0700` directory under `$XDG_RUNTIME_DIR`, so only the
-  question leaves the machine. It is a spec 005 task (`lazyos --ask-run <id> <agent> <viewer pid>
-  Q` under the detached runner) whose log is the answer, shown in the same window with `c` to
-  copy, and a failure shows the agent's own error line (its JSON error, else its stderr's first
-  line). **Nothing outlives the question, by three mechanisms, because each one alone has a
-  hole**: the agent gets a process group, killed when the answer is in or on a stop; every
-  process it starts carries `LAZYOS_ASK=<id>`, and after the group is killed anything still
-  carrying the mark is killed too (a helper that called `setsid` left the group but not its
-  environment); and `--ask-run` holds a **pidfd on the window's process**, so Alt+Q on the window
-  or a killed foot ends the question as surely as Escape - a stop file only works when the window
-  lives long enough to write it. `check-system.sh` FAILs on a process with the mark whose
-  `--ask-run` is gone. No server, no streaming, no conversation: that is a later spec.
+  007). `lazyos-cli/src/menu/table.rs` is `bar-menu` as data - its 43 rows (spec 016's *Local
+  model* among them), its four groups (`open`, `ai`, `system`, `session`) and its order, plus
+  **Ask** - and each row's `Action` is a `Program` (a session script, a program on `PATH`, or
+  this binary) with literal words, or one of four things the menu does in its own window
+  (Password, Ask, Power, and the session action a confirm returns). Nothing in the table is ever
+  handed to a shell, so a label, a detail or a future row read from data cannot become a command
+  line, and `action_never_contains_a_shell_metacharacter` refuses a row that would need one; the
+  row runs with `setsid` after the terminal is restored, the order `bar-menu`'s `exec` had.
+  **`bar-menu` is a link to `/usr/bin/lazyos`** in `~/.config/bin`, so Alt+Space, the bar's
+  button and `org.lazyos.menu.desktop` did not change, and `--symlinks` lists it as installed -
+  the framework check accepts a name in `/usr/bin` *or* `~/.config/bin`. Because the old script
+  is gone, every `check-system.sh` line that grepped it for a row (Developer, Install, Camera,
+  Share this screen, Agent session, Local model, the five menus `02-rofi.md` sends people to)
+  reads **`lazyos menu --rows`** instead (`key<TAB>group<TAB>label<TAB>what it runs`, printed
+  before the host so it never opens a window): grepping a link to an ELF would match strings in
+  the binary and prove nothing. The rows are compared with bar-menu's keys, an Ask row must
+  exist, and every row's program must be installed - "a row with no action" cannot be written any
+  more, but "a row whose program is missing" still does nothing. **The one ranking** is
+  `ListState::ranked` (exact, prefix, word prefix, substring, subsequence, then the detail/value
+  floor; then frecency; then the shorter label), shared by the menu and the palette; an empty
+  needle keeps the groups' order. **Frecency** (`~/.local/state/lazyos/frecency.json`, 200
+  entries) is written on a launch and never on a look, boosts a row only from its **third**
+  launch (one mistaken Enter must not reorder the menu), and an unreadable file starts empty.
+  **Escape steps back** (confirm → power list → menu) through `Outcome::Consumed`, which keeps a
+  key from the shell: before it, Escape on a confirm was also the shell's Escape and closed the
+  window. Power's three rows sit behind a `Confirm` whose first answer is Cancel. **The Ask strip
+  runs the agent once and owns its whole lifetime.** The default the Agents menu marks answers
+  when it is Claude Code (`claude -p --output-format json --tools "" --disallowedTools mcp__*
+  --no-session-persistence -- Q`) or OpenCode (`opencode run --format json Q`), otherwise
+  OpenCode, and the prompt says which before Enter; the question is one argument (a test sends
+  `$HOME; rm -rf ~` and reads it back verbatim) and the agent runs in an empty `0700` directory
+  under `$XDG_RUNTIME_DIR`, so only the question leaves the machine. It is a spec 005 task
+  (`lazyos --ask-run <id> <agent> <viewer pid> Q` under the detached runner) whose log is the
+  answer, shown in the same window with `c` to copy, and a failure shows the agent's own error
+  line (its JSON error, else its stderr's first line). **Nothing outlives the question, by three
+  mechanisms, because each one alone has a hole**: the agent gets a process group, killed when
+  the answer is in or on a stop; every process it starts carries `LAZYOS_ASK=<id>`, and after the
+  group is killed anything still carrying the mark is killed too (a helper that called `setsid`
+  left the group but not its environment); and `--ask-run` holds a **pidfd on the window's
+  process**, so Alt+Q on the window or a killed foot ends the question as surely as Escape - a
+  stop file only works when the window lives long enough to write it. `check-system.sh` FAILs on
+  a process with the mark whose `--ask-run` is gone. No server, no streaming, no conversation:
+  that is a later spec.
 - **Work ships as a spec, one branch and one PR each.** [`specs/`](specs/README.md) turns
   [`docs/plan-ui.md`](docs/plan-ui.md) §16 into 14 mergeable specs, each naming its scope,
   acceptance criteria, three witnesses, tests and the `opencode go` model that builds it. The
@@ -2160,6 +2161,46 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   rebuilt. `check-system.sh` checks the manual, `rofi-keys`, the dictation tools,
   the model (SKIP when absent) and the hibernate conditions (SKIP/WARN, never FAIL, plus the
   `--status` size agreement above).
+- **The local model is a runtime configuration, not a build** (`lazyos-model`, `Alt+Ctrl+M`, the
+  root menu's *Local model* row and `org.lazyos.model.desktop`). It runs Qwen3-1.7B from
+  `~/.local/share/lazyos/models/` in foot with `--app-id=lazyos-model`, floated and centred by
+  `config.d/34-local-model.conf` at 1000x700 (997x696 measured on the 1366x912 panel). **forky's
+  `llama.cpp-examples` is the binary and `tools/llama.cpp/` does not exist**: the package already
+  runtime-dispatches to `libggml-cpu-armv8.2` (1867 `sdot`, the kernels this SoC has), and a
+  platform build with `-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16` measured **11.14 against 10.95
+  tok/s** for 396 s of build, so the only reason to revisit is a model architecture newer than
+  forky's snapshot. Three measured numbers are the whole configuration, and each one is a silence
+  if it goes: **`-t 4`** (llama.cpp's default is `nproc` = 8, which puts work on the A55s - 7.8x
+  slower per core - and measured **6.67 tok/s against 11.19**, a cliff the package feels twice
+  because it is built with OpenMP); **Q4_0 rather than Q4_K_M** (repacked dotprod prefill
+  **84.7 against 46.2 tok/s**, so an 1800-token prompt answers in 31 s instead of 49, at 1.14
+  against 1.19 GiB); and **`-fa on` with `-ctk/-ctv q8_0`**, worth **228 MiB** at 4k context
+  (2356 against 2584 MiB peak RSS, against 2544 MiB free with the session up - so f16 KV at 4k does
+  not fit beside a browser). `taskset -c 4-7` is kept but buys **no** throughput (11.19 unpinned
+  against 11.14 pinned): it keeps the desktop off the big cores, and it is skipped on a machine
+  whose `nproc` is under 8 rather than pinning to cores that are not there. `-b/-ub` and a smaller
+  `-c` did **not** move peak RSS; the floor is the 1280 MiB of weights. `-rea off` is the fourth
+  decision: a Qwen3 thinking block is several hundred tokens, i.e. ~45 s of silence at 11 tok/s,
+  so the switch is one line at the top of the script. **The weights are never committed and never
+  built**: `lazyos-model --fetch` downloads the recommended GGUF with `curl` to a `.part` and
+  verifies it against `~/.config/lazyos/models.sha256` before the rename (the hash lives only in
+  the pins file, which is also what `--verify` reads, so a download cannot disagree with the
+  check), the same shape as `dictate-model`. No GPU and no NPU is a fact, not a setting: Panfrost
+  is OpenGL 3.1, PanVK answers *Mali-G57 not supported*, and there is no `i8mm` for the IQ-quants.
+  **A key has no terminal, and `[ -t 0 ]` does not say otherwise**: sway's `exec` inherits the VT
+  the compositor was started on (`/proc/$(pgrep -x sway)/fd/0 -> /dev/tty7`), so the first wrapper
+  believed it was inside a terminal, skipped `foot` and started `llama-cli` reading a prompt from a
+  screen nobody was looking at - the key looked dead. `on_terminal()` is the same predicate
+  `lazyos-profile` already uses (a tty **and** this process is its foreground group, `ps -o tpgid=`
+  equal to `ps -o pgid=`), and both paths are a test: from `swaymsg exec` one `foot` appears with
+  `app_id=lazyos-model` at 997x696, and under `script -qec` (a real pty) no second window opens.
+  Witnesses: `check-system.sh` FAILs on `llama-cli`, the script's execute bit, the pins file, the
+  float rule, the binding, the menu row, the `.desktop` entry and its `dictate-model.png`, on a
+  wrapper that decides "a terminal" with a bare `-t 0`, and on a
+  model that does not match its pin, and WARNs when the flags lose `-t 4` or `-fa on`/q8_0; SKIPs
+  when no model is downloaded. The manual is `04-software.md` § *A local model* (§ *Panels, lock
+  and power* lists the key) and the measurement record is
+  `~/.local/share/lazyos/models/BENCH.md`.
 - **Agents** (`rofi-agents`, Alt+Ctrl+Shift+A = Omarchy's Super+Shift+Ctrl+A) is the local half of
   Omarchy's agents feature: launch (in foot, from `~/Work`, because the agents refuse to remember
   trust in `$HOME`), install (`npm install -g --prefix ~/.local <pkg>` - an explicit prefix, so npm

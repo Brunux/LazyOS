@@ -126,6 +126,20 @@ whisper.cpp-tools
 # emoji picker needs to insert its glyph, so it is not dictation-only.
 wtype
 
+# --- local model ------------------------------------------------------------
+# llama.cpp: the model window (~/.config/bin/lazyos-model, Alt+Ctrl+M) runs a
+# GGUF file with `llama-cli`, and `--bench` re-measures this machine with
+# `llama-bench`. This is the *Debian package*, not a build: forky's 1:0.7.0
+# runtime-dispatches to libggml-cpu-armv8.2 (the dotprod kernels this SoC has),
+# a platform build with `-DGGML_CPU_ARM_ARCH=armv8.2-a+dotprod+fp16` measured
+# +1.7% (11.14 against 10.95 tok/s) for 396 s of build, so tools/llama.cpp/ is
+# not allowed to exist. The weights are not in the image either (2.4 GB): a
+# person fetches them with `lazyos-model --fetch`, verified against the pinned
+# SHA256 in ~/.config/lazyos/models.sha256, the way dictate-model fetches
+# whisper's. The LLM itself is the tool here, and it only runs while its window
+# is open.
+llama.cpp-examples
+
 # --- media ------------------------------------------------------------------
 yt-dlp
 # ffmpeg is what yt-dlp uses to merge a video stream and an audio stream; without

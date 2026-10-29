@@ -322,6 +322,16 @@ pub const ROOT: &[MenuItem] = &[
         Ai,
         session("dictate"),
     ),
+    // The model that runs here (spec 016): no network, no account, and the
+    // flags it was measured into. Alt+Ctrl+M opens the same window.
+    item(
+        "model",
+        "Local model",
+        "a 1.7B model, offline, on four cores",
+        Glyph::Chip,
+        Ai,
+        session("lazyos-model"),
+    ),
     item(
         "wifi",
         "Wi-Fi",
@@ -597,6 +607,7 @@ pub const BAR_MENU_KEYS: &[&str] = &[
     "agent",
     "agents",
     "dictate",
+    "model",
     "wifi",
     "qr",
     "dns",

@@ -3208,6 +3208,74 @@ _model="$(ls "$HOME"/.local/share/whisper/ggml-*.bin 2>/dev/null | head -1)"
 [ -n "$_model" ] && ok "speech model present ($(basename "$_model"))" ||
 	skip "no speech model yet: the dictation shortcut fetches tiny.en (78 MB) on first use"
 
+# The local model (Alt+Ctrl+M, the root menu's "Local model" row and the
+# launcher's org.lazyos.model.desktop): llama-cli runs a GGUF file with the flags
+# this machine was measured into. Every piece fails silently on its own - a
+# script without its execute bit is EACCES in the journal, a missing float rule
+# tiles the window, a missing icon drops the launcher row's icon column - so all
+# of them are asked here. The weights are a 1.2 GB download and are not in the
+# image: their absence is the SKIP further down, not a failure.
+_lm_missing=""
+have llama-cli || _lm_missing="$_lm_missing llama-cli"
+[ -x "$HOME/.config/bin/lazyos-model" ] ||
+	_lm_missing="$_lm_missing bin/lazyos-model(not executable)"
+[ -f "$HOME/.config/lazyos/models.sha256" ] ||
+	_lm_missing="$_lm_missing .config/lazyos/models.sha256(pins)"
+grep -qs 'app_id="lazyos-model"' /etc/sway/config.d/34-local-model.conf 2>/dev/null ||
+	_lm_missing="$_lm_missing 34-local-model.conf(no-float-rule)"
+grep -qs 'bindsym \$mod+Ctrl+m exec .*/lazyos-model' \
+	/etc/sway/config.d/24-keys.conf 2>/dev/null ||
+	_lm_missing="$_lm_missing 24-keys.conf(no-binding)"
+menu_runs lazyos-model ||
+	_lm_missing="$_lm_missing root-menu(no-row: lazyos menu --rows)"
+[ -r /usr/share/applications/org.lazyos.model.desktop ] ||
+	_lm_missing="$_lm_missing org.lazyos.model.desktop"
+[ -r /usr/share/icons/LazyOS/48x48/apps/dictate-model.png ] ||
+	_lm_missing="$_lm_missing dictate-model.png"
+# `[ -t 0 ]` alone is not "a terminal somebody can see" in this session: sway's
+# `exec` inherits the VT the compositor was started on, so a model opened by a
+# key would have a tty on stdin, skip its own window and read the prompt from a
+# screen nobody is looking at - which reads as a key that does nothing (measured
+# here; lazyos-profile documents the same trap for the password prompt). The
+# wrapper asks the foreground process group as well, and that line is the witness.
+grep -qs 'tpgid=' "$HOME/.config/bin/lazyos-model" 2>/dev/null ||
+	_lm_missing="$_lm_missing bin/lazyos-model(says-a-VT-is-a-terminal)"
+if [ -z "$_lm_missing" ]; then
+	ok "local model ready (Alt+Ctrl+M, the root menu row, the launcher entry and its icon)"
+else
+	fail "local model incomplete:$_lm_missing (the key does nothing, or the launcher row has a hole)"
+fi
+# The two numbers the flags are: -t 4 (the A76 cluster - llama.cpp's own default
+# of nproc measured 6.67 tok/s against 11.19 here) and -fa on with a q8_0 KV
+# cache (228 MiB at 4k context, which is the difference between fitting beside
+# the session and not). A wrapper edited back to -t 8 is not broken, it is 40%
+# slower, and nothing else would say so.
+if [ -x "$HOME/.config/bin/lazyos-model" ]; then
+	_lm_flags=$("$HOME/.config/bin/lazyos-model" --flags 2>/dev/null || true)
+	case $_lm_flags in
+	*"-t 4 "*) ok "the model runs on four threads (the A76 cluster)" ;;
+	*) warn "the local model is not on -t 4: llama.cpp's default (nproc) measured 6.67 tok/s against 11.19 on this chip" ;;
+	esac
+	case $_lm_flags in
+	*"-fa on"*q8_0*) ok "the model's KV cache is q8_0 behind flash attention (4k context fits next to the session)" ;;
+	*) warn "the local model lost -fa on / q8_0 KV: 4k context then peaks at 2584 MiB, more than the session leaves free" ;;
+	esac
+fi
+# A weight file that is present but does not match its pin is a FAIL: llama.cpp
+# would load it and answer from a corrupt model instead of refusing. The check
+# reads the whole file, so it is only run when there is something to read.
+_lm_count=$(ls "$HOME"/.local/share/lazyos/models/*.gguf 2>/dev/null | wc -l)
+if [ "$_lm_count" -eq 0 ]; then
+	skip "no local model yet: 'lazyos-model --fetch' downloads Qwen3-1.7B (1.2 GB), checked against its pin"
+elif [ -x "$HOME/.config/bin/lazyos-model" ]; then
+	_lm_verify=$("$HOME/.config/bin/lazyos-model" --verify 2>&1)
+	if [ $? -eq 0 ]; then
+		ok "the local model matches its pinned SHA256 ($_lm_count file(s))"
+	else
+		fail "a local model does not match its pin: $(grep -v ': OK$' <<<"$_lm_verify" | head -2 | tr '\n' ' ')"
+	fi
+fi
+
 # Translate (Alt+Ctrl+T): the selection goes to one endpoint with a fallback.
 # What a report can see is the tools, the binding and the Settings row - the
 # network is asked, never required, because a card without Wi-Fi translates
@@ -3616,7 +3684,7 @@ if have lazyos; then
 	else
 		_menu_lost=
 		for _menu_key in terminal files files-window grep places capture camera download \
-			settings learn keys calc emoji clip password ssh agent agents dictate wifi qr \
+			settings learn keys calc emoji clip password ssh agent agents dictate model wifi qr \
 			dns bt audio media notify vnc tz clean swap install kill pkg dev colour about \
 			remind lock screensaver suspend hibernate power; do
 			grep -q "^$_menu_key	" <<<"$MENU_ROWS" || _menu_lost="$_menu_lost $_menu_key"
