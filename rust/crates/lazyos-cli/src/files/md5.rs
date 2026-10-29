@@ -34,10 +34,13 @@ pub fn hex(data: &[u8]) -> String {
         message.push(0);
     }
     message.extend_from_slice(&bits.to_le_bytes());
-    for chunk in message.chunks_exact(64) {
+    // The padding made the length a multiple of 64, so nothing is left over.
+    let (blocks, _) = message.as_chunks::<64>();
+    for block in blocks {
+        let (words, _) = block.as_chunks::<4>();
         let mut m = [0u32; 16];
-        for (i, word) in m.iter_mut().enumerate() {
-            *word = u32::from_le_bytes(chunk[i * 4..i * 4 + 4].try_into().unwrap());
+        for (word, bytes) in m.iter_mut().zip(words) {
+            *word = u32::from_le_bytes(*bytes);
         }
         let [mut a, mut b, mut c, mut d] = state;
         for i in 0..64 {
