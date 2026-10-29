@@ -680,6 +680,69 @@ impl ListState {
         self.refilter();
     }
 
+    /// Append rows while the list is open, for a producer that streams them (a
+    /// walk of the disk, spec 009). Only the new rows are tested against the
+    /// needle, and the cursor stays on the row it was on: a batch arriving
+    /// while a person moves down the list must not move the row under them,
+    /// which is what `set_rows` (a new list) would do.
+    pub fn extend_rows(&mut self, rows: impl IntoIterator<Item = Row>) {
+        let start = self.rows.len();
+        for row in rows {
+            if let Some(glyph) = row.glyph.as_deref() {
+                self.glyph_width = self.glyph_width.max(UnicodeWidthStr::width(glyph) as u16);
+            }
+            self.rows.push(row);
+        }
+        if self.rows.len() == start {
+            return;
+        }
+        let selected = self.selected_index();
+        let needle = &self.needle;
+        let rows = &self.rows;
+        if self.ranked && !needle.is_empty() {
+            self.tiers.resize(rows.len(), 0);
+            for (i, row) in rows.iter().enumerate().skip(start) {
+                let tier = Tier::of(row, needle).map_or(0, |t| t as u8);
+                self.tiers[i] = tier;
+                if tier > 0 {
+                    self.visible.push(i);
+                }
+            }
+            self.sort_ranked();
+            if let Some(selected) = selected
+                && let Some(position) = self.visible.iter().position(|&i| i == selected)
+            {
+                self.cursor = position;
+            }
+        } else {
+            if self.ranked {
+                self.tiers.resize(rows.len(), 0);
+            }
+            self.visible
+                .extend((start..rows.len()).filter(|&i| rows[i].matches(needle)));
+        }
+    }
+
+    /// The ranked order: the best tier, then the boost, then the shorter label,
+    /// then the rows' own order - one comparator for a new needle and for rows
+    /// that arrive later.
+    fn sort_ranked(&mut self) {
+        let rows = &self.rows;
+        let tiers = &self.tiers;
+        // Unstable, because the last key is the index: a total order sorts
+        // the same way every time, and `sort_unstable` allocates nothing.
+        self.visible.sort_unstable_by(|&a, &b| {
+            tiers[b]
+                .cmp(&tiers[a])
+                .then(rows[b].boost.cmp(&rows[a].boost))
+                .then(
+                    UnicodeWidthStr::width(rows[a].label.as_str())
+                        .cmp(&UnicodeWidthStr::width(rows[b].label.as_str())),
+                )
+                .then(a.cmp(&b))
+        });
+    }
+
     pub fn rows(&self) -> &[Row] {
         &self.rows
     }
@@ -747,19 +810,7 @@ impl ListState {
                 self.visible.clear();
                 self.visible.extend((0..rows.len()).filter(|&i| score(i)));
             }
-            let tiers = &self.tiers;
-            // Unstable, because the last key is the index: a total order sorts
-            // the same way every time, and `sort_unstable` allocates nothing.
-            self.visible.sort_unstable_by(|&a, &b| {
-                tiers[b]
-                    .cmp(&tiers[a])
-                    .then(rows[b].boost.cmp(&rows[a].boost))
-                    .then(
-                        UnicodeWidthStr::width(rows[a].label.as_str())
-                            .cmp(&UnicodeWidthStr::width(rows[b].label.as_str())),
-                    )
-                    .then(a.cmp(&b))
-            });
+            self.sort_ranked();
         } else if narrowing {
             self.visible.retain(|&i| rows[i].matches(needle));
         } else {
@@ -768,7 +819,7 @@ impl ListState {
                 .extend((0..rows.len()).filter(|&i| rows[i].matches(needle)));
         }
         self.applied.clear();
-        self.applied.push_str(needle);
+        self.applied.push_str(&self.needle);
         if self.ranked {
             // The best match is the first row, and Enter must take it: a cursor
             // left on the third row by the previous needle would open the
