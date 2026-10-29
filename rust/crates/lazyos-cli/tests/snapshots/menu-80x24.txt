@@ -1,0 +1,24 @@
+LazyOS · Menu                                                           44 rows
+────────────────────────────────────────────────────────────────────────────────
+╭ Menu ────────────────────────────────────────────────────────────────────────╮
+│  type to filter: a name, a word of it, or `system`                          │
+│                                                                              │
+│ ▍     Terminal  foot                                                 open   │
+│       Files  browse the filesystem                                   open   │
+│       Files (window)  favnyr: folders, drag and drop, trash          open   │
+│       Search inside files  the text in them, with ripgrep            open   │
+│       Places  home, disks, the configuration                         open   │
+│       Capture  screenshot, OCR, QR, recording                        open   │
+│       Camera  look through the webcam, take a photo                  open   │
+│       Download  a link, into ~/Downloads                             open   │
+│       Settings  Wi-Fi, Bluetooth, night light, tablet mode, rotation open   │
+│       Learn  the manual, with search                                 open   │
+│   kbd  Keybindings  every binding, from the configuration             open   │
+│   =    Calculator  type it, Enter copies the result                   open   │
+│       Emoji  type a name, insert the glyph                           open   │
+│       Clipboard  what was copied, back in one pick                   open   │
+│       Password  32 random characters, into the clipboard             open   │
+│       SSH  hosts from ~/.ssh/config                                  open   │
+│       Agent session  ● opencode, in ~/Work                             ai   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close

@@ -18,6 +18,15 @@ is not installed any more it starts OpenCode instead of failing, and with no
 agent CLI installed at all it raises a card ("the Agents menu installs one with
 npm") rather than opening a terminal that closes at once.
 
+**One question, without a session.** The AI group's **Ask** row (also the
+**Ask** launcher entry, and `lazyos ask` in a terminal) sends one question to
+the same default agent - when it is Claude Code or OpenCode; any other default
+is answered by OpenCode, and the window says so - and shows the answer in the
+window it was asked in, with **c** to copy it. Only the question is sent: the
+agent runs in an empty private directory, Claude Code with no tools and no saved
+session, and nothing of it stays running afterwards. `02-rofi.md` § *The root
+menu, the palette and Ask* has the details.
+
 | Row | Does |
 |---|---|
 | `<Agent>` | runs it in foot, in `~/Work` when that directory exists (agents remember trust per directory, and they refuse `$HOME`) |

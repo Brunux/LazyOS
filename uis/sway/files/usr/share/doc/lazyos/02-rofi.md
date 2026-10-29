@@ -9,7 +9,7 @@ daemon).
 | **Alt+D** | `rofi -show drun` | the applications: the `.desktop` entries, including this image's own (LazyOS Menu, Settings, Wi-Fi, Bluetooth, audio, media, notifications, power, Files, Camera, Learn, Keys, Dictate, Agents…) |
 | **Alt+Tab** | `rofi -show window` | the open windows (sway has no switcher of its own; this uses wlroots' foreign-toplevel protocol) |
 | **Alt+Shift+D** | `rofi -show run` | every executable in `$PATH`. **Enter** runs it, **Shift+Enter** runs it in foot |
-| **Alt+Space** | `bar-menu` | the root menu: what opens something, the system panels, and the session actions |
+| **Alt+Space** | `lazyos menu` (`bar-menu`) | the root menu: what opens something, the AI rows (Ask among them), the system panels, and the session actions - type to narrow it |
 | **Alt+Ctrl+K** | `rofi-keys` | every key binding this session defines, parsed from `/etc/sway` and `~/.config/sway`. Enter copies the command |
 | **Alt+Ctrl+F** | `rofi-files` | the filesystem: directories first, sizes and dates dimmed. Enter opens a directory or reads a text file in foot; the dotfiles are one row away |
 | **Alt+Ctrl+G** | `rofi-grep` | **search inside the files**: ripgrep over your home, one row per match; Enter opens the file at that line |
@@ -32,6 +32,51 @@ one row away for someone who does not know the key yet, and the launcher is not
 only applications - the bar's left-most button and this entry open the same
 window.
 
+## The root menu, the palette and Ask
+
+**The root menu is a window of its own now, not a rofi list.** `bar-menu` is a
+link to `lazyos`, so **Alt+Space**, the bar's button and the launcher entry open
+the framework's menu: the same rows in the same four groups (*open*, *ai*,
+*system*, *session*, the group's name dim on the right of each row), a glyph per
+row, and a filter line at the top. **Type to narrow it** - case does not matter -
+and the best match moves to the top and is selected, so `wifi` Enter opens the
+Wi-Fi list and `lock` Enter locks: a name that starts with what you typed beats
+one where a word of it does, which beats one that only contains the letters in
+order. A group's name narrows to its rows (`system`). What you open often moves
+up, but only from the third time (a single slip does not reorder the menu); that
+history is `~/.local/state/lazyos/frecency.json`, it keeps 200 entries, and
+deleting it - or a damaged copy - just starts the ranking over. Arrows move,
+**Enter** opens, **Escape** closes and changes nothing. A row starts its program
+directly, never through a shell, after the menu's window is gone.
+
+**Power** opens the three rows that end the session - log out, reboot, shut
+down - inside the same window, and each one asks once more with **Cancel**
+selected: a stray Enter answers Cancel. Escape goes back one step (from the
+question to the list, from the list to the menu) before it closes anything.
+
+**The command palette** (`lazyos menu palette`) is the same window over every
+row the menu has, plus the commands that need no question: one row per theme
+(*Theme: Nord* sets it), *Next theme* and *Next wallpaper*. Typing ranks it the
+same way. The applications join it later, with their icons.
+
+**Ask** (the *ai* group, or the **Ask** launcher entry, or `lazyos ask` in a
+terminal) is one question to an AI, answered in the same window. The header
+says **AI** and names the agent before anything is sent: the default the Agents
+menu marks with `●` when that is Claude Code or OpenCode, and otherwise
+OpenCode, with a line saying why (Codex, Gemini and Copilot have no one-question
+mode here). **What leaves the machine is the question, and nothing else**: the
+agent runs once in an empty private directory under `$XDG_RUNTIME_DIR`, so it
+has no files to read, and Claude Code runs with no tools at all and saves no
+session. **Enter** sends it; the window shows the agent working, then the answer
+- **c** copies it, the arrows scroll - or, when it fails, the agent's own error
+line (not signed in, no network, a rate limit). **What it costs** is what the
+agent's own account charges for one question: the image ships no model and no
+key, the answer comes from whatever you signed the agent in with. Nothing stays
+afterwards: the agent, and anything it started (an `opencode serve`), is ended
+when the answer is in, when you press **Escape** or **Ctrl+C**, and when the
+window is closed in any other way. `check-system.sh` fails if one was left
+behind. It is one question, not a conversation: the next one starts fresh.
+
 The rest of the menus live in the root menu and the launcher: **Places**
 
 (home, documents, downloads, pictures, every mounted disk, and a **Mount** row
@@ -50,7 +95,7 @@ ext4),
 playing, play/pause/next/previous), **Time zone** (with network time),
 **Free space** (what is using the disk, one action per row), **End a process**
 (the heaviest twenty), **Calculator**, **Password** (32 random characters from
-`openssl`, straight into the clipboard: hex, so there is no shift key and no `+`,
+the kernel's generator, straight into the clipboard: hex, so there is no shift key and no `+`,
 `/` or `=` to re-quote when it is pasted into a file or a URL, and the value never
 appears in a notification - mako keeps a history, and a password in it is a
 password on disk), **SSH** (hosts from `~/.ssh/config`),

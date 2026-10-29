@@ -607,7 +607,11 @@ fn escape_markup(text: &str) -> String {
 
 /// The clipboard, the way the shell's `ui_copy` puts text on it: on stdin, so
 /// the value is never on a command line.
-fn copy_to_clipboard(value: &str) -> io::Result<()> {
+/// Put `value` on the Wayland clipboard through `wl-copy`, which reads it on
+/// stdin - never on the command line, where another local process could read
+/// it from `/proc`. The secret helper uses it, and so does any surface with a
+/// copy action (spec 007: the Ask answer).
+pub fn copy_to_clipboard(value: &str) -> io::Result<()> {
     let mut child = Command::new("wl-copy")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())

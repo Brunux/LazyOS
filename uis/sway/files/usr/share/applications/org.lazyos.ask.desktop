@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Ask
+GenericName=One question to the AI
+Comment=One question to the default agent; the answer appears in the window, and only the question is sent
+Exec=lazyos ask
+Icon=dialog-question
+Terminal=false
+Categories=Utility;
+Keywords=ask;ai;question;agent;claude;opencode;llm;

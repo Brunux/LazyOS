@@ -6,7 +6,9 @@
 //! shape they plug into is this file.
 //!
 //! ```text
-//! lazyos menu            the session menu     (spec 007: the real one)
+//! lazyos menu            the session menu     (spec 007)
+//! lazyos menu palette    every row, ranked    (spec 007; 012 adds the apps)
+//! lazyos ask [question]  one question to the default agent (spec 007)
 //! lazyos menu files      the file browser     (spec 009: the real one)
 //! lazyos --help          the table above, from the same data check-system reads
 //! lazyos --version       the repository's VERSION, compiled in
@@ -16,8 +18,10 @@
 //! `1` Escape (nothing happened), `2` usage, `3` the action failed and the
 //! reason was already shown - so `|| exit 0` in a binding stays correct.
 
+pub mod ask;
 pub mod command;
 pub mod host;
+pub mod menu;
 mod notify;
 pub mod paths;
 pub mod task_cmd;
@@ -73,6 +77,11 @@ pub fn run(argv: Vec<String>, env: &Env) -> i32 {
         let id = args.get(1).cloned().unwrap_or_default();
         return task_cmd::run(&id);
     }
+    // The Ask task's child (spec 007): the agent, once, in its own group. It
+    // is what the runner above starts, so it has no terminal either.
+    if args.first().map(String::as_str) == Some("--ask-run") {
+        return ask::run(&args[1..]);
+    }
 
     if let Some(code) = global(&args) {
         return code;
@@ -93,6 +102,10 @@ pub fn run(argv: Vec<String>, env: &Env) -> i32 {
             return EXIT_USAGE;
         }
     };
+
+    if let Some(code) = query(&resolved) {
+        return code;
+    }
 
     match host::plan(&resolved, env) {
         Launch::Direct => run_direct(&resolved),
@@ -220,6 +233,35 @@ fn global(args: &[String]) -> Option<i32> {
     }
 }
 
+/// A question a command answers on stdout without a window: what
+/// `check-system.sh` reads. It is decided before the host, because from the
+/// session the host would open a `foot` for a line of text.
+fn query(resolved: &Resolved) -> Option<i32> {
+    if resolved.args.first().map(String::as_str) != Some("--rows") {
+        return None;
+    }
+    let surface = match resolved.spec.path {
+        "menu" => menu::Surface::Root,
+        "menu palette" => menu::Surface::Palette,
+        _ => return None,
+    };
+    // `key<TAB>group<TAB>label<TAB>runs`, in the order the menu draws them.
+    // The table alone, not this machine's context: the check compares rows,
+    // and a row's detail (which agent it starts) is not part of what it is.
+    let mut out = io::stdout();
+    for entry in menu::entries(surface, &menu::Context::default()) {
+        let _ = writeln!(
+            out,
+            "{}\t{}\t{}\t{}",
+            entry.key,
+            entry.group.label(),
+            entry.label,
+            menu::runs(entry.action)
+        );
+    }
+    Some(EXIT_OK)
+}
+
 fn print_commands(out: &mut impl Write) {
     let _ = writeln!(out, "commands:");
     for spec in COMMANDS {
@@ -277,8 +319,10 @@ fn execute(
     design: &Design,
 ) -> Result<i32, Failure> {
     match resolved.spec.path {
-        "menu" => menu(resolved, terminal, design, "the session menu", "spec 007"),
-        "menu files" => menu(resolved, terminal, design, "the file browser", "spec 009"),
+        "menu" => session_menu(resolved, terminal, design, menu::Surface::Root),
+        "menu palette" => session_menu(resolved, terminal, design, menu::Surface::Palette),
+        "ask" => session_menu(resolved, terminal, design, menu::Surface::Root),
+        "menu files" => empty_menu(resolved, terminal, design, "the file browser", "spec 009"),
         "task attach" => task_cmd::attach(resolved, terminal, design),
         other => Err(Failure::new(
             format!("`{other}` is in the table but has no implementation"),
@@ -287,11 +331,111 @@ fn execute(
     }
 }
 
-/// The one command spec 001 ships: it proves the host, the frame and the keys.
+/// The root menu, the palette and the Ask strip: one window, three ways in.
 ///
-/// It draws, it closes on Escape and it writes nothing - no state directory is
-/// created, which is the test for "a menu is a process, not a daemon".
-fn menu(
+/// Escape writes nothing - frecency is written on a launch, never on a look -
+/// which is still the test for "a menu is a process, not a daemon". A chosen
+/// row runs after the terminal is restored and the window is gone, in the
+/// order `bar-menu`'s `exec` had.
+fn session_menu(
+    resolved: &Resolved,
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    design: &Design,
+    surface: menu::Surface,
+) -> Result<i32, Failure> {
+    let asking = resolved.spec.path == "ask";
+    if !asking && let Some(extra) = resolved.args.first() {
+        return Err(Failure::new(
+            format!("`{extra}` is not something this menu knows"),
+            format!("try: lazyos {}", resolved.spec.path),
+        ));
+    }
+    let vars: BTreeMap<String, String> = std::env::vars().collect();
+    let paths = paths::Paths::resolve(&vars).map_err(|error| {
+        Failure::new("cannot find the session state directory", error.to_string())
+    })?;
+    let exe = std::env::current_exe()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| "lazyos".to_string());
+    let setup = menu::screen::Setup {
+        surface,
+        context: menu::Context::from_vars(&vars),
+        agent: ask::choose(&vars),
+        ask: asking.then(|| resolved.args.join(" ")),
+        state: paths.state,
+        exe,
+        vars,
+    };
+    let state = setup.state.clone();
+    let home = setup
+        .vars
+        .get("HOME")
+        .cloned()
+        .unwrap_or_else(|| "/".into());
+    let mut screen = menu::screen::MenuScreen::new(setup);
+    let code = App::new(Header::new("LazyOS"))
+        .design(design.clone())
+        .screen(&mut screen)
+        .run(terminal)
+        .map_err(|error| Failure::new("the terminal stopped answering", error.to_string()))?;
+    match screen.chosen.take() {
+        None => Ok(code),
+        Some(picked) => act(picked, &state, &home),
+    }
+}
+
+/// Do what the window chose. Everything here is a value from the table: a
+/// program and its words, or one of the three things the menu does itself.
+fn act(picked: menu::screen::Picked, state: &std::path::Path, home: &str) -> Result<i32, Failure> {
+    use menu::screen::Picked;
+    match picked {
+        Picked::Run { key, argv } => match menu::spawn_detached(&argv, home) {
+            Ok(()) => {
+                menu::remember(state, &key);
+                Ok(EXIT_OK)
+            }
+            Err(error) => {
+                // The window is already gone, so the reason goes on a card.
+                let _ = lazyos_ui::Card::new("Menu")
+                    .body(format!("Could not start {}: {error}", argv[0]))
+                    .urgency(lazyos_ui::Urgency::Critical)
+                    .send();
+                Ok(EXIT_FAILED)
+            }
+        },
+        Picked::Password { key } => {
+            menu::remember(state, &key);
+            // The secret card copies the value and names only the label, so
+            // mako's history never holds the password (spec 006).
+            let sent = menu::password().map(|value| {
+                let card = lazyos_ui::Card::secret("a new password", &value);
+                let copied = card.urgency_level() != lazyos_ui::Urgency::Critical;
+                let _ = card.send();
+                copied
+            });
+            match sent {
+                Ok(true) => Ok(EXIT_OK),
+                Ok(false) => Ok(EXIT_FAILED),
+                Err(error) => {
+                    let _ = lazyos_ui::Card::new("Password")
+                        .body(format!("No password was copied: {error}"))
+                        .urgency(lazyos_ui::Urgency::Critical)
+                        .send();
+                    Ok(EXIT_FAILED)
+                }
+            }
+        }
+        Picked::Session(action) => Ok(if menu::run_session(action) {
+            EXIT_OK
+        } else {
+            EXIT_FAILED
+        }),
+    }
+}
+
+/// The empty state spec 001 ships for a surface whose spec has not landed: it
+/// proves the host, the frame and the keys, and writes nothing.
+fn empty_menu(
     resolved: &Resolved,
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     design: &Design,
@@ -305,7 +449,7 @@ fn menu(
         ));
     }
     let hint = format!("{arrives} - Esc closes");
-    let mut screen = MenuScreen {
+    let mut screen = EmptyMenu {
         inner: EmptyScreen::new(title, hint),
     };
     let mut app = App::new(Header::new("LazyOS").subtitle(title))
@@ -319,16 +463,16 @@ fn menu(
         .map_err(|error| Failure::new("the terminal stopped answering", error.to_string()))
 }
 
-/// The menu's body, and the one place a panic can be forced on purpose.
+/// An empty surface's body, and the one place a panic can be forced on purpose.
 ///
 /// The acceptance test sets `LAZYOS_FORCE_PANIC=1` to prove the hook restores
 /// the cursor and the alternate screen; the panic has to happen while the
 /// terminal is in UI mode, which is what drawing the body is.
-struct MenuScreen {
+struct EmptyMenu {
     inner: EmptyScreen,
 }
 
-impl Screen for MenuScreen {
+impl Screen for EmptyMenu {
     fn draw(&mut self, ctx: &mut BodyCtx) {
         if std::env::var_os("LAZYOS_FORCE_PANIC").is_some() {
             panic!("LAZYOS_FORCE_PANIC: the frame's panic path");

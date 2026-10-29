@@ -1,0 +1,24 @@
+LazyOS · Palette                                                        10 rows
+────────────────────────────────────────────────────────────────────────────────
+╭ Palette ─────────────────────────────────────────────────────────────────────╮
+│  theme                                                                      │
+│                                                                              │
+│ ▍     Theme: Nord  lazyos theme set nord                           system   │
+│       Theme: Gruvbox  lazyos theme set gruvbox                     system   │
+│       Theme: Kanagawa  lazyos theme set kanagawa                   system   │
+│       Theme: Solarized  lazyos theme set solarized                 system   │
+│       Theme: Rose Pine  lazyos theme set rose-pine                 system   │
+│       Theme: Catppuccin  lazyos theme set catppuccin               system   │
+│       Theme: Everforest  lazyos theme set everforest               system   │
+│       Theme: Tokyo Night  lazyos theme set tokyo-night             system   │
+│       Next theme  the palette after this one (Alt+Shift+T)         system   │
+│       Next wallpaper  of the active theme (Alt+Shift+W)            system   │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close

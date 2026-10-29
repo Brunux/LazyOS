@@ -211,6 +211,50 @@ yet present in `scripts/` as not implemented.
   regenerates them, like `make-icons.sh`. Two surfaces stay hand-written on purpose: the
   screensaver's profile (it carries the brand's cyan) and the GTK stylesheets (they are the
   session's, not a terminal's palette).
+- **A menu row is an enum action, never a shell string, and the root menu is that table** (spec
+  007). `lazyos-cli/src/menu/table.rs` is `bar-menu` as data - its 43 rows (spec 016's *Local
+  model* among them), its four groups (`open`, `ai`, `system`, `session`) and its order, plus
+  **Ask** - and each row's `Action` is a `Program` (a session script, a program on `PATH`, or
+  this binary) with literal words, or one of four things the menu does in its own window
+  (Password, Ask, Power, and the session action a confirm returns). Nothing in the table is ever
+  handed to a shell, so a label, a detail or a future row read from data cannot become a command
+  line, and `action_never_contains_a_shell_metacharacter` refuses a row that would need one; the
+  row runs with `setsid` after the terminal is restored, the order `bar-menu`'s `exec` had.
+  **`bar-menu` is a link to `/usr/bin/lazyos`** in `~/.config/bin`, so Alt+Space, the bar's
+  button and `org.lazyos.menu.desktop` did not change, and `--symlinks` lists it as installed -
+  the framework check accepts a name in `/usr/bin` *or* `~/.config/bin`. Because the old script
+  is gone, every `check-system.sh` line that grepped it for a row (Developer, Install, Camera,
+  Share this screen, Agent session, Local model, the five menus `02-rofi.md` sends people to)
+  reads **`lazyos menu --rows`** instead (`key<TAB>group<TAB>label<TAB>what it runs`, printed
+  before the host so it never opens a window): grepping a link to an ELF would match strings in
+  the binary and prove nothing. The rows are compared with bar-menu's keys, an Ask row must
+  exist, and every row's program must be installed - "a row with no action" cannot be written any
+  more, but "a row whose program is missing" still does nothing. **The one ranking** is
+  `ListState::ranked` (exact, prefix, word prefix, substring, subsequence, then the detail/value
+  floor; then frecency; then the shorter label), shared by the menu and the palette; an empty
+  needle keeps the groups' order. **Frecency** (`~/.local/state/lazyos/frecency.json`, 200
+  entries) is written on a launch and never on a look, boosts a row only from its **third**
+  launch (one mistaken Enter must not reorder the menu), and an unreadable file starts empty.
+  **Escape steps back** (confirm → power list → menu) through `Outcome::Consumed`, which keeps a
+  key from the shell: before it, Escape on a confirm was also the shell's Escape and closed the
+  window. Power's three rows sit behind a `Confirm` whose first answer is Cancel. **The Ask strip
+  runs the agent once and owns its whole lifetime.** The default the Agents menu marks answers
+  when it is Claude Code (`claude -p --output-format json --tools "" --disallowedTools mcp__*
+  --no-session-persistence -- Q`) or OpenCode (`opencode run --format json Q`), otherwise
+  OpenCode, and the prompt says which before Enter; the question is one argument (a test sends
+  `$HOME; rm -rf ~` and reads it back verbatim) and the agent runs in an empty `0700` directory
+  under `$XDG_RUNTIME_DIR`, so only the question leaves the machine. It is a spec 005 task
+  (`lazyos --ask-run <id> <agent> <viewer pid> Q` under the detached runner) whose log is the
+  answer, shown in the same window with `c` to copy, and a failure shows the agent's own error
+  line (its JSON error, else its stderr's first line). **Nothing outlives the question, by three
+  mechanisms, because each one alone has a hole**: the agent gets a process group, killed when
+  the answer is in or on a stop; every process it starts carries `LAZYOS_ASK=<id>`, and after the
+  group is killed anything still carrying the mark is killed too (a helper that called `setsid`
+  left the group but not its environment); and `--ask-run` holds a **pidfd on the window's
+  process**, so Alt+Q on the window or a killed foot ends the question as surely as Escape - a
+  stop file only works when the window lives long enough to write it. `check-system.sh` FAILs on
+  a process with the mark whose `--ask-run` is gone. No server, no streaming, no conversation:
+  that is a later spec.
 - **Work ships as a spec, one branch and one PR each.** [`specs/`](specs/README.md) turns
   [`docs/plan-ui.md`](docs/plan-ui.md) §16 into 14 mergeable specs, each naming its scope,
   acceptance criteria, three witnesses, tests and the `opencode go` model that builds it. The

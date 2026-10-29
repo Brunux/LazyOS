@@ -1,0 +1,45 @@
+LazyOS · Menu                                                                                                                                   44 rows
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╭ Menu ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  type to filter: a name, a word of it, or `system`                                                                                                  │
+│                                                                                                                                                      │
+│ ▍     Terminal  foot                                                                                                                         open   │
+│       Files  browse the filesystem                                                                                                           open   │
+│       Files (window)  favnyr: folders, drag and drop, trash                                                                                  open   │
+│       Search inside files  the text in them, with ripgrep                                                                                    open   │
+│       Places  home, disks, the configuration                                                                                                 open   │
+│       Capture  screenshot, OCR, QR, recording                                                                                                open   │
+│       Camera  look through the webcam, take a photo                                                                                          open   │
+│       Download  a link, into ~/Downloads                                                                                                     open   │
+│       Settings  Wi-Fi, Bluetooth, night light, tablet mode, rotation                                                                         open   │
+│       Learn  the manual, with search                                                                                                         open   │
+│   kbd  Keybindings  every binding, from the configuration                                                                                     open   │
+│   =    Calculator  type it, Enter copies the result                                                                                           open   │
+│       Emoji  type a name, insert the glyph                                                                                                   open   │
+│       Clipboard  what was copied, back in one pick                                                                                           open   │
+│       Password  32 random characters, into the clipboard                                                                                     open   │
+│       SSH  hosts from ~/.ssh/config                                                                                                          open   │
+│       Agent session  ● opencode, in ~/Work                                                                                                     ai   │
+│       Ask  one question, the answer here                                                                                                       ai   │
+│       Agents  Claude Code, Codex and the others                                                                                                ai   │
+│       Dictation  speak, and it is typed                                                                                                        ai   │
+│       Local model  a 1.7B model, offline, on four cores                                                                                        ai   │
+│   wifi Wi-Fi  pick a network                                                                                                                system   │
+│   qr   QR code  this network, or any text                                                                                                   system   │
+│       DNS  the resolver this connection uses                                                                                               system   │
+│   bt   Bluetooth  pick a device                                                                                                             system   │
+│       Audio output  sinks and volume                                                                                                       system   │
+│       Media  play, pause, next                                                                                                             system   │
+│       Notifications  history and do-not-disturb                                                                                            system   │
+│       Share this screen  read-only, over ssh                                                                                               system   │
+│       Time zone  and network time                                                                                                          system   │
+│       Free space  what is using it, and clean up                                                                                           system   │
+│       Auxiliary swap  a card as more memory, on every boot                                                                                 system   │
+│       Install LazyOS  copy this system to the internal disk - asks twice                                                                   system   │
+│       End a process  the heaviest twenty                                                                                                   system   │
+│       Packages  search, then install one                                                                                                   system   │
+│       Developer  profile export and restore, diagnostics                                                                                   system   │
+│       Colour  the hex of a pixel, and the palette                                                                                          system   │
+│       About  kernel, uptime, memory, battery                                                                                               system   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close

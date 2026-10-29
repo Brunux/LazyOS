@@ -41,9 +41,9 @@ pub use design::{Border, ColorRole, Density, Design, GLYPHS, Space, TextStyle};
 pub use glyphs::Glyph;
 pub use task::{Step, StepState, Task, TaskState, TaskView};
 pub use widgets::{
-    Confirm, ConfirmAction, Header, KeyHint, ListAction, ListState, LogPane, Row, centered,
-    draw_badge, draw_card, draw_card_with, draw_empty, draw_failure, draw_gauge, draw_header,
-    draw_keybar, draw_progress,
+    Confirm, ConfirmAction, Header, Input, InputAction, KeyHint, ListAction, ListState, LogPane,
+    Row, Tier, centered, draw_badge, draw_card, draw_card_with, draw_empty, draw_failure,
+    draw_gauge, draw_header, draw_keybar, draw_progress,
 };
 
 /// A buffer as text, one line per row, for tests that want to read the screen
