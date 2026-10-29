@@ -131,9 +131,13 @@ impl CallLog {
             outcome,
             elapsed.as_millis()
         );
+        // 0600: the log says what an agent did on this desktop, and that is the
+        // person's business.
+        use std::os::unix::fs::OpenOptionsExt;
         if let Ok(mut file) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
+            .mode(0o600)
             .open(path)
         {
             let _ = file.write_all(line.as_bytes());

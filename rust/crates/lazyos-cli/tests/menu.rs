@@ -108,6 +108,8 @@ fn setup(home: &Home, surface: Surface, agent: Option<Agent>) -> Setup {
         state: home.state(),
         agent: agent.map(|agent| Choice { agent, note: None }),
         ask: None,
+        filter: None,
+        power: None,
     }
 }
 
@@ -677,5 +679,67 @@ fn rows_lists_the_table_without_a_window() {
         text.lines()
             .any(|l| l == "agent\tai\tAgent session\trofi-agents --default"),
         "{text}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The two ways lazyos mcp opens this window (spec 008)
+// ---------------------------------------------------------------------------
+
+/// `lazyos menu --power reboot`, what `power_propose` opens: the question with
+/// Cancel selected, and nothing behind it - a Cancel closes the window.
+#[test]
+fn the_power_confirm_a_proposal_opens() {
+    let home = Home::new("power-propose");
+    let open = |action| {
+        let mut s = setup(&home, Surface::Root, None);
+        s.power = Some(Some(action));
+        MenuScreen::new(s)
+    };
+    snapshot("menu-power-propose", || open(SessionAction::Reboot));
+
+    // A stray Enter answers Cancel, and Cancel is the end.
+    let mut screen = open(SessionAction::Reboot);
+    assert_eq!(
+        drive(&mut screen, &[press(KeyCode::Enter)]),
+        Outcome::Done(1)
+    );
+    assert_eq!(screen.chosen, None);
+    let mut screen = open(SessionAction::Poweroff);
+    assert_eq!(drive(&mut screen, &[press(KeyCode::Esc)]), Outcome::Done(1));
+    assert_eq!(screen.chosen, None);
+    // Only the deliberate second answer is the action.
+    let mut screen = open(SessionAction::Poweroff);
+    let keys = [press(KeyCode::Right), press(KeyCode::Enter)];
+    assert_eq!(drive(&mut screen, &keys), Outcome::Done(0));
+    assert_eq!(
+        screen.chosen,
+        Some(Picked::Session(SessionAction::Poweroff))
+    );
+
+    // `--power` alone opens the list; Escape there closes the window.
+    let mut s = setup(&home, Surface::Root, None);
+    s.power = Some(None);
+    let mut screen = MenuScreen::new(s);
+    assert_eq!(drive(&mut screen, &[press(KeyCode::Esc)]), Outcome::Done(1));
+}
+
+/// `lazyos menu --filter wifi`, what `menu_open` asks for: the row is first and
+/// selected, and the person still presses Enter.
+#[test]
+fn a_filter_typed_for_the_person() {
+    let home = Home::new("filter");
+    let mut s = setup(&home, Surface::Root, None);
+    s.filter = Some("wifi".to_string());
+    let mut screen = MenuScreen::new(s);
+    assert_eq!(screen.chosen, None, "nothing runs until Enter");
+    assert_eq!(
+        drive(&mut screen, &[press(KeyCode::Enter)]),
+        Outcome::Done(0)
+    );
+    assert!(
+        matches!(&screen.chosen, Some(Picked::Run { key, .. }) if key == "wifi"),
+        "{:?}",
+        screen.chosen
     );
 }

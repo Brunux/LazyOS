@@ -21,6 +21,7 @@
 pub mod ask;
 pub mod command;
 pub mod host;
+pub mod mcp;
 pub mod menu;
 mod notify;
 pub mod paths;
@@ -276,6 +277,8 @@ fn run_direct(resolved: &Resolved) -> i32 {
     match resolved.spec.path {
         "theme" => theme::run(resolved),
         "notify" => notify::run(resolved),
+        "mcp" => mcp::run(resolved),
+        "task stop" => task_cmd::stop(resolved),
         other => {
             eprintln!("lazyos {other}: this command has no direct handler");
             EXIT_USAGE
@@ -344,12 +347,11 @@ fn session_menu(
     surface: menu::Surface,
 ) -> Result<i32, Failure> {
     let asking = resolved.spec.path == "ask";
-    if !asking && let Some(extra) = resolved.args.first() {
-        return Err(Failure::new(
-            format!("`{extra}` is not something this menu knows"),
-            format!("try: lazyos {}", resolved.spec.path),
-        ));
-    }
+    let (filter, power) = if asking {
+        (None, None)
+    } else {
+        menu_options(resolved)?
+    };
     let vars: BTreeMap<String, String> = std::env::vars().collect();
     let paths = paths::Paths::resolve(&vars).map_err(|error| {
         Failure::new("cannot find the session state directory", error.to_string())
@@ -362,6 +364,8 @@ fn session_menu(
         context: menu::Context::from_vars(&vars),
         agent: ask::choose(&vars),
         ask: asking.then(|| resolved.args.join(" ")),
+        filter,
+        power,
         state: paths.state,
         exe,
         vars,
@@ -382,6 +386,47 @@ fn session_menu(
         None => Ok(code),
         Some(picked) => act(picked, &state, &home),
     }
+}
+
+type PowerOpen = Option<Option<menu::SessionAction>>;
+
+/// `--filter TEXT` (the filter already typed) and `--power [ACTION]` (the
+/// Power list, or one action's confirm with Cancel selected): the two ways
+/// `lazyos mcp` opens this window for the person (spec 008).
+fn menu_options(resolved: &Resolved) -> Result<(Option<String>, PowerOpen), Failure> {
+    let unknown = |word: &str| {
+        Failure::new(
+            format!("`{word}` is not something this menu knows"),
+            format!(
+                "try: lazyos {} [--filter TEXT] [--power [logout|reboot|poweroff]]",
+                resolved.spec.path
+            ),
+        )
+    };
+    let (mut filter, mut power) = (None, None);
+    let mut words = resolved.args.iter().peekable();
+    while let Some(word) = words.next() {
+        match word.as_str() {
+            "--filter" => match words.next() {
+                Some(text) => filter = Some(text.clone()),
+                None => return Err(unknown("--filter")),
+            },
+            "--power" => {
+                let action = match words.peek().map(|w| w.as_str()) {
+                    Some("logout") => Some(menu::SessionAction::Logout),
+                    Some("reboot") => Some(menu::SessionAction::Reboot),
+                    Some("poweroff") => Some(menu::SessionAction::Poweroff),
+                    _ => None,
+                };
+                if action.is_some() {
+                    words.next();
+                }
+                power = Some(action);
+            }
+            other => return Err(unknown(other)),
+        }
+    }
+    Ok((filter, power))
 }
 
 /// Do what the window chose. Everything here is a value from the table: a

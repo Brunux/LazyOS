@@ -67,6 +67,19 @@ pub struct Setup {
     pub agent: Option<ask::Choice>,
     /// Open on the Ask prompt (`lazyos ask`), with this text in it.
     pub ask: Option<String>,
+    /// Open with this already typed in the filter (`lazyos menu --filter`,
+    /// what `menu_open` asks for): the row meant is the first one, and the
+    /// person still presses Enter.
+    pub filter: Option<String>,
+    /// Open on the Power list (`--power`), or straight on one action's confirm
+    /// with Cancel selected (`--power reboot`, what `power_propose` opens).
+    pub power: Option<Option<SessionAction>>,
+}
+
+/// The question that ends the session, Cancel first: the one gate the Power
+/// rows have, whoever opened it.
+fn confirm_for(action: SessionAction) -> Confirm {
+    Confirm::new("Power", action.question()).with_options(&["Cancel", action.verb()])
 }
 
 pub struct MenuScreen {
@@ -105,9 +118,23 @@ impl MenuScreen {
                 .map(|item| Row::new(item.label).glyph(item.glyph).detail(item.detail))
                 .collect(),
         );
-        let mode = match &setup.ask {
-            Some(text) => Mode::Ask(Input::with_text(text.clone())),
-            None => Mode::List,
+        // Behind a confirm opened straight on one action, the list points at
+        // that action - not at Log out above a question about rebooting.
+        if let Some(Some(action)) = setup.power
+            && let Some(index) = table::POWER
+                .iter()
+                .position(|item| item.action == Action::Session(action))
+        {
+            power.set_cursor(index);
+        }
+        if let Some(filter) = &setup.filter {
+            list.set_filter(filter.clone());
+        }
+        let mode = match (&setup.ask, setup.power) {
+            (Some(text), _) => Mode::Ask(Input::with_text(text.clone())),
+            (None, Some(Some(action))) => Mode::Confirm(action, confirm_for(action)),
+            (None, Some(None)) => Mode::Power,
+            (None, None) => Mode::List,
         };
         let mut screen = Self {
             setup,
@@ -470,6 +497,8 @@ impl Screen for MenuScreen {
             // close the window: a person backing out of a confirm has not
             // asked for the menu to vanish.
             Mode::Power => match key.code {
+                // Opened on the Power list, there is no menu behind it.
+                KeyCode::Esc if self.setup.power.is_some() => Outcome::Done(ESCAPE),
                 KeyCode::Esc => {
                     self.mode = Mode::List;
                     Outcome::Consumed
@@ -479,9 +508,7 @@ impl Screen for MenuScreen {
                         if let Some(item) = table::POWER.get(index)
                             && let Action::Session(action) = item.action
                         {
-                            let confirm = Confirm::new("Power", action.question())
-                                .with_options(&["Cancel", action.verb()]);
-                            self.mode = Mode::Confirm(action, confirm);
+                            self.mode = Mode::Confirm(action, confirm_for(action));
                         }
                         Outcome::Continue
                     }
@@ -494,6 +521,14 @@ impl Screen for MenuScreen {
                     ConfirmAction::Chosen(1) => {
                         self.chosen = Some(Picked::Session(action));
                         Outcome::Done(OK)
+                    }
+                    // Opened straight on this question (power_propose), a
+                    // Cancel is the end: nothing happened, and the window says
+                    // so by closing.
+                    ConfirmAction::Chosen(_) | ConfirmAction::Cancelled
+                        if matches!(self.setup.power, Some(Some(_))) =>
+                    {
+                        Outcome::Done(ESCAPE)
                     }
                     ConfirmAction::Chosen(_) | ConfirmAction::Cancelled => {
                         self.mode = Mode::Power;
