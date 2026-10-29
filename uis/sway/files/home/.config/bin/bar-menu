@@ -70,6 +70,9 @@ while :; do
 		ui_row "$UI_I_CODE" 'Agent session' "$agent_default, in ~/Work" agent
 		ui_row "$UI_I_USERS" 'Agents' 'Claude Code, Codex and the others' agents
 		ui_row "$UI_I_MIC" 'Dictation' 'speak, and it is typed' dictate
+		# The model that runs here: no network, no account, and the flags it was
+		# measured into. Alt+Ctrl+M opens the same window (24-keys.conf).
+		ui_row "$UI_I_CHIP" 'Local model' 'a 1.7B model, offline, on four cores' model
 
 		ui_heading 'system'
 		ui_row "$UI_I_WIFI" 'Wi-Fi' 'pick a network' wifi
@@ -174,6 +177,7 @@ while :; do
 	install) exec "$dir/rofi-install" ;;
 	kill) exec "$dir/rofi-kill" ;;
 	dictate) exec "$dir/dictate" ;;
+	model) exec "$dir/lazyos-model" ;;
 	lock) exec "$dir/sway-lock" ;;
 	screensaver) exec "$dir/lazyos-screensaver" ;;
 	suspend) exec "$dir/sway-suspend" ;;
