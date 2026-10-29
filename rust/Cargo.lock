@@ -728,6 +728,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazyos-mcp"
+version = "0.0.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "lazyos-theme"
 version = "0.0.0"
 dependencies = [
