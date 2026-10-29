@@ -22,9 +22,9 @@ read. This page is the tour.
 | Alt+Tab | window switcher |
 | Alt+Shift+D | command palette (`$PATH`; Shift+Enter runs it in foot) |
 | Alt+Ctrl+K | every key binding, searchable, Enter copies the command |
-| Alt+Ctrl+F | files: browse a directory, Enter reads a text file in foot, Alt+1 acts on the row |
-| Search+Shift | the file search in a terminal (`lazyos-find`): live filtering as you type, a preview on the right, Enter opens the file |
-| Alt+Ctrl+G | search inside the files: ripgrep over your home, Enter opens the file at the matching line |
+| Alt+Ctrl+F | files: browse a directory with a preview, Enter opens the file, Tab acts on the row |
+| Search+Shift | every file under your home (`lazyos-find`): filtered while it is found, a preview on the right, Enter opens the file |
+| Alt+Ctrl+G | search inside the files: ripgrep over your home, Enter shows the file at the matching line |
 | Alt+Ctrl+D | developer: export your profile (keys, configs, packages) encrypted to a disk, restore one, or save a diagnostics bundle |
 | Alt+Ctrl+T | translate the selected text (or the clipboard): the answer is copied, and the card names the direction |
 | Alt+Ctrl+O | settings: the radio switches, night light, touchpad, rotation, display arrangement |
@@ -58,21 +58,21 @@ opens on the press. Pressing Search first also works - it reaches sway as the
 Search key, and releasing it while Alt is still down opens the same list - but
 the Alt-first order is the one that does not depend on which key comes up first.
 
-**Search+Shift is the same key with Shift held: the file search in a terminal.**
-It opens `lazyos-find`: `fzf` over every file under your home - the same four exclusions,
-but with the dotfiles included, since the whole tree is the pool and `~/.config`
-is a place people look for things. The list narrows as you type and the pane on
-the right previews the row under the cursor: text is read in place, a picture or
-the first page of a PDF is decoded once and drawn in the terminal, anything else
-is named by its type and size. Enter opens the choice with the same rules the
-file browser uses (text in `bat`, a picture in `imv`, a video in `mpv`, a PDF in
-the reader); **Ctrl+Y** copies its path instead, which is what a search in a
-terminal can do that a menu cannot, and Escape closes it.
+**Search+Shift is the same key with Shift held: every file, while it is found.**
+It opens the walk (`lazyos-find`, now `lazyos menu find`): `fd` over every file
+under your home - the same four exclusions, but with the dotfiles included, since
+the whole tree is the pool and `~/.config` is a place people look for things. The
+rows appear as they are found and narrow as you type, and the pane on the right
+previews the row under the cursor: text is read in place, a picture or the first
+page of a PDF is made once and drawn as a picture, anything else is named by its
+type and size. Enter opens the choice with the same rules the file list uses
+(text in `bat`, a picture in `imv`, a video in `mpv`, a PDF in the reader);
+**Ctrl+Y** copies its path instead, and Escape stops the walk and closes it.
 
-The two searches answer different questions. Alt+Search opens a *menu* - rows
-with icons and thumbnails, ready before you can type, one bounded run over the
-tree, and a list you scroll. Search+Shift *filters everything*, uncapped,
-while the walk is still running, and shows you the file before you open it.
+The two searches answer different questions. Alt+Search is the *newest 500* -
+one bounded run over the tree, sorted by date, ready before you can type.
+Search+Shift *filters everything*, uncapped, while the walk is still running.
+Both show the file beside the list before you open it.
 Neither stays resident: one process while its window is open.
 
 **Alt+Ctrl+Shift+F opens the file manager in a window** (**favnyr**), the Shift
@@ -323,7 +323,7 @@ wherever sway does not already own the key.
 | browser | no key (its launcher) | **Alt+Shift+Return** (firefox-esr) |
 | screenshot | Super+Shift+S, Print | Alt+Shift+S, Alt+Shift+F, Alt+Ctrl+S |
 | capture menu (screenshot, OCR, QR, recording) | Super+Ctrl+C | **Alt+Ctrl+C** |
-| files | Super+Shift+F opens the file manager | Alt+Search: `rofi-files --search` (a list); **Alt+Ctrl+Shift+F**: favnyr, the same files in a window; **Search+Shift**: `lazyos-find`, the same files in a terminal; **Alt+Ctrl+F**: browse a directory |
+| files | Super+Shift+F opens the file manager | Alt+Search: `rofi-files --search` (the newest 500); **Alt+Ctrl+Shift+F**: favnyr, the same files in a window; **Search+Shift**: `lazyos-find`, every file as it is found; **Alt+Ctrl+F**: browse a directory |
 | fullscreen | Super+F | Alt+F |
 | volume, brightness, media keys | XF86 keys | the same keys |
 | workspaces | Super+Tab cycles | Alt+1..0 and three-finger swipe |
