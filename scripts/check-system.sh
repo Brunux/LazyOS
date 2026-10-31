@@ -4149,7 +4149,8 @@ if [ -r "$HOME/Pictures/Wallpapers/lazyos.png" ]; then
 else
 	fail "missing Pictures/Wallpapers/lazyos.png: the desktop falls back to a flat colour"
 fi
-if grep -qs 'Pictures/Wallpapers/lazyos.png' /etc/sway/config "$HOME/.config/sway/config" 2>/dev/null; then
+if grep -rqs 'Pictures/Wallpapers/lazyos.png' /etc/sway/config "$HOME/.config/sway/config" \
+	/etc/sway/config.d "$HOME/.config/sway/config.d" 2>/dev/null; then
 	ok "sway paints the brand wallpaper"
 else
 	fail "sway does not name Pictures/Wallpapers/lazyos.png (output * bg)"

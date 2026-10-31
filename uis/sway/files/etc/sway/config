@@ -35,7 +35,7 @@ set $switcher rofi -show window
 ### Output configuration
 #
 # The wallpaper is not here: it belongs to the theme, and `lazyos theme set`
-# writes ~/.config/sway/config.d/35-wallpaper.conf, which is included after this
+# writes ~/.config/sway/config.d/35-theme.conf, which is included after this
 # file. One `output bg` in one place, so a theme switch cannot leave a picture
 # that a system file keeps pinning back.
 
