@@ -82,8 +82,12 @@ impl Home {
             ".local/bin"
         };
         let path = self.root.join(dir).join(name);
-        fs::write(&path, format!("#!/bin/sh\n{body}")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        // Via a scratch name: a script still open for writing is inherited by
+        // another thread's `fork` and its `exec` fails with `ETXTBSY`.
+        let scratch = path.with_file_name(format!("{name}.new"));
+        fs::write(&scratch, format!("#!/bin/sh\n{body}")).unwrap();
+        fs::set_permissions(&scratch, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::rename(&scratch, &path).unwrap();
     }
 
     /// The pids a fake agent wrote down for the helpers it left behind.
