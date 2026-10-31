@@ -211,6 +211,76 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "Root filesystem"
+# ---------------------------------------------------------------------------
+# `/` belongs to root and it is 0755, and both halves are one failure measured on
+# the card: the UI overlay was copied with `rsync -a <overlay>/ /`, which applies
+# the *source directory's* owner and mode to the destination, so `/`, `/etc` and
+# `/usr` came out `775` under the builder's uid. The build is immune because
+# build-rootfs.sh stages the tree, chowns the staging copy to root and then
+# rootfs-setup.sh copies its *entries* into `/` - never the tree root itself.
+# What the wrong owner costs is long and silent: systemd-tmpfiles-setup exits 73,
+# /run/lock is never created, alsactl cannot lock the sound card, the UCM boot
+# sequence never runs, WirePlumber picks the `off` profile and the only sink is
+# Dummy Output (2026-10-30 card; the chain is in 06-troubleshooting.md).
+for _d in / /etc /usr; do
+	_down="$(stat -c '%U:%G' "$_d" 2>/dev/null)"
+	_dmode="$(stat -c '%a' "$_d" 2>/dev/null)"
+	if [ "$_down" != root:root ]; then
+		fail "$_d is owned by ${_down:-nobody}, not root:root: tmpfiles then exits 73 and the sound card is a Dummy Output (see 06-troubleshooting.md)"
+	elif [ "$_dmode" != 755 ]; then
+		warn "$_d is $_dmode, not 755: the same copy that can set the owner also takes the directory's mode (harmless here, not what the build produces)"
+	else
+		ok "$_d is 755 root:root"
+	fi
+done
+
+# The first thing that failure costs, and the one that is a whole feature (the
+# speaker) rather than a line in a log. systemd-tmpfiles-setup creates it from
+# /usr/lib/tmpfiles.d/debian.conf on every boot, so a missing /run/lock is that
+# unit not having run, not a directory somebody deleted by hand.
+if [ -d /run/lock ]; then
+	ok "/run/lock exists (systemd-tmpfiles-setup ran)"
+else
+	fail "/run/lock is missing: systemd-tmpfiles-setup did not create it, so alsactl cannot lock the sound card and the UCM boot sequence never runs"
+fi
+
+# A recursive `chown` clears S_ISUID/S_ISGID from every file it touches (Linux
+# drops the set-id bits on chown, under root as well), and the same walk flattens
+# the shadow group. Both failures are invisible until the moment they matter:
+# `sudo` is present and executable and cannot escalate, and `passwd` cannot write
+# /etc/shadow. The modes are the packages' own (`dpkg-deb -c`, and dbus's
+# `dpkg-statoverride`), not a preference, so this is a witness rather than taste.
+# One line, because the report is read rather than audited; the mode and owner of
+# every entry are named only when one is wrong.
+_priv_bad=""
+while read -r _p _want; do
+	[ -e "$_p" ] || continue
+	_got="$(stat -c '%a %U:%G' "$_p" 2>/dev/null)"
+	[ "$_got" = "$_want" ] || _priv_bad="$_priv_bad $_p(${_got:-unreadable}, want $_want)"
+done <<'SETID'
+/usr/bin/sudo 4755 root:root
+/usr/bin/su 4755 root:root
+/usr/bin/mount 4755 root:root
+/usr/bin/umount 4755 root:root
+/usr/bin/passwd 4755 root:root
+/usr/bin/chfn 4755 root:root
+/usr/bin/chsh 4755 root:root
+/usr/bin/gpasswd 4755 root:root
+/usr/bin/chage 2755 root:shadow
+/usr/sbin/unix_chkpwd 2755 root:shadow
+/usr/lib/openssh/ssh-keysign 4755 root:root
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper 4754 root:messagebus
+/etc/shadow 640 root:shadow
+/etc/gshadow 640 root:shadow
+SETID
+if [ -z "$_priv_bad" ]; then
+	ok "the setuid helpers and the shadow files keep their mode and group"
+else
+	fail "wrong mode/owner:$_priv_bad (a recursive chown is what does this; restore the bits, see 06-troubleshooting.md)"
+fi
+
+# ---------------------------------------------------------------------------
 section "Firmware"
 # ---------------------------------------------------------------------------
 if have dmesg; then
