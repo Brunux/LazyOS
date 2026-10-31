@@ -39,8 +39,13 @@ fn scratch(name: &str) -> PathBuf {
 
 fn script(path: &Path, body: &str) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
-    fs::write(path, format!("#!/bin/sh\n{body}")).unwrap();
-    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    let scratch = path.with_file_name(format!(
+        "{}.new",
+        path.file_name().unwrap().to_string_lossy()
+    ));
+    fs::write(&scratch, format!("#!/bin/sh\n{body}")).unwrap();
+    fs::set_permissions(&scratch, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::rename(&scratch, path).unwrap();
 }
 
 /// A home, a runtime directory and fake programs. Every fake that opens
@@ -507,6 +512,18 @@ fn task_stop_only_stops_what_says_it_can_be_stopped() {
         record["started_at"] = json!(1_700_000_000u64);
         fs::write(&path, record.to_string()).unwrap();
     }
+    // A finished task says the same capability in its record, and the list must
+    // not offer it as something to stop (measured on the device: every Done
+    // task came back with `stoppable: true`).
+    {
+        let mut task = lazyos_ui::Task::new("ask-1", "ask-1", &state).with_command(&["true"]);
+        task.set_stoppable(true);
+        task.write_state().unwrap();
+        let path = state.join("tasks/ask-1.json");
+        let mut record: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        record["state"] = json!("Done");
+        fs::write(&path, record.to_string()).unwrap();
+    }
     let mut s = desk.start();
     let tasks = s.ok("task_list", json!({}));
     assert_eq!(
@@ -514,7 +531,23 @@ fn task_stop_only_stops_what_says_it_can_be_stopped() {
             .as_array()
             .unwrap()
             .len(),
-        2
+        3
+    );
+    let listed = |id: &str| {
+        tasks["structuredContent"]["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["id"] == json!(id))
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(listed("scan-1")["stoppable"], json!(true));
+    assert_eq!(listed("install-1")["stoppable"], json!(false));
+    assert_eq!(
+        listed("ask-1")["stoppable"],
+        json!(false),
+        "a task that is done is not a task to stop"
     );
     let stopped = s.ok("task_stop", json!({"id": "scan-1"}));
     assert!(text(&stopped).contains("stop requested"), "{stopped}");

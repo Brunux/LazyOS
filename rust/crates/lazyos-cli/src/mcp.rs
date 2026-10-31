@@ -35,7 +35,7 @@ use std::time::{Duration, Instant};
 
 use lazyos_mcp::server::Resource;
 use lazyos_mcp::{CallLog, Handler, Reply, Server, ToolSpec, manifest, serve};
-use lazyos_ui::Task;
+use lazyos_ui::{Task, TaskState};
 use serde_json::{Map, Value, json};
 
 use crate::command::Resolved;
@@ -362,7 +362,17 @@ impl Desk {
     }
 
     fn windows(&self) -> Result<Reply, String> {
-        let tree = capture("swaymsg", &["-t", "get_tree", "-r"], Duration::from_secs(5))?;
+        let socket = sway_socket(&self.vars);
+        let env: Vec<(&str, &str)> = socket
+            .as_deref()
+            .map(|s| vec![("SWAYSOCK", s)])
+            .unwrap_or_default();
+        let tree = capture_env(
+            "swaymsg",
+            &["-t", "get_tree", "-r"],
+            Duration::from_secs(5),
+            &env,
+        )?;
         if !tree.ok() {
             return Err(format!(
                 "swaymsg could not read the window tree: {}",
@@ -511,7 +521,12 @@ impl Desk {
                         "id": task.id,
                         "title": task.title,
                         "state": format!("{:?}", task.state).to_lowercase(),
-                        "stoppable": task.stoppable,
+                        // What `task_stop` would answer: a finished task that
+                        // could have been stopped is not a task to stop, and
+                        // the record's own flag says the capability, not the
+                        // moment (measured on the device: every Done task
+                        // listed `stoppable: true`).
+                        "stoppable": task.stoppable && task.state == TaskState::Running,
                         "result": task.error_line.clone().or(task.result.clone()),
                     }),
                 ))
@@ -892,10 +907,81 @@ impl Captured {
 
 /// Run `program` with `args`, no stdin, both outputs captured, killed when it
 /// outlives `timeout`. Never a shell.
+/// `swaymsg` finds the compositor through `SWAYSOCK`, and a server inherits
+/// that variable when it starts. A session that restarted sway since
+/// (`swaymsg restart`, a crash, a re-login) wrote a socket under a new pid and
+/// unlinked the old one, so the inherited path names nothing and every window
+/// question answered "swaymsg could not read the window tree" while the desktop
+/// was healthy - the message names the dead socket, which is how it was found.
+/// The socket is therefore resolved per call: the inherited one while it is
+/// still a socket, otherwise the newest `sway-ipc.<uid>.<pid>.sock` whose pid
+/// is a live `sway` (the `/proc/<pid>/comm` test `rofi-vnc` makes of its own).
+fn sway_socket(vars: &BTreeMap<String, String>) -> Option<String> {
+    sway_socket_where(vars, |pid| {
+        read_trim(&format!("/proc/{pid}/comm")) == "sway"
+    })
+}
+
+fn sway_socket_where(
+    vars: &BTreeMap<String, String>,
+    is_sway: impl Fn(u32) -> bool,
+) -> Option<String> {
+    use std::os::unix::fs::FileTypeExt;
+    let socket = |path: &Path| {
+        std::fs::metadata(path)
+            .map(|m| m.file_type().is_socket())
+            .unwrap_or(false)
+    };
+    if let Some(path) = vars
+        .get("SWAYSOCK")
+        .filter(|v| !v.is_empty())
+        .filter(|p| socket(Path::new(p)))
+    {
+        return Some(path.clone());
+    }
+    let runtime = vars.get("XDG_RUNTIME_DIR").filter(|v| !v.is_empty())?;
+    let mut best: Option<(std::time::SystemTime, String)> = None;
+    for entry in std::fs::read_dir(runtime).ok()?.flatten() {
+        let name = entry.file_name();
+        let Some(pid) = name
+            .to_str()
+            .and_then(|n| n.strip_prefix("sway-ipc."))
+            .and_then(|n| n.strip_suffix(".sock"))
+            .and_then(|n| n.rsplit('.').next())
+            .and_then(|pid| pid.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if !is_sway(pid) || !socket(&entry.path()) {
+            continue;
+        }
+        let when = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::UNIX_EPOCH);
+        if best.as_ref().is_none_or(|(seen, _)| when > *seen) {
+            best = Some((when, entry.path().to_string_lossy().into_owned()));
+        }
+    }
+    best.map(|(_, path)| path)
+}
+
 pub fn capture(program: &str, args: &[&str], timeout: Duration) -> Result<Captured, String> {
+    capture_env(program, args, timeout, &[])
+}
+
+/// The same, with variables set for the child. Only the compositor needs it:
+/// everything else here reads a file or asks a service.
+fn capture_env(
+    program: &str,
+    args: &[&str],
+    timeout: Duration,
+    env: &[(&str, &str)],
+) -> Result<Captured, String> {
     let mut child = Command::new(program)
         .args(args)
         .env_remove("LAZYOS_UI")
+        .envs(env.iter().copied())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -1114,6 +1200,35 @@ mod tests {
         assert_eq!(out[0]["focused"], true);
         assert_eq!(out[1]["app"], "Steam");
         assert_eq!(out[1]["floating"], true);
+    }
+
+    #[test]
+    fn the_compositor_socket_is_found_again_after_sway_restarts() {
+        let dir = std::env::temp_dir().join(format!("lazyos-mcp-sock-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut vars = BTreeMap::new();
+        vars.insert("XDG_RUNTIME_DIR".into(), dir.display().to_string());
+        // The socket this server inherited: sway restarted and unlinked it.
+        let dead = dir.join("sway-ipc.1000.999999.sock");
+        vars.insert("SWAYSOCK".into(), dead.display().to_string());
+        assert_eq!(sway_socket_where(&vars, |_| true), None);
+        // The live compositor's own socket, named after its pid.
+        let live = dir.join("sway-ipc.1000.4242.sock");
+        let _listener = std::os::unix::net::UnixListener::bind(&live).unwrap();
+        assert_eq!(
+            sway_socket_where(&vars, |pid| pid == 4242).as_deref(),
+            Some(live.to_str().unwrap())
+        );
+        // A socket whose pid is not a sway is not the compositor.
+        assert_eq!(sway_socket_where(&vars, |_| false), None);
+        // An inherited socket that still exists is used as it is.
+        vars.insert("SWAYSOCK".into(), live.display().to_string());
+        assert_eq!(
+            sway_socket_where(&vars, |_| false).as_deref(),
+            Some(live.to_str().unwrap())
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
