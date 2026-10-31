@@ -511,7 +511,11 @@ uncommitted changes, since those do not travel into the image.
   `/etc` or `/usr` is not `root:root`, when `/run/lock` is missing, and when one of the fourteen
   setuid/shadow entries is not the mode and owner `dpkg-deb -c` (and dbus's `dpkg-statoverride`)
   ships; a repair from the card is a mode-and-group table, not another `chown -R`, which is why
-  that path is in `06-troubleshooting.md` § *No sound* and `docs/test-checklist.md`.
+  that path is in `06-troubleshooting.md` § *No sound* and `docs/test-checklist.md`. The same
+  `PRIV` flag, set once from `asroot true`, is what keeps the rest of the report honest on that
+  machine: a privileged read that could not be made says SKIP with its reason, because an empty
+  answer is not evidence - the same page's worth of FAILs ("no wireless interface", "controller is
+  not powered") was three false accusations in the middle of one real one.
 - **Every script under `uis/sway/files/home/.config/bin/` must be committed `100755`.** The image
   is staged with `git archive HEAD`, which takes the mode from the index, so a `100644` script
   arrives in the image readable but not executable; the binding `exec`s it, gets `EACCES`, and the
