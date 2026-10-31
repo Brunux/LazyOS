@@ -286,7 +286,15 @@ yet present in `scripts/` as not implemented.
   when the handshake does not list every tool, when a propose window is not executable and
   when the registration is gone. The protocol is hand-written over `serde_json` rather than
   `rmcp`: the subset is initialize, tools and resources over stdio lines, and an SDK would
-  bring an async runtime into a binary that has none. `task_start` waits for spec 010,
+  bring an async runtime into a binary that has none. **The compositor socket is resolved per
+  call, never inherited once**: a server outlives a `swaymsg reload` (the compositor keeps its
+  pid) and a logout, and the agent that spawned it hands down the `SWAYSOCK` of the session it
+  started in, so `sway_socket()` reads the environment when it names a socket and otherwise takes
+  the newest `sway-ipc.<uid>.<pid>.sock` whose `/proc/<pid>/comm` is `sway` - measured on the card
+  with a deliberately dead `SWAYSOCK`, where every window tool answered "swaymsg failed" until the
+  lookup was per call. `task_list`'s `stoppable` is the conjunction (`task.stoppable &&
+  state == Running`), because a Done row that still offers a stop is a stop that answers "nothing
+  to stop" and reads as a broken window. `task_start` waits for spec 010,
   which gives a task an allow-listed program; the manual is `07-agents.md` § *The desktop
   the agent can drive*.
 - **The three file questions are one binary with one opener table, and the preview is
@@ -485,6 +493,25 @@ uncommitted changes, since those do not travel into the image.
 - **Never edit a script while it is executing.** The shell re-reads the file as it goes and can
   die with `unexpected EOF while looking for matching '"'`. Write the new version elsewhere and
   `mv` it into place.
+- **The overlay is copied as its entries, and never `chown -R`'d over a live root.** `rsync -a
+  <tree>/ /` applies the *source directory's* owner and mode to `/` itself, so a hand-applied
+  overlay from a checkout in somebody's home is how `/`, `/etc` and `/usr` end up `775` under that
+  uid (measured on the 2026-10-30 card). What that costs is one long
+  silent chain: `systemd-tmpfiles-setup` exits 73, `/run/lock` is never created, `alsactl` cannot
+  take the sound card's lock, the UCM boot sequence never runs, WirePlumber picks the `off`
+  profile and the only sink is **Dummy Output** - a card that "has no sound" for a reason that
+  names none of those things. `cp -a <tree>/. /` copies the entries and leaves `/` alone, which is
+  the rule; `rootfs-setup.sh` already copies each entry of `/tmp/ui-files/*` into `/` after
+  `build-rootfs.sh` chowned the staging copy to root, so the build has never had this bug and a
+  by-hand overlay must reproduce it rather than invent a shortcut. The second half is worse than
+  the first: **a recursive `chown` clears S_ISUID/S_ISGID from every file it touches** (Linux drops
+  the bits on chown, under root too), so `sudo`, `su`, `mount`, `passwd`, `chsh`, `unix_chkpwd` and
+  the dbus helper stay present and executable and cannot escalate, and the shadow files lose their
+  group. Both are witnesses now: `check-system.sh`'s *Root filesystem* section FAILs when `/`,
+  `/etc` or `/usr` is not `root:root`, when `/run/lock` is missing, and when one of the fourteen
+  setuid/shadow entries is not the mode and owner `dpkg-deb -c` (and dbus's `dpkg-statoverride`)
+  ships; a repair from the card is a mode-and-group table, not another `chown -R`, which is why
+  that path is in `06-troubleshooting.md` § *No sound* and `docs/test-checklist.md`.
 - **Every script under `uis/sway/files/home/.config/bin/` must be committed `100755`.** The image
   is staged with `git archive HEAD`, which takes the mode from the index, so a `100644` script
   arrives in the image readable but not executable; the binding `exec`s it, gets `EACCES`, and the

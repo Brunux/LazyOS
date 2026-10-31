@@ -28,6 +28,27 @@ sudo alsactl restore          # run the boot sequence by hand
 If the card is there but the profile is off, something removed `alsa-utils` or
 `alsa-ucm-conf`; `apt install` them back.
 
+If `sudo alsactl restore` cannot even take its lock - `Failed to open
+/run/lock/...: No such file or directory`, or `/run/lock` is simply absent -
+then look at the root directory before anything else:
+
+```sh
+stat -c '%a %U:%G' / /etc /usr     # 755 root:root, on every one of them
+ls -ld /run/lock                   # systemd-tmpfiles-setup creates it at boot
+```
+
+A `/` that belongs to somebody other than root makes `systemd-tmpfiles-setup`
+exit 73, and nothing under `/run` is created after that, so `alsactl` has no
+lock to take, the UCM boot sequence never runs and WirePlumber falls back to
+*Dummy Output*. The usual cause is an overlay copied with `rsync -a <tree>/ /`,
+which applies the *source directory's* owner and mode to `/` itself (`cp -a
+<tree>/. /` copies the entries instead and leaves `/` alone; the build stages a
+copy, `chown -R root:root` **that** copy, and then copies its entries into `/`).
+Because Linux clears the setuid bit on every file a `chown` touches, that walk
+also leaves `sudo` and `su` present and unable to escalate - `check-system.sh`
+reports both, and the repair from the rescue card is
+`/home/brunux/restore-permissions.sh` rather than another recursive `chown`.
+
 **ALSA-only programs** (aplay without `-D`, emulators, some Java games) need
 `pipewire-alsa`; without it they fail with *audio open error: No such file or
 directory* while everything else works.
