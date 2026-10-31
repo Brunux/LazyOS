@@ -29,6 +29,61 @@ cat /etc/debian-aarch64-revision ~/Dev/LazyOS/REVISION ~/Dev/LazyOS/VERSION
 * `check-system.sh` must end with **0 FAIL**. WARN and SKIP lines are expected
   and explained in `reports/README.md`; anything else stops the run here.
 
+## Trying a spec on the installed system, without rebuilding the image
+
+A spec merges before the card is rebuilt, so the way to try it on the machine in
+front of you is to apply the same overlay the build applies (`uis/<ui>/files`),
+plus the framework binary. The build copies the overlay's **entries** into `/`
+after `build-rootfs.sh` has chowned its staging copy to root; doing it by hand is
+the same step with the same rule, and the 2026-10-30 session got it wrong in the
+one way that costs the most.
+
+| Step | Expected |
+|---|---|
+| `sudo cp -a <checkout>/uis/sway/files/. /` | `/`, `/etc` and `/usr` still answer `stat -c '%a %U:%G'` as `755 root:root`. `rsync -a <tree>/ /` applies the **source directory's** owner and mode to the destination root, which is how `/` became `brunux:brunux 775` |
+| `sudo scripts/install-lazyos.sh /` (and `install-swayfx.sh /` first, on a card that has no framework) | `/usr/bin/lazyos` answers `--version` with `/etc/debian-aarch64-revision`'s version |
+| `sudo -n true` and `stat -c '%a' /usr/bin/sudo` | still works, `4755` - a `chown -R` over `/etc` or `/usr` clears the setuid bit from every file it touches (`sudo`, `su`, `mount`, `passwd`, `chsh`, `unix_chkpwd`, the dbus helper…), and `check-system.sh`'s *Root filesystem* section lists all twelve |
+| reboot, then `ls -ld /run/lock` and `pactl list cards short` | `/run/lock` exists and the card is on `HiFi` with a real sink. A root-owned `/` is what keeps `systemd-tmpfiles-setup` at exit 0; while it was not, `/run` was created without `/run/lock`, `alsactl` had no lock, the UCM boot sequence never ran and the only sink was *Dummy Output* |
+| carry the maintainer's own edits back afterwards | `~/.bashrc` (hand-written `PATH` lines) and `~/.config/waybar/config.jsonc` (the modules this card has switched off) are the two files on this machine that differ from the overlay, so neither may be overwritten: `diff -r` the overlay's `home/` against `$HOME` before and after the copy |
+
+The repair for a tree that already lost those bits is **not** another recursive
+`chown`: it is the mode-and-group table in `06-troubleshooting.md` § *No sound*,
+run from the microSD rescue card against the unmounted eMMC root. `chown` and
+`chmod` on a live root filesystem edit the copy you are running from, and the
+first reboot reformats nothing - but a `sudo` that lost its bit cannot fix
+itself, which is the whole reason the card exists.
+
+## The framework's windows - the root menu, the agent's tools, the file questions
+
+Specs 007, 008 and 009 replaced `bar-menu`, the three file scripts and
+`lazyos-view` with one binary (`lazyos`) whose old names are links to it. What a
+person can judge here is not "does it draw" - the golden snapshots and the
+glyph check cover that - but whether the window behaves like the menu it
+replaced.
+
+| Step | Expected |
+|---|---|
+| `Alt+Space` | the root menu in foot, 44 rows in four groups (`open`, `ai`, `system`, `session`), **a glyph on every row** and every label starting in the same column; the `ai` group holds **Agent session** and **Dictation** together |
+| type `blue` | the list filters as you type, case folded, and **Bluetooth** is above *Settings* - the ranker wants an exact word prefix before a substring |
+| `Escape` on the power confirm | back to the menu, not out of the window: `Escape` steps back through `Outcome::Consumed` |
+| `lazyos menu --rows` | one `key<TAB>group<TAB>label<TAB>command` line per row, printed without opening a window |
+| launch the same row three times, then reopen the menu | it has moved up (frecency is written on a launch and boosts from the **third** one); a single mistaken Enter must not reorder anything |
+| `Alt+Shift+D` | the command palette, same ranker and the binary icons; `Escape` closes with 1 |
+| the Ask strip: type a question, Enter | the window says which agent will answer, then the answer in the same window, `c` copies it; `Escape` or `Alt+Q` ends it and `pgrep -f '[L]AZYOS_ASK'` is empty afterwards |
+| `lazyos menu files`, `lazyos menu find`, `lazyos menu grep` | a folder list with thumbnails, the fzf window with its preview pane, and one row per match; Enter on a match opens the file **with the line marked and in view**, not at the top |
+| `lazyos open <a picture>`, `<a pdf>`, `<a film>`, `<a page>` | `imv`, `papers`, `mpv` and the browser - the same table a double click resolves (`gio mime`) |
+| `LAZYOS_UI=1 lazyos menu files` from a terminal *inside a framework window* | exit 3 and a card, never a second window: the guard is the host's `LAZYOS_UI=1` |
+| `lazyos mcp --tools` | the manifest with its version; the number is the one `~/.config/opencode/AGENTS.md` pins |
+| from an OpenCode session: `task_list`, then `task_open`, then `task_stop` on a running one | the TaskView with its title, timer, checklist and result; a stop turns the state to `Stopped` and the task's process is gone |
+| `menu_open --filter blue`, `view_open <file>` | the menu in front of you with the filter typed, and the file in its viewer - both without a shell |
+| `swaymsg reload`, then ask the agent again | the tools keep working: the compositor socket is resolved per call, not inherited once |
+| `swaymsg exit` and log back in, then `pgrep -c -f 'lazyos mcp'` | one server per client session, none left over: a stale server would hold a dead socket |
+
+`check-system.sh` covers the half a script can see - the links, the rows, the
+manifest pin, the glyphs the theme draws, the refused tools - and the golden
+snapshots (`UPDATE_SNAPSHOTS=1`) are what a moved border shows up in. The manual
+pages are `02-rofi.md` (§ *The root menu*), `03-shortcuts.md` and `07-agents.md`.
+
 ## The first launch - the caches built at build time
 
 Two caches are built inside the image so the first session does not pay for

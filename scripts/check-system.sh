@@ -96,9 +96,20 @@ fi
 
 if [ "$(id -u)" -eq 0 ]; then
 	asroot() { "$@" 2>/dev/null; }
+	PRIV=yes
 else
 	asroot() { sudo -n "$@" 2>/dev/null; }
-	asroot true 2>/dev/null || warn "sudo -n does not work here: privileged checks will be skipped"
+	# A machine whose setuid bit is gone (a recursive chown - see the *Root
+	# filesystem* section) keeps every tool present and answers nothing, and an
+	# empty answer is not evidence: the checks that read through `asroot` say SKIP
+	# instead of turning "could not ask" into "no wireless interface". Measured on
+	# the 2026-10-30 card, where three falsified FAILs is exactly what this is.
+	if asroot true; then
+		PRIV=yes
+	else
+		PRIV=no
+		warn "sudo -n does not work here: every privileged read below says SKIP, so its verdict is not guessed"
+	fi
 fi
 
 # `systemctl is-active` always succeeds inside a chroot ("Running in chroot,
@@ -176,7 +187,11 @@ if [ -n "$_guid" ]; then
 		fail "kern_guid=$_guid names no partition: nothing to boot from next time"
 	else
 		ok "kernel partition $_kpart_part (kern_guid=$_guid)"
-		if have futility; then
+		if ! have futility; then
+			skip "futility not installed (package vboot-kernel-utils): kernel partition not verified"
+		elif [ "$PRIV" != yes ]; then
+			skip "sudo -n does not work: futility cannot read $_kpart_part, so the FIT is unverified"
+		else
 			# Do not pipe futility into `grep -q` (see the header).
 			_fv="$(asroot futility show "$_kpart_part" 2>/dev/null || true)"
 			case "$_fv" in
@@ -187,8 +202,6 @@ if [ -n "$_guid" ]; then
 					fail "futility cannot verify a signed kpart in $_kpart_part"
 					;;
 			esac
-		else
-			skip "futility not installed (package vboot-kernel-utils): kernel partition not verified"
 		fi
 	fi
 fi
@@ -211,9 +224,79 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "Root filesystem"
+# ---------------------------------------------------------------------------
+# `/` belongs to root and it is 0755, and both halves are one failure measured on
+# the card: the UI overlay was copied with `rsync -a <overlay>/ /`, which applies
+# the *source directory's* owner and mode to the destination, so `/`, `/etc` and
+# `/usr` came out `775` under the builder's uid. The build is immune because
+# build-rootfs.sh stages the tree, chowns the staging copy to root and then
+# rootfs-setup.sh copies its *entries* into `/` - never the tree root itself.
+# What the wrong owner costs is long and silent: systemd-tmpfiles-setup exits 73,
+# /run/lock is never created, alsactl cannot lock the sound card, the UCM boot
+# sequence never runs, WirePlumber picks the `off` profile and the only sink is
+# Dummy Output (2026-10-30 card; the chain is in 06-troubleshooting.md).
+for _d in / /etc /usr; do
+	_down="$(stat -c '%U:%G' "$_d" 2>/dev/null)"
+	_dmode="$(stat -c '%a' "$_d" 2>/dev/null)"
+	if [ "$_down" != root:root ]; then
+		fail "$_d is owned by ${_down:-nobody}, not root:root: tmpfiles then exits 73 and the sound card is a Dummy Output (see 06-troubleshooting.md)"
+	elif [ "$_dmode" != 755 ]; then
+		warn "$_d is $_dmode, not 755: the same copy that can set the owner also takes the directory's mode (harmless here, not what the build produces)"
+	else
+		ok "$_d is 755 root:root"
+	fi
+done
+
+# The first thing that failure costs, and the one that is a whole feature (the
+# speaker) rather than a line in a log. systemd-tmpfiles-setup creates it from
+# /usr/lib/tmpfiles.d/debian.conf on every boot, so a missing /run/lock is that
+# unit not having run, not a directory somebody deleted by hand.
+if [ -d /run/lock ]; then
+	ok "/run/lock exists (systemd-tmpfiles-setup ran)"
+else
+	fail "/run/lock is missing: systemd-tmpfiles-setup did not create it, so alsactl cannot lock the sound card and the UCM boot sequence never runs"
+fi
+
+# A recursive `chown` clears S_ISUID/S_ISGID from every file it touches (Linux
+# drops the set-id bits on chown, under root as well), and the same walk flattens
+# the shadow group. Both failures are invisible until the moment they matter:
+# `sudo` is present and executable and cannot escalate, and `passwd` cannot write
+# /etc/shadow. The modes are the packages' own (`dpkg-deb -c`, and dbus's
+# `dpkg-statoverride`), not a preference, so this is a witness rather than taste.
+# One line, because the report is read rather than audited; the mode and owner of
+# every entry are named only when one is wrong.
+_priv_bad=""
+while read -r _p _want; do
+	[ -e "$_p" ] || continue
+	_got="$(stat -c '%a %U:%G' "$_p" 2>/dev/null)"
+	[ "$_got" = "$_want" ] || _priv_bad="$_priv_bad $_p(${_got:-unreadable}, want $_want)"
+done <<'SETID'
+/usr/bin/sudo 4755 root:root
+/usr/bin/su 4755 root:root
+/usr/bin/mount 4755 root:root
+/usr/bin/umount 4755 root:root
+/usr/bin/passwd 4755 root:root
+/usr/bin/chfn 4755 root:root
+/usr/bin/chsh 4755 root:root
+/usr/bin/gpasswd 4755 root:root
+/usr/bin/chage 2755 root:shadow
+/usr/sbin/unix_chkpwd 2755 root:shadow
+/usr/lib/openssh/ssh-keysign 4755 root:root
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper 4754 root:messagebus
+/etc/shadow 640 root:shadow
+/etc/gshadow 640 root:shadow
+SETID
+if [ -z "$_priv_bad" ]; then
+	ok "the setuid helpers and the shadow files keep their mode and group"
+else
+	fail "wrong mode/owner:$_priv_bad (a recursive chown is what does this; restore the bits, see 06-troubleshooting.md)"
+fi
+
+# ---------------------------------------------------------------------------
 section "Firmware"
 # ---------------------------------------------------------------------------
-if have dmesg; then
+if have dmesg && [ "$PRIV" = yes ]; then
 	_dmesg="$(asroot dmesg 2>/dev/null)"
 	_missing="$(printf '%s\n' "$_dmesg" | grep -oE 'Direct firmware load for [^ ]+ failed' |
 		awk '{print $5}' | sort -u)"
@@ -242,7 +325,7 @@ if have dmesg; then
 	[ "${_dmesg_err:-0}" -eq 0 ] && ok "no errors from the wireless/Bluetooth/audio subsystems" ||
 		warn "$_dmesg_err dmesg line(s) mention errors in the wireless/Bluetooth/audio subsystems"
 else
-	skip "dmesg not available"
+	skip "dmesg not available (or sudo -n does not work): failed firmware loads not read"
 fi
 
 # ---------------------------------------------------------------------------
@@ -562,25 +645,29 @@ fi
 section "Network"
 # ---------------------------------------------------------------------------
 if have iw; then
-	_ifaces="$(asroot iw dev | awk '/Interface/ {print $2}')"
-	if [ -n "$_ifaces" ]; then
-		ok "wireless interface: $(printf '%s' "$_ifaces" | tr '\n' ' ')"
+	if [ "$PRIV" != yes ]; then
+		skip "iw needs root and sudo -n does not work: the wireless interface is not read"
 	else
-		fail "no wireless interface (is rtw88_8822ce loading its firmware?)"
-	fi
-	# A world regulatory domain (country 00) is not a bug by itself: it is what
-	# remains while neither NetworkManager, wpa_supplicant nor the AP's 802.11d
-	# country IE has set one. What *is* a bug is wireless-regdb missing, which
-	# makes cfg80211 log "failed to load regulatory.db" and pins the world domain
-	# no matter what connects (AGENTS.md).
-	_reg="$(asroot iw reg get | sed -n 's/^country \([^:]*\).*/\1/p' | head -1)"
-	_regdb_bad="$(asroot dmesg 2>/dev/null | grep -c 'failed to load regulatory.db' || true)"
-	if [ "${_regdb_bad:-0}" -gt 0 ]; then
-		warn "cfg80211 could not load regulatory.db (package wireless-regdb): the world domain cannot change"
-	elif [ -z "$_reg" ] || [ "$_reg" = 00 ]; then
-		info "regulatory domain: world (country 00), set once NetworkManager or the AP provides one"
-	else
-		ok "regulatory domain: $_reg"
+		_ifaces="$(asroot iw dev | awk '/Interface/ {print $2}')"
+		if [ -n "$_ifaces" ]; then
+			ok "wireless interface: $(printf '%s' "$_ifaces" | tr '\n' ' ')"
+		else
+			fail "no wireless interface (is rtw88_8822ce loading its firmware?)"
+		fi
+		# A world regulatory domain (country 00) is not a bug by itself: it is what
+		# remains while neither NetworkManager, wpa_supplicant nor the AP's 802.11d
+		# country IE has set one. What *is* a bug is wireless-regdb missing, which
+		# makes cfg80211 log "failed to load regulatory.db" and pins the world domain
+		# no matter what connects (AGENTS.md).
+		_reg="$(asroot iw reg get | sed -n 's/^country \([^:]*\).*/\1/p' | head -1)"
+		_regdb_bad="$(asroot dmesg 2>/dev/null | grep -c 'failed to load regulatory.db' || true)"
+		if [ "${_regdb_bad:-0}" -gt 0 ]; then
+			warn "cfg80211 could not load regulatory.db (package wireless-regdb): the world domain cannot change"
+		elif [ -z "$_reg" ] || [ "$_reg" = 00 ]; then
+			info "regulatory domain: world (country 00), set once NetworkManager or the AP provides one"
+		else
+			ok "regulatory domain: $_reg"
+		fi
 	fi
 else
 	skip "iw is not installed"
@@ -629,13 +716,17 @@ fi
 section "Bluetooth"
 # ---------------------------------------------------------------------------
 if have bluetoothctl; then
-	_show="$(asroot bluetoothctl show)"
-	info "controller $(printf '%s\n' "$_show" | grep -m1 'Controller' | cut -d' ' -f2-)"
-	case "$_show" in
-		*"Powered: yes"*) ok "controller powered" ;;
-		*) fail "controller is not powered (bluetoothd? rtl_bt firmware?)" ;;
-	esac
-	have btmgmt && info "btmgmt: $(asroot btmgmt info | grep -m1 'current settings' | sed 's/^ *//')"
+	if [ "$PRIV" != yes ]; then
+		skip "bluetoothctl needs root and sudo -n does not work: the controller is not read"
+	else
+		_show="$(asroot bluetoothctl show)"
+		info "controller $(printf '%s\n' "$_show" | grep -m1 'Controller' | cut -d' ' -f2-)"
+		case "$_show" in
+			*"Powered: yes"*) ok "controller powered" ;;
+			*) fail "controller is not powered (bluetoothd? rtl_bt firmware?)" ;;
+		esac
+		have btmgmt && info "btmgmt: $(asroot btmgmt info | grep -m1 'current settings' | sed 's/^ *//')"
+	fi
 else
 	skip "bluetoothctl is not installed (package bluez)"
 fi
@@ -815,7 +906,9 @@ case "$(cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null)" in
 esac
 
 # Storage IRQ balancing witness: ensure MMC interrupts do not starve CPU0 (ChromeOS EC input core)
-_mmc_irq=$(awk '/11f70000.mmc/ {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':')
+# `$NF` is the data IRQ: the controller's `mt-eint ... cd` line comes first and a
+# substring match reads that one instead (see scripts/rootfs-setup.sh).
+_mmc_irq=$(awk '$NF == "11f70000.mmc" {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':')
 if [ -n "$_mmc_irq" ] && [ -r "/proc/irq/$_mmc_irq/smp_affinity_list" ]; then
 	_aff=$(cat "/proc/irq/$_mmc_irq/smp_affinity_list" 2>/dev/null)
 	case "$_aff" in
@@ -3004,9 +3097,14 @@ done
 # /etc/polkit-1/rules.d is 0750 root:polkitd, so the rule is read through sudo
 # like every other privileged file in this report (captured first: a
 # `producer | grep -q` here would report a match as a failure whenever grep
-# exits before the producer finishes).
-_am_polkit=$(sudo -n cat /etc/polkit-1/rules.d/49-lazyos-automount.rules 2>/dev/null || true)
-[ -n "$_am_polkit" ] || _am_missing="$_am_missing /etc/polkit-1/rules.d/49-lazyos-automount.rules"
+# exits before the producer finishes). A machine where `sudo -n` does not work
+# cannot read it at all, and that is a SKIP below rather than a missing rule.
+_am_polkit=
+if [ "$PRIV" = yes ]; then
+	_am_polkit=$(sudo -n cat /etc/polkit-1/rules.d/49-lazyos-automount.rules 2>/dev/null || true)
+	[ -n "$_am_polkit" ] ||
+		_am_missing="$_am_missing /etc/polkit-1/rules.d/49-lazyos-automount.rules"
+fi
 [ -x /usr/local/sbin/lazyos-automount ] || _am_missing="$_am_missing lazyos-automount(!exec)"
 if [ -z "$_am_missing" ]; then
 	ok "a plugged USB drive mounts itself (udev rule, unit, helper, polkit rule)"
@@ -3044,7 +3142,9 @@ if [ -z "$_missing" ]; then
 else
 	fail "the auto-mount helper is missing:$_missing (a plugged stick fails to mount)"
 fi
-if grep -qs 'filesystem-mount' <<<"$_am_polkit" &&
+if [ "$PRIV" != yes ]; then
+	skip "sudo -n does not work: the polkit auto-mount rule was not read"
+elif grep -qs 'filesystem-mount' <<<"$_am_polkit" &&
 	grep -qs "isInGroup('plugdev')" <<<"$_am_polkit"; then
 	ok "polkit lets the auto-mount helper mount a removable disk (plugdev)"
 else
@@ -4147,7 +4247,8 @@ if [ -r "$HOME/Pictures/Wallpapers/lazyos.png" ]; then
 else
 	fail "missing Pictures/Wallpapers/lazyos.png: the desktop falls back to a flat colour"
 fi
-if grep -qs 'Pictures/Wallpapers/lazyos.png' /etc/sway/config "$HOME/.config/sway/config" 2>/dev/null; then
+if grep -rqs 'Pictures/Wallpapers/lazyos.png' /etc/sway/config "$HOME/.config/sway/config" \
+	/etc/sway/config.d "$HOME/.config/sway/config.d" 2>/dev/null; then
 	ok "sway paints the brand wallpaper"
 else
 	fail "sway does not name Pictures/Wallpapers/lazyos.png (output * bg)"
@@ -4369,12 +4470,16 @@ fi
 # ---------------------------------------------------------------------------
 section "Journal"
 # ---------------------------------------------------------------------------
-_errs="$(asroot journalctl -b -p err --no-pager | grep -vc '^-- No entries --')"
-if [ "${_errs:-0}" -eq 0 ]; then
-	ok "no error-priority messages this boot"
+if [ "$PRIV" != yes ]; then
+	skip "journalctl needs sudo -n here: the error-priority count is not read"
 else
-	warn "$_errs error-priority line(s) this boot; the last ones:"
-	asroot journalctl -b -p err --no-pager | tail -6 | sed 's/^/          /'
+	_errs="$(asroot journalctl -b -p err --no-pager | grep -vc '^-- No entries --')"
+	if [ "${_errs:-0}" -eq 0 ]; then
+		ok "no error-priority messages this boot"
+	else
+		warn "$_errs error-priority line(s) this boot; the last ones:"
+		asroot journalctl -b -p err --no-pager | tail -6 | sed 's/^/          /'
+	fi
 fi
 
 # ---------------------------------------------------------------------------

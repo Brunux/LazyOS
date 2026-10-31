@@ -109,14 +109,19 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let log = dir.join("args.txt");
         let program = dir.join("notify-send");
+        let scratch = dir.join("notify-send.new");
         let script = format!(
             "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n{reply}\n",
             log.display()
         );
-        std::fs::write(&program, script).unwrap();
-        let mut perms = std::fs::metadata(&program).unwrap().permissions();
+        // Written through a scratch name and renamed: another test thread can
+        // fork while this file is open for writing, the child inherits that
+        // descriptor, and the next `exec` fails with `ETXTBSY`.
+        std::fs::write(&scratch, script).unwrap();
+        let mut perms = std::fs::metadata(&scratch).unwrap().permissions();
         perms.set_mode(0o755);
-        std::fs::set_permissions(&program, perms).unwrap();
+        std::fs::set_permissions(&scratch, perms).unwrap();
+        std::fs::rename(&scratch, &program).unwrap();
         (program, log)
     }
 

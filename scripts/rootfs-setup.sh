@@ -250,13 +250,20 @@ EOF
 # Storage IRQ balancing: route MMC interrupts away from CPU0 (Cortex-A55) so the
 # ChromeOS EC (keyboard, trackpad, power button) and system timers on CPU0 are
 # never starved by storage I/O.
+#
+# The match is the *last* field, not a substring of the line: each controller
+# appears twice in /proc/interrupts - its data IRQ from the GIC and, first, a
+# `mt-eint ... cd` line for the card-detect GPIO. `/11f70000.mmc/ {print $1;
+# exit}` therefore selected the card-detect EINT, whose affinity is not
+# per-CPU routable, so the write silently failed and the real storage IRQ was
+# never pinned (measured on the card: IRQ 33 cd at 0-7, IRQ 270 data at 0-7).
 install -d /usr/local/sbin
 cat >/usr/local/sbin/lazyos-irq-balance <<'EOF'
 #!/bin/sh
-for irq in $(awk '/11f70000.mmc/ {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':'); do
+for irq in $(awk '$NF == "11f70000.mmc" {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':'); do
 	[ -w "/proc/irq/$irq/smp_affinity_list" ] && echo 2 > "/proc/irq/$irq/smp_affinity_list" 2>/dev/null || true
 done
-for irq in $(awk '/11f60000.mmc/ {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':'); do
+for irq in $(awk '$NF == "11f60000.mmc" {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':'); do
 	[ -w "/proc/irq/$irq/smp_affinity_list" ] && echo 3 > "/proc/irq/$irq/smp_affinity_list" 2>/dev/null || true
 done
 EOF

@@ -45,17 +45,21 @@ fn stub_notify_send(name: &str) -> (PathBuf, PathBuf) {
     let dir = scratch(name);
     let log = dir.join("argv.txt");
     let program = dir.join("notify-send");
+    // Through a scratch name: a writer still open in another thread's `fork`
+    // makes the child's `exec` fail with `ETXTBSY` ("Text file busy").
+    let scratch = dir.join("notify-send.new");
     std::fs::write(
-        &program,
+        &scratch,
         format!(
             "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\necho 7\n",
             log.display()
         ),
     )
     .unwrap();
-    let mut perms = std::fs::metadata(&program).unwrap().permissions();
+    let mut perms = std::fs::metadata(&scratch).unwrap().permissions();
     perms.set_mode(0o755);
-    std::fs::set_permissions(&program, perms).unwrap();
+    std::fs::set_permissions(&scratch, perms).unwrap();
+    std::fs::rename(&scratch, &program).unwrap();
     (dir, log)
 }
 

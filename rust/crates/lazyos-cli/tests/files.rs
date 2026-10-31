@@ -37,9 +37,17 @@ fn scratch(name: &str) -> PathBuf {
     dir
 }
 
+/// A stub program, published by rename: a writer that is still open in another
+/// test thread is inherited by that thread's `fork`, and the child's `exec`
+/// then fails with `ETXTBSY` ("Text file busy").
 fn script(path: &Path, body: &str) {
-    fs::write(path, format!("#!/bin/sh\n{body}")).unwrap();
-    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    let scratch = path.with_file_name(format!(
+        "{}.new",
+        path.file_name().unwrap().to_string_lossy()
+    ));
+    fs::write(&scratch, format!("#!/bin/sh\n{body}")).unwrap();
+    fs::set_permissions(&scratch, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::rename(&scratch, path).unwrap();
 }
 
 /// 2026-10-01 12:00 UTC: the same local day in every time zone a build host
@@ -191,17 +199,34 @@ fn mask(rendered: &str) -> String {
             }
             None => line.to_string(),
         })
-        .map(|line| match (line.find(" · "), line.find(" free")) {
-            (Some(_), Some(end)) => {
-                let start = line[..end].rfind(" · ").unwrap();
-                let masked = format!("{} · ### free{}", &line[..start], &line[end + 5..]);
-                // Keep the width, so the rest of the line stays where it was.
-                let pad = line.chars().count().saturating_sub(masked.chars().count());
-                format!("{masked}{}", " ".repeat(pad))
-                    .trim_end()
-                    .to_string()
-            }
-            _ => line.to_string(),
+        .map(|line| {
+            let Some(end) = line.find(" free") else {
+                return line;
+            };
+            // The value between the last ` · ` and ` free` is this machine's
+            // (`52G`, `9.3G`, `1.2T`), and so is the gap put_right leaves
+            // before the status: a fixed placeholder in its place moves every
+            // column after it. Rebuild the line with `###` and right-align the
+            // status exactly where the original ended, so the snapshot is the
+            // frame's and not the disk's.
+            let Some(separator) = line[..end].rfind(" · ") else {
+                return line;
+            };
+            // The status starts after the run of spaces that pads the title.
+            let Some(gap) = line[..separator].rfind("  ") else {
+                return line;
+            };
+            let status_start =
+                gap + line[gap..separator].len() - line[gap..separator].trim_start().len();
+            let title = line[..status_start].trim_end();
+            let status = format!("{} · ### free", &line[status_start..separator]);
+            let width = line.chars().count();
+            let pad = width.saturating_sub(title.chars().count() + status.chars().count());
+            let mut out = String::with_capacity(width);
+            out.push_str(title);
+            out.push_str(&" ".repeat(pad));
+            out.push_str(&status);
+            out
         })
         .collect::<Vec<_>>()
         .join("\n")
