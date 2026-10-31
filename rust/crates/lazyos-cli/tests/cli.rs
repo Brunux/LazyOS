@@ -38,8 +38,14 @@ fn fake_foot(dir: &Path) -> PathBuf {
         log.display(),
         log.display()
     );
-    std::fs::write(&path, script).unwrap();
-    set_executable(&path);
+    // Through a scratch name: another test thread can fork while this file is
+    // open for writing, the child inherits the descriptor, and the next exec
+    // then fails with `ETXTBSY` ("Text file busy"). A rename publishes a file
+    // no child holds.
+    let scratch = path.with_file_name("foot.new");
+    std::fs::write(&scratch, script).unwrap();
+    set_executable(&scratch);
+    std::fs::rename(&scratch, &path).unwrap();
     log
 }
 
@@ -121,8 +127,14 @@ fn in_pty_with(args: &[&str], input: &str, configure: impl FnOnce(&mut Command))
     let _ = taken.recv_timeout(Duration::from_secs(10));
     let mut stdin = child.stdin.take().unwrap();
     let _ = stdin.write_all(input.as_bytes());
-    drop(stdin);
+    let _ = stdin.flush();
+    // The pipe stays open until the program is gone: `script(1)` writes a
+    // literal EOT (`\x04`) into the pty when its own stdin reaches EOF, and
+    // crossterm parses `ESC` followed by another byte as an `Alt` chord - so a
+    // closed stdin turned Escape into `Alt+Ctrl+D` (the Developer menu) and
+    // the window waited for ever. Browsers do not hang up the tty either.
     let output = child.wait_with_output().unwrap();
+    drop(stdin);
     let stdout = reader.join().unwrap();
     let mut text = String::from_utf8_lossy(&stdout).into_owned();
     text.push_str(&String::from_utf8_lossy(&output.stderr));
