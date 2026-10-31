@@ -96,9 +96,20 @@ fi
 
 if [ "$(id -u)" -eq 0 ]; then
 	asroot() { "$@" 2>/dev/null; }
+	PRIV=yes
 else
 	asroot() { sudo -n "$@" 2>/dev/null; }
-	asroot true 2>/dev/null || warn "sudo -n does not work here: privileged checks will be skipped"
+	# A machine whose setuid bit is gone (a recursive chown - see the *Root
+	# filesystem* section) keeps every tool present and answers nothing, and an
+	# empty answer is not evidence: the checks that read through `asroot` say SKIP
+	# instead of turning "could not ask" into "no wireless interface". Measured on
+	# the 2026-10-30 card, where three falsified FAILs is exactly what this is.
+	if asroot true; then
+		PRIV=yes
+	else
+		PRIV=no
+		warn "sudo -n does not work here: every privileged read below says SKIP, so its verdict is not guessed"
+	fi
 fi
 
 # `systemctl is-active` always succeeds inside a chroot ("Running in chroot,
@@ -176,7 +187,11 @@ if [ -n "$_guid" ]; then
 		fail "kern_guid=$_guid names no partition: nothing to boot from next time"
 	else
 		ok "kernel partition $_kpart_part (kern_guid=$_guid)"
-		if have futility; then
+		if ! have futility; then
+			skip "futility not installed (package vboot-kernel-utils): kernel partition not verified"
+		elif [ "$PRIV" != yes ]; then
+			skip "sudo -n does not work: futility cannot read $_kpart_part, so the FIT is unverified"
+		else
 			# Do not pipe futility into `grep -q` (see the header).
 			_fv="$(asroot futility show "$_kpart_part" 2>/dev/null || true)"
 			case "$_fv" in
@@ -187,8 +202,6 @@ if [ -n "$_guid" ]; then
 					fail "futility cannot verify a signed kpart in $_kpart_part"
 					;;
 			esac
-		else
-			skip "futility not installed (package vboot-kernel-utils): kernel partition not verified"
 		fi
 	fi
 fi
@@ -283,7 +296,7 @@ fi
 # ---------------------------------------------------------------------------
 section "Firmware"
 # ---------------------------------------------------------------------------
-if have dmesg; then
+if have dmesg && [ "$PRIV" = yes ]; then
 	_dmesg="$(asroot dmesg 2>/dev/null)"
 	_missing="$(printf '%s\n' "$_dmesg" | grep -oE 'Direct firmware load for [^ ]+ failed' |
 		awk '{print $5}' | sort -u)"
@@ -312,7 +325,7 @@ if have dmesg; then
 	[ "${_dmesg_err:-0}" -eq 0 ] && ok "no errors from the wireless/Bluetooth/audio subsystems" ||
 		warn "$_dmesg_err dmesg line(s) mention errors in the wireless/Bluetooth/audio subsystems"
 else
-	skip "dmesg not available"
+	skip "dmesg not available (or sudo -n does not work): failed firmware loads not read"
 fi
 
 # ---------------------------------------------------------------------------
@@ -632,25 +645,29 @@ fi
 section "Network"
 # ---------------------------------------------------------------------------
 if have iw; then
-	_ifaces="$(asroot iw dev | awk '/Interface/ {print $2}')"
-	if [ -n "$_ifaces" ]; then
-		ok "wireless interface: $(printf '%s' "$_ifaces" | tr '\n' ' ')"
+	if [ "$PRIV" != yes ]; then
+		skip "iw needs root and sudo -n does not work: the wireless interface is not read"
 	else
-		fail "no wireless interface (is rtw88_8822ce loading its firmware?)"
-	fi
-	# A world regulatory domain (country 00) is not a bug by itself: it is what
-	# remains while neither NetworkManager, wpa_supplicant nor the AP's 802.11d
-	# country IE has set one. What *is* a bug is wireless-regdb missing, which
-	# makes cfg80211 log "failed to load regulatory.db" and pins the world domain
-	# no matter what connects (AGENTS.md).
-	_reg="$(asroot iw reg get | sed -n 's/^country \([^:]*\).*/\1/p' | head -1)"
-	_regdb_bad="$(asroot dmesg 2>/dev/null | grep -c 'failed to load regulatory.db' || true)"
-	if [ "${_regdb_bad:-0}" -gt 0 ]; then
-		warn "cfg80211 could not load regulatory.db (package wireless-regdb): the world domain cannot change"
-	elif [ -z "$_reg" ] || [ "$_reg" = 00 ]; then
-		info "regulatory domain: world (country 00), set once NetworkManager or the AP provides one"
-	else
-		ok "regulatory domain: $_reg"
+		_ifaces="$(asroot iw dev | awk '/Interface/ {print $2}')"
+		if [ -n "$_ifaces" ]; then
+			ok "wireless interface: $(printf '%s' "$_ifaces" | tr '\n' ' ')"
+		else
+			fail "no wireless interface (is rtw88_8822ce loading its firmware?)"
+		fi
+		# A world regulatory domain (country 00) is not a bug by itself: it is what
+		# remains while neither NetworkManager, wpa_supplicant nor the AP's 802.11d
+		# country IE has set one. What *is* a bug is wireless-regdb missing, which
+		# makes cfg80211 log "failed to load regulatory.db" and pins the world domain
+		# no matter what connects (AGENTS.md).
+		_reg="$(asroot iw reg get | sed -n 's/^country \([^:]*\).*/\1/p' | head -1)"
+		_regdb_bad="$(asroot dmesg 2>/dev/null | grep -c 'failed to load regulatory.db' || true)"
+		if [ "${_regdb_bad:-0}" -gt 0 ]; then
+			warn "cfg80211 could not load regulatory.db (package wireless-regdb): the world domain cannot change"
+		elif [ -z "$_reg" ] || [ "$_reg" = 00 ]; then
+			info "regulatory domain: world (country 00), set once NetworkManager or the AP provides one"
+		else
+			ok "regulatory domain: $_reg"
+		fi
 	fi
 else
 	skip "iw is not installed"
@@ -699,13 +716,17 @@ fi
 section "Bluetooth"
 # ---------------------------------------------------------------------------
 if have bluetoothctl; then
-	_show="$(asroot bluetoothctl show)"
-	info "controller $(printf '%s\n' "$_show" | grep -m1 'Controller' | cut -d' ' -f2-)"
-	case "$_show" in
-		*"Powered: yes"*) ok "controller powered" ;;
-		*) fail "controller is not powered (bluetoothd? rtl_bt firmware?)" ;;
-	esac
-	have btmgmt && info "btmgmt: $(asroot btmgmt info | grep -m1 'current settings' | sed 's/^ *//')"
+	if [ "$PRIV" != yes ]; then
+		skip "bluetoothctl needs root and sudo -n does not work: the controller is not read"
+	else
+		_show="$(asroot bluetoothctl show)"
+		info "controller $(printf '%s\n' "$_show" | grep -m1 'Controller' | cut -d' ' -f2-)"
+		case "$_show" in
+			*"Powered: yes"*) ok "controller powered" ;;
+			*) fail "controller is not powered (bluetoothd? rtl_bt firmware?)" ;;
+		esac
+		have btmgmt && info "btmgmt: $(asroot btmgmt info | grep -m1 'current settings' | sed 's/^ *//')"
+	fi
 else
 	skip "bluetoothctl is not installed (package bluez)"
 fi
@@ -3076,9 +3097,14 @@ done
 # /etc/polkit-1/rules.d is 0750 root:polkitd, so the rule is read through sudo
 # like every other privileged file in this report (captured first: a
 # `producer | grep -q` here would report a match as a failure whenever grep
-# exits before the producer finishes).
-_am_polkit=$(sudo -n cat /etc/polkit-1/rules.d/49-lazyos-automount.rules 2>/dev/null || true)
-[ -n "$_am_polkit" ] || _am_missing="$_am_missing /etc/polkit-1/rules.d/49-lazyos-automount.rules"
+# exits before the producer finishes). A machine where `sudo -n` does not work
+# cannot read it at all, and that is a SKIP below rather than a missing rule.
+_am_polkit=
+if [ "$PRIV" = yes ]; then
+	_am_polkit=$(sudo -n cat /etc/polkit-1/rules.d/49-lazyos-automount.rules 2>/dev/null || true)
+	[ -n "$_am_polkit" ] ||
+		_am_missing="$_am_missing /etc/polkit-1/rules.d/49-lazyos-automount.rules"
+fi
 [ -x /usr/local/sbin/lazyos-automount ] || _am_missing="$_am_missing lazyos-automount(!exec)"
 if [ -z "$_am_missing" ]; then
 	ok "a plugged USB drive mounts itself (udev rule, unit, helper, polkit rule)"
@@ -3116,7 +3142,9 @@ if [ -z "$_missing" ]; then
 else
 	fail "the auto-mount helper is missing:$_missing (a plugged stick fails to mount)"
 fi
-if grep -qs 'filesystem-mount' <<<"$_am_polkit" &&
+if [ "$PRIV" != yes ]; then
+	skip "sudo -n does not work: the polkit auto-mount rule was not read"
+elif grep -qs 'filesystem-mount' <<<"$_am_polkit" &&
 	grep -qs "isInGroup('plugdev')" <<<"$_am_polkit"; then
 	ok "polkit lets the auto-mount helper mount a removable disk (plugdev)"
 else
@@ -4442,12 +4470,16 @@ fi
 # ---------------------------------------------------------------------------
 section "Journal"
 # ---------------------------------------------------------------------------
-_errs="$(asroot journalctl -b -p err --no-pager | grep -vc '^-- No entries --')"
-if [ "${_errs:-0}" -eq 0 ]; then
-	ok "no error-priority messages this boot"
+if [ "$PRIV" != yes ]; then
+	skip "journalctl needs sudo -n here: the error-priority count is not read"
 else
-	warn "$_errs error-priority line(s) this boot; the last ones:"
-	asroot journalctl -b -p err --no-pager | tail -6 | sed 's/^/          /'
+	_errs="$(asroot journalctl -b -p err --no-pager | grep -vc '^-- No entries --')"
+	if [ "${_errs:-0}" -eq 0 ]; then
+		ok "no error-priority messages this boot"
+	else
+		warn "$_errs error-priority line(s) this boot; the last ones:"
+		asroot journalctl -b -p err --no-pager | tail -6 | sed 's/^/          /'
+	fi
 fi
 
 # ---------------------------------------------------------------------------
