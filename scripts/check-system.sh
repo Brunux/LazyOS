@@ -815,7 +815,9 @@ case "$(cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null)" in
 esac
 
 # Storage IRQ balancing witness: ensure MMC interrupts do not starve CPU0 (ChromeOS EC input core)
-_mmc_irq=$(awk '/11f70000.mmc/ {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':')
+# `$NF` is the data IRQ: the controller's `mt-eint ... cd` line comes first and a
+# substring match reads that one instead (see scripts/rootfs-setup.sh).
+_mmc_irq=$(awk '$NF == "11f70000.mmc" {print $1; exit}' /proc/interrupts 2>/dev/null | tr -d ':')
 if [ -n "$_mmc_irq" ] && [ -r "/proc/irq/$_mmc_irq/smp_affinity_list" ]; then
 	_aff=$(cat "/proc/irq/$_mmc_irq/smp_affinity_list" 2>/dev/null)
 	case "$_aff" in
