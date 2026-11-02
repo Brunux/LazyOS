@@ -242,3 +242,61 @@ configuration, and `pam_systemd` then passes the same environment on to the user
 manager. The card this report came from was patched in place, so its next boot is
 the one that proves it; an image built from the commit that carries the fix has
 it without the patch.
+
+## check-system-2026-11-02-card.txt
+
+Fourth report, from the image built 2026-10-23 (`e8282e9`) with specs 004, 006,
+007, 008 and 009 applied on top by hand — there is no image that carries them
+yet — and every one of them exercised on the card: **329 OK, 4 WARN, 1 FAIL**.
+
+Its value is that it is the second half of an experiment whose first half went
+wrong in an instructive way. The overlay (`uis/sway/files`) was applied to the
+running system with `rsync -a <tree>/ /` followed by
+`sudo chown -R root:root /etc /usr`. Neither is how the build does it, and the
+run before this one (**323 OK, 9 WARN, 4 FAIL**) is what found this branch's two
+new witnesses:
+
+| that run said | what it was |
+|---|---|
+| `FAIL / is 775 brunux:brunux` (and `/etc`, `/usr`) | `rsync -a <src>/ /` gives the *source directory's* owner and mode to `/` itself. The *Root filesystem* section was written from this. |
+| `FAIL /run/lock is missing: systemd-tmpfiles-setup did not create it` | The direct consequence: the tmpfiles unit answered 73 while `/` was not root's, so nothing under `/run` was made. |
+| `FAIL card active profile is 'off'` and `FAIL no real sink (found: auto_null)` | The sound card, three layers down: no `/run/lock` → `alsactl` cannot take the card's lock → the UCM `BootSequence` never runs → WirePlumber falls back to `auto_null`. The chain is now in `06-troubleshooting.md` § *No sound*. |
+| `FAIL futility cannot verify a signed kpart`, `FAIL no wireless interface`, `FAIL controller is not powered`, `WARN keyd logged no 'DEVICE: match'`, `WARN no suspend recorded` | Not the machine. `sudo -n` answered nothing because the same `chown` had cleared S_ISUID from `sudo` itself, and an empty answer was being read as evidence. This is the `PRIV` flag: those reads now SKIP with their reason. |
+
+The report here is the run **after the reboot that followed the repair of the
+ownership** (`chmod 755 / /etc /usr`; the mode was the harmless half), and it
+proves the same chain from the other end, which is why it is kept as evidence
+rather than as a clean sheet:
+
+```
+OK    /run/lock (systemd-tmpfiles-setup ran)
+OK    card active profile: HiFi
+OK    sinks: alsa_output.platform-sound.HiFi__Headphones__sink ...HiFi__Speaker__sink
+OK    microSD IRQ 270 routed to CPU 2 (CPU0 input handling protected)
+OK    zram device is 1902 MiB, half of RAM
+```
+
+The last two are the witnesses of this branch's other two fixes: the IRQ line
+now asks for the *data* interrupt (the card-detect EINT that shares the
+controller's name used to be pinned instead, at `0-7`), and `ram/2` reaches the
+device on the boot after the configuration lands — the run before the reboot
+still had the 1522 MiB zram the previous boot had created, and reported it.
+
+The four WARNs are that copy's leftovers and nothing else:
+
+| line in the report | what it is |
+|---|---|
+| `WARN / is 775, not 755` (and `/etc`, `/usr`) | The mode half of the same overlay. Harmless — root writes regardless — and not what the build produces. |
+| `WARN sudo -n does not work here: every privileged read below says SKIP` | The one real damage, and the FAIL below. |
+
+The single FAIL is the machine and not the tree:
+
+```
+FAIL  wrong mode/owner: /usr/bin/sudo(755 root:root, want 4755 root:root) … (14 entries)
+```
+
+A `sudo` that cannot escalate cannot restore its own bit, so that repair is the
+microSD's: `/home/brunux/restore-permissions.sh` against the *unmounted* eMMC
+root, the procedure `06-troubleshooting.md` § *No sound* names. The report is
+left as the evidence that the guard catches it — and, with the six lines above,
+that the version of the report before `PRIV` did not.
