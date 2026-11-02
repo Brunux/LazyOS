@@ -109,15 +109,42 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let log = dir.join("args.txt");
         let program = dir.join("notify-send");
+        let scratch = dir.join("notify-send.new");
         let script = format!(
             "#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n{reply}\n",
             log.display()
         );
-        std::fs::write(&program, script).unwrap();
-        let mut perms = std::fs::metadata(&program).unwrap().permissions();
+        // Written through a scratch name and renamed: another test thread can
+        // fork while this file is open for writing, the child inherits that
+        // descriptor, and the next `exec` fails with `ETXTBSY`.
+        std::fs::write(&scratch, script).unwrap();
+        let mut perms = std::fs::metadata(&scratch).unwrap().permissions();
         perms.set_mode(0o755);
-        std::fs::set_permissions(&program, perms).unwrap();
+        std::fs::set_permissions(&scratch, perms).unwrap();
+        std::fs::rename(&scratch, &program).unwrap();
         (program, log)
+    }
+
+    /// [`notify_with`], retried while the stub is still `ETXTBSY`.
+    ///
+    /// The rename inside [`stub`] is not enough here, and the reason is the shape
+    /// of these tests rather than the file: another thread's `fork` can inherit
+    /// the descriptor that is writing the stub, and because the stub is executed
+    /// **by this same process** (unlike an integration test, where the `lazyos`
+    /// binary is exec'd first and that descriptor is gone before it runs
+    /// anything) nothing closes it before the `exec`. Linux answers `ETXTBSY`
+    /// until the forking child has exec'd, microseconds later, so the test waits
+    /// instead of failing (measured: one run in CI, one test of 76).
+    fn reply(program: &Path, message: &Message) -> Result<u32, String> {
+        for _ in 0..40 {
+            match notify_with(program, message) {
+                Err(reason) if reason.contains("Text file busy") => {
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                answer => return answer,
+            }
+        }
+        notify_with(program, message)
     }
 
     #[test]
@@ -163,7 +190,7 @@ mod tests {
     #[test]
     fn the_reply_is_the_id_notify_send_printed_and_the_call_is_recorded() {
         let (program, log) = stub("reply", "echo 7");
-        let id = notify_with(&program, &message()).expect("the stub answers");
+        let id = reply(&program, &message()).expect("the stub answers");
         assert_eq!(id, 7);
         let recorded = std::fs::read_to_string(&log).unwrap();
         assert!(
@@ -183,7 +210,7 @@ mod tests {
             "refused",
             "echo 'Failed to show notification: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: nobody' >&2\necho 0\nexit 1",
         );
-        let reason = notify_with(&program, &message()).unwrap_err();
+        let reason = reply(&program, &message()).unwrap_err();
         assert!(reason.contains("no notification daemon"), "{reason}");
         let _ = std::fs::remove_dir_all(program.parent().unwrap());
     }

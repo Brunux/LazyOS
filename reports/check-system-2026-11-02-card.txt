@@ -1,0 +1,396 @@
+debian-aarch64 system report  2026-11-02 15:32:20 CST
+  WARN  sudo -n does not work here: every privileged read below says SKIP, so its verdict is not guessed
+
+==> Boot
+  ----  kernel  7.2.7-mt81
+  ----  cmdline cros_secure kern_guid=5c0631e4-37fe-3d48-ad77-e2f76a682e19 quiet loglevel=2 transparent_hugepage=madvise root=UUID=4634a03c-39d1-4e4c-b096-dc99cfedb647 rootwait rw resume=LABEL=lazyos_swap
+  OK    depthcharge substituted kern_guid
+  OK    root=UUID= present
+  OK    kernel partition /dev/mmcblk0p1 (kern_guid=5c0631e4-37fe-3d48-ad77-e2f76a682e19)
+  SKIP  sudo -n does not work: futility cannot read /dev/mmcblk0p1, so the FIT is unverified
+  OK    device tree: Google Hayato rev1
+  OK    modules for 7.2.7-mt81 installed
+
+==> Root filesystem
+  WARN  / is 775, not 755: the same copy that can set the owner also takes the directory's mode (harmless here, not what the build produces)
+  WARN  /etc is 775, not 755: the same copy that can set the owner also takes the directory's mode (harmless here, not what the build produces)
+  WARN  /usr is 775, not 755: the same copy that can set the owner also takes the directory's mode (harmless here, not what the build produces)
+  OK    /run/lock exists (systemd-tmpfiles-setup ran)
+  FAIL  wrong mode/owner: /usr/bin/sudo(755 root:root, want 4755 root:root) /usr/bin/su(755 root:root, want 4755 root:root) /usr/bin/mount(755 root:root, want 4755 root:root) /usr/bin/umount(755 root:root, want 4755 root:root) /usr/bin/passwd(755 root:root, want 4755 root:root) /usr/bin/chfn(755 root:root, want 4755 root:root) /usr/bin/chsh(755 root:root, want 4755 root:root) /usr/bin/gpasswd(755 root:root, want 4755 root:root) /usr/bin/chage(755 root:root, want 2755 root:shadow) /usr/sbin/unix_chkpwd(755 root:root, want 2755 root:shadow) /usr/lib/openssh/ssh-keysign(755 root:root, want 4755 root:root) /usr/lib/dbus-1.0/dbus-daemon-launch-helper(754 root:root, want 4754 root:messagebus) /etc/shadow(640 root:root, want 640 root:shadow) /etc/gshadow(640 root:root, want 640 root:shadow) (a recursive chown is what does this; restore the bits, see 06-troubleshooting.md)
+
+==> Firmware
+  SKIP  dmesg not available (or sudo -n does not work): failed firmware loads not read
+
+==> Storage
+  ----  root    /dev/mmcblk0p3 (UUID 4634a03c-39d1-4e4c-b096-dc99cfedb647)
+  ----  booted from the internal eMMC
+  OK    /etc/fstab matches the mounted root
+  OK    swap active: /dev/zram0 /dev/mmcblk1p1
+  OK    /boot is a separate filesystem (/dev/mmcblk0p2) matching /etc/fstab
+  OK    the running kernel's vmlinuz is on /boot
+  OK    root filesystem 87% used
+
+==> Display and GPU
+  OK    display connected on card1-eDP-1
+  OK    panfrost loaded (GPU acceleration available)
+  OK    backlight writable by group video (664 video)
+  OK    session user is in group video
+  OK    external display connector card1-DP-1 present (DPI and ANX7625 in the DTB)
+  OK    lazyos-dp-mux is executable
+  OK    udev runs lazyos-dp-mux when a port enters DisplayPort alt mode
+  OK    i2cset is installed
+  OK    lazyos-dp-resume is executable
+  OK    lazyos-dp-resume retrains the link after writing the crosspoint
+  OK    rofi-display is executable
+  OK    Settings has the display arrangement row
+  OK    the saved arrangement is read at login (config.d included)
+  OK    wdisplays is installed (manual arrangement)
+  OK    the display menu brings the panel back with no monitor (no dead end)
+  OK    a key turns the internal panel back on with no picture (blind recovery)
+  OK    rofi-display --panel-on exists
+
+==> Input
+  OK    4 keyboard device(s)
+  OK    6 pointer/touch device(s)
+  ----  devices: cros_ec|cros_ec_buttons|Elan Touchpad|hid-over-i2c 04F3:2E70|hid-over-i2c 04F3:2E70 UNKNOWN|hid-over-i2c 04F3:2E70 UNKNOWN|hid-over-i2c 04F3:2E70 Stylus|hid-over-i2c 04F3:2E70 Stylus|mt8192_mt6359_rt1015p_rt5682 Headset Jack|keyd virtual keyboard|keyd virtual pointer|
+  OK    keyd.service is active
+  OK    keyd leaves the sleep key alone
+  SKIP  keyd's journal needs sudo -n here: the matched keyboard is not read
+
+==> Network
+  SKIP  iw needs root and sudo -n does not work: the wireless interface is not read
+  OK    NetworkManager is active (connected:full)
+  OK    1 Wi-Fi profile(s) installed
+  OK    no Wi-Fi profile pins an interface name
+  OK    nmtui present
+  OK    network diagnostics present (ip, ping, ss)
+  ----  remote login is enabled (ssh, default password documented in 04-software.md)
+
+==> Bluetooth
+  SKIP  bluetoothctl needs root and sudo -n does not work: the controller is not read
+
+==> Audio
+  OK    audio server: PulseAudio (on PipeWire 1.6.9)
+  OK    sound card: alsa_card.platform-sound
+  OK    ALSA codec: mt8192_mt6359 mt8192mt6359rt1 mt8192_mt6359_rt1015p_rt5682
+  OK    card active profile: HiFi
+  OK    sinks: alsa_output.platform-sound.HiFi__Headphones__sink alsa_output.platform-sound.HiFi__Speaker__sink 
+  OK    alsa 'default' PCM available (pipewire-alsa)
+
+==> Suspend and power
+  OK    /sys/power/state advertises suspend (freeze mem disk)
+  OK    systemd-logind is active (its button handling is the polkit-free suspend path)
+  OK    polkitd is active (session suspend via loginctl)
+  OK    sway-suspend helper is executable
+  SKIP  journalctl needs sudo -n here: the suspend cycles this boot are not read
+
+==> System tuning
+  OK    cpufreq governor is schedutil on every policy
+  OK    MGLRU enabled (0x0003)
+  OK    transparent hugepages: madvise
+  OK    swap is zram (0 kB in use)
+  OK    zram swap is a systemd unit (systemd-oomd can manage it)
+  OK    zram-size = ram/2 (half of RAM: fast swap, the card as the spillover)
+  OK    zram device is 1902 MiB, half of RAM
+  OK    systemd-oomd is active (kills a hog on memory pressure)
+  OK    vm.swappiness=100 (swapping to compressed RAM is cheap)
+  OK    vm.page-cluster=0 (single-page decompress preserves Cortex-A55 32KB L1 cache)
+  OK    vm.watermark_boost_factor=0 (stops premature kswapd churn)
+  OK    vm.vfs_cache_pressure=100 (reclaims clean dentries/inodes before anon memory)
+  OK    eMMC I/O scheduler: kyber
+  OK    microSD IRQ 270 routed to CPU 2 (CPU0 input handling protected)
+  OK    kernel config carries the tuning (config-7.2.7-mt81)
+
+==> Clock
+  ----  America/Mexico_City / local RTC no
+  OK    clock synchronised
+
+==> Session
+  OK    greetd is active
+  OK    greeter vt = 7
+  OK    greeter user _greetd exists
+  OK    tuigreet is installed
+  OK    session locale is UTF-8 (en_US.UTF-8)
+  OK    compositor is swayfx version 0.6 (based on sway 1.12.0)
+  OK    GPU renderer is Mali-G57 MC5 (Panfrost)
+  OK    sway configuration is valid
+  OK    Xwayland present (X11 programs can run)
+  OK    every command the sway configuration invokes is installed
+  OK    workstyle installed (workstyle 0.8.2)
+  OK    the sway configuration starts workstyle
+  OK    workstyle is running
+  OK    the bar draws the whole workspace name (number and icons)
+  OK    workspace icons use 8 codepoints from the menu alphabet
+  OK    sway addresses workspaces by number, so renaming them does not break a binding
+  SKIP  kitty is not installed (the session terminal is foot)
+  OK    a notification daemon owns org.freedesktop.Notifications (mako)
+  OK    notification icons resolve in the LazyOS theme
+  OK    every notification in ~/.config/bin carries an icon
+  OK    notifications can carry a picture (icons=1, icon-path=/usr/share/icons/LazyOS)
+  OK    bar menus complete (scripts plus rofi, nmcli, bluetoothctl, jq)
+  OK    the bar's busy card is the stop button (custom/busy on-click)
+  OK    busy records the stop command (mode 0600) the spinner runs
+  OK    busy cancelled tells a running task from a stopped one
+  OK    after a stop, busy says the task was cancelled (the producer reports nothing)
+  OK    idle screen complete (tte, LazyOS art, launcher, sway-lock, terminal profile)
+  OK    idle screen ends on the pointer too (mouse reporting on, and off again on exit)
+  OK    idle screen restores the pointer on exit (captures the prior hide_cursor and puts it back)
+  OK    idle screen launcher returns at once (swayidle -w reaches the 300 s lock)
+  OK    idle chain armed (150 s idle screen, 300 s lock, 360 s panel off, lock before sleep)
+  OK    fullscreen video inhibits the idle chain (Firefox, papers, mpv)
+  OK    the bar carries a keep-awake toggle (idle_inhibitor, yellow when on)
+  OK    volume and brightness keys draw an overlay (bin/osd, three volume icons, the theme's brightness icon)
+  OK    the overlay can carry its icon and its level bar (mako icons=1, progress-color)
+  OK    both brightness directions pass a step brightnessctl accepts (set 5%- set 5%+)
+  OK    night light wired (helper, login line, after-resume, Settings switch)
+  OK    CLI tools complete (eza, bat, fd, rg, fzf, zoxide, starship, btop, ...)
+  OK    all 23 private-use glyphs of the prompt are drawn by fonts foot is given
+  OK    non-Latin text has a font (Arabic, Hebrew, Indic; CJK is an install away)
+  OK    editors installed (nvim, vim, vi, nano)
+  OK    EDITOR is nvim (eff, git commit, crontab -e)
+  OK    ls is eza in an interactive shell
+  OK    zoxide initialises after starship and cd - stays bash's (hook survives)
+  OK    launcher complete (rofi, config.rasi, solarized.rasi)
+  OK    bar-pick (rofi -dmenu) is executable
+  OK    rofi inhibits the compositor's shortcuts while a menu is open (global-kb)
+  OK    the Search key opens the applications launcher ($launcher)
+  OK    Alt+Search opens the file search (rofi-files --search)
+  OK    Alt+d is not unbound (the launcher stays on $mod+d)
+  OK    rofi-files is `lazyos menu files` (spec 009)
+  OK    lazyos-find is `lazyos menu find` (spec 009)
+  OK    rofi-grep is `lazyos menu grep` (spec 009)
+  OK    lazyos-view is `lazyos open` (spec 009)
+  OK    file search available (fd), which the list's --search and the walk run
+  OK    the preview's thumbnail cache is writable (/home/brunux/.cache/thumbnails/large)
+  OK    Search+Shift opens the terminal file search (lazyos-find)
+  OK    keyd maps Alt+Search to F20
+  OK    Alt+Ctrl+G searches inside the files (rofi-grep)
+  OK    ripgrep present, which the search inside files runs
+  OK    download complete (yt-dlp, ffmpeg, node, rofi-download)
+  OK    yt-dlp is told to use node (JS runtimes)
+  OK    the home folders are there (Documents, Downloads, Music, Videos)
+  OK    the file actions have their tools (tar, unzip, ffmpeg, udisksctl)
+  OK    developer menu complete (tar, zstd, gpg, udisksctl, rofi-dev, lazyos-profile)
+  OK    gpg round-trips the Developer menu's passphrase pipeline (AES256, fd 3)
+  OK    the profile export still includes ~/.ssh and ~/.gnupg (export --dry-run)
+  OK    the profile export includes the file manager (favnyr settings and workspaces)
+  OK    the profile export covers the agents' homes and account directories (transcripts excluded)
+  OK    the profile export covers the Firefox profile (site data, session and caches excluded)
+  OK    the passphrase prompt cannot land on an invisible terminal (tpgid test, rofi fallback)
+  OK    the Developer menu is reachable three ways (root menu, Alt+Ctrl+D, launcher)
+  OK    the Developer launcher entry asks for a picture the theme carries
+  OK    the manual has the profile section (04-software.md)
+  OK    format a disk complete (parted, mkfs.exfat, mkfs.ext4, rofi-format)
+  OK    format a disk refuses fixed storage and the disk this system runs from (ui_disk_system)
+  OK    Auxiliary swap and Format a disk resolve the sbin tools (lib-rofi.sh adds /usr/sbin:/sbin)
+  OK    auxiliary swap complete (parted, mkswap, swapon, blkid, rofi-swap)
+  OK    auxiliary swap fstab block is safe for a missing card (nofail, device timeout, priority 10 < 100)
+  SKIP  auxiliary swap configured, card not inserted (nofail keeps the boot clean)
+  OK    Places lists the Auxiliary swap row
+  OK    install to the internal disk complete (rsync, parted, cgpt, depthchargectl, and the menu with its runner)
+  OK    the install runner delegates to scripts/install-emmc.sh with CONFIRM=yes
+  OK    the install runner carries no partitioning, filesystem or copy command of its own
+  OK    the install menu asks for the disk's name typed in full before it starts the runner
+  OK    root menu has the Install LazyOS row
+  OK    the install log opens in a floated foot window (app-id lazyos-install)
+  OK    the install icon is in the LazyOS theme (system-software-install)
+  OK    manual pages searchable (apropos, man), which the Learn menu's second row opens
+  OK    openssl present, which the Password row generates with
+  OK    dig present (bind9-dnsutils), which DNS troubleshooting asks for
+  OK    manual installed (7 pages) and rofi-learn present
+  OK    keybindings view (rofi-keys) is executable
+  OK    file browser (rofi-files) is executable
+  OK    session menus complete (settings, notifications, free space, processes, time zone, places, media, calculator, layout, power, about, DNS, packages, colour, reminders)
+  OK    every script in ~/.config/bin is executable
+  OK    reminders complete (systemd-analyze, notify-send, jq, the clock icon)
+  OK    the reminder When menu carries its format help row
+  OK    systemd parses the calendar expressions the reminder menu writes
+  OK    root menu reaches DNS, Packages, Colour, About, Reminders and Auxiliary swap
+  OK    every root-menu row runs a program that is installed
+  OK    rofi-keys asks the theme for a picture per row (-show-icons, LazyOS)
+  OK    the key view's pictures all resolve in the LazyOS theme (sections, actions and tools)
+  OK    rofi-about holds its fastfetch window open (--hold)
+  OK    the About windows name a close key this keyboard answers (Alt+Q)
+  OK    capture menu complete (grimshot, swappy, tesseract, zbarimg, wf-recorder, qrencode)
+  OK    the screenshot keys go through bin/screenshot
+  OK    no key calls grimshot directly
+  OK    the capture menu saves through bin/screenshot
+  OK    the Screenshot (area) launcher entry uses bin/screenshot
+  OK    screen sharing complete (wayvnc, bin/rofi-vnc)
+  OK    screen sharing is read-only (wayvnc --disable-input)
+  OK    screen sharing listens on the loopback address only
+  OK    the ssh tunnel command is on the menu row and in the manual (5900, loopback)
+  OK    Settings carries the Share this screen row
+  OK    the root menu reaches Share this screen
+  OK    the bar has the screen-sharing indicator (custom/vnc)
+  OK    the sharing indicator collapses when nothing is shared
+  OK    clipboard history and emoji picker complete (cliphist, wl-clipboard, wtype, emojis.tsv)
+  OK    clipboard watcher running (wl-paste --watch cliphist store)
+  OK    file(1) is installed (a clipboard image is saved with its extension)
+  OK    a colour emoji font is installed (Noto Color Emoji)
+  OK    the emoji table matches the font it was filtered against
+  OK    touchpad swipes wired (3-finger left/right workspaces, up/down Ctrl+Tab / Ctrl+Shift+Tab in Firefox)
+  OK    no user drop-in repeats a system bindgesture (a duplicate raises the red config-error bar on reload)
+  OK    tablet mode wired (wvkbd-mobintl, tablet-mode, bindswitch tablet:on/off)
+  OK    accelerometer present (/sys/bus/iio/devices/iio:device1, cros-ec-accel) for tablet rotation
+  OK    tablet mode switches the physical keyboard off per identifier, leaving the tablet switch enabled (after wvkbd is up)
+  OK    every switch device is enabled (the tablet switch is not suspended with a keyboard)
+  OK    tablet mode off restores the rotation without the state directory
+  SKIP  no rotation calibration (/home/brunux/.config/lazyos/tablet.conf): the built-in -Y reference is in use
+  OK    welcome window lists the nine keys and says it is once per install
+  OK    welcome marker works (failure leaves none, success writes the machine id, third run stays quiet)
+  OK    manual renderer complete (glow with the solarized glamour style)
+  OK    browser installed (firefox-esr), used by rofi-files and xdg-open
+  OK    xdg-open shim is installed (URLs and paths go to the browser)
+  OK    thumbnails can be generated (ffmpeg for images/video, pdftocairo for PDF page 1)
+  OK    picture viewer present (chafa draws sixels in foot)
+  OK    viewers installed (imv for a picture, papers for a document, mpv for a video)
+  OK    the imv short name resolves (/usr/local/bin/imv -> the package dispatcher)
+  OK    the viewer keys are hinted once per session (lazyos-image-hint)
+  OK    mpv is an MPRIS player (mpv-mpris at /etc/mpv/scripts/mpris.so)
+  OK    media player installed (mpv), what rofi-files opens a video with
+  OK    document reader installed (papers), what a double click on a PDF uses
+  OK    webcam found (/dev/video0, uvcvideo: USB2.0 HD UVC WebCam: USB2.0 HD)
+  OK    camera application installed (guvcview 2.2.2-1+b3)
+  OK    the camera wrapper runs (bin/lazyos-camera, executable)
+  OK    Camera is in the launcher (org.lazyos.camera.desktop)
+  OK    the Camera entry has its picture (camera-web in the LazyOS theme)
+  OK    the root menu carries the Camera row (Alt+Space)
+  ----  no camera portal (No such interface “org.freedesktop.portal.Camera” on object at path /org/freedesktop/portal/desktop): a Flatpak app cannot use the camera; guvcview, ffmpeg and Firefox read /dev/video0 directly
+  OK    file browser icons present (the LazyOS theme has every row name)
+  OK    GTK3 programs use the solarized palette (gtk-3.0/gtk.css)
+  OK    GTK3 settings name the LazyOS icons and a dark base (favnyr reads them too)
+  OK    GTK4 windows prefer the dark palette (gtk-4.0/settings.ini)
+  OK    GTK4 windows use the solarized palette (gtk-4.0/gtk.css)
+  OK    file manager installed (favnyr is executable)
+  OK    Alt+Ctrl+Shift+F opens the file manager (favnyr)
+  OK    removable media can be mounted (udisks2 answers on the system bus)
+  OK    a plugged USB drive mounts itself (udev rule, unit, helper, polkit rule)
+  OK    auto-mount matches USB disks only (never the eMMC or the SD slot)
+  OK    the udev rule wants the auto-mount unit
+  OK    the auto-mount helper mounts as the session user (setpriv + udisksctl)
+  OK    the auto-mount helper has its tools (setpriv, findfs, udisksctl, lsblk, findmnt)
+  SKIP  sudo -n does not work: the polkit auto-mount rule was not read
+  OK    the session user is in plugdev (the group the auto-mount rule names)
+  OK    polkitd is running (the auto-mount rule is in force)
+  OK    Settings has the auto-mount switch
+  OK    fuser is available, so a refused unmount names the process holding the disk
+  OK    favnyr opens a terminal with foot (TERMINAL=foot in /etc/environment)
+  OK    the LazyOS theme carries every icon the file manager asks for
+  OK    open-with handler installed (lazyos-view: bat, imv, papers, mpv, firefox-esr)
+  OK    the launcher names the window 'Files (window)'
+  OK    a double click on an image reaches lazyos-view (mimeapps.list)
+  OK    a double click on a PDF reaches papers (mimeapps.list)
+  OK    'Open containing folder' opens favnyr via pcmanfm.desktop shadow entry (inode/directory)
+  OK    dictation tools present (whisper-cli, wtype, parecord)
+  OK    dictation normalises the level (ffmpeg dynaudnorm)
+  OK    speech model present (ggml-tiny.en.bin)
+  OK    local model ready (Alt+Ctrl+M, the root menu row, the launcher entry and its icon)
+  OK    the model runs on four threads (the A76 cluster)
+  OK    the model's KV cache is q8_0 behind flash attention (4k context fits next to the session)
+  OK    the local model matches its pinned SHA256 (3 file(s))
+  OK    translate ready (Alt+Ctrl+T: curl, jq, wl-paste, the binding, the Settings row, the globe icon)
+  OK    translate target is 'es', a language both engines take
+  OK    the translation endpoint answers (Google first, MyMemory as the fallback)
+  OK    hibernation possible (disk swap /dev/mmcblk1p1, resume=LABEL=lazyos_swap resolves to /dev/mmcblk1p1)
+  OK    bin/sway-hibernate is executable
+  OK    sway-hibernate reads the size of /dev/mmcblk1p1 (8191 MiB), not how much of it is in use
+  OK    agents menu (rofi-agents) is executable
+  OK    the agents menu draws the session's glyph rows (lib-rofi.sh, ui_row)
+  OK    the agents menu asks rofi to render markup rows
+  OK    coding agent CLI(s) installed: opencode
+  OK    OpenCode ships with the image (v2.2.4)
+  OK    the Agents menu puts ~/.opencode/bin on PATH
+  OK    the agents menu starts a session with the default agent (rofi-agents --default)
+  OK    the root menu's AI group starts a session with the default agent
+  OK    no agent outlived an Ask question (no LAZYOS_ASK process without its --ask-run)
+  OK    launcher entries present (session actions, nmtui, lazygit, tmux, about)
+  OK    the root menu has a launcher entry (LazyOS Menu -> bar-menu)
+  OK    waybar backlight device backlight-lcd0 exists
+  OK    the icon theme ships its cache (the first launcher scan is a read)
+  OK    the system font cache exists (the first font lookup does not walk every face)
+  OK    no declined daemon is running (udiskie, swaync, dunst, picom, blueman, packagekit, indexers)
+  OK    the user units are the expected ones (PipeWire, WirePlumber, portals, gvfs)
+
+==> The framework
+  OK    lazyos is installed (/usr/bin/lazyos)
+  OK    lazyos reports the version the image was built from (0.4.1)
+  OK    lazyos --help lists the menu
+  OK    /usr/bin/lazyos-menu -> lazyos menu
+  OK    /home/brunux/.config/bin/bar-menu -> lazyos menu
+  OK    /home/brunux/.config/bin/rofi-files -> lazyos menu files
+  OK    /home/brunux/.config/bin/lazyos-find -> lazyos menu find
+  OK    /home/brunux/.config/bin/rofi-grep -> lazyos menu grep
+  OK    /home/brunux/.config/bin/lazyos-view -> lazyos open
+  OK    /usr/bin/lazyos-task -> lazyos task attach
+  OK    lazyos --help lists task attach (the task surface reattaches by id)
+  OK    lazyos --help lists ask (one question to the default agent)
+  OK    the root menu keeps every row bar-menu had (44 rows, four groups)
+  OK    the root menu has the Ask row (ai group)
+  OK    ~/.config/bin/bar-menu is the framework's root menu (Alt+Space, the bar's button)
+  OK    ~/.config/bin/bar-menu is a framework symlink the table knows
+  OK    ~/.config/bin/lazyos-find is a framework symlink the table knows
+  OK    ~/.config/bin/lazyos-view is a framework symlink the table knows
+  OK    ~/.config/bin/rofi-files is a framework symlink the table knows
+  OK    ~/.config/bin/rofi-grep is a framework symlink the table knows
+  OK    sway floats and centres lazyos-pick
+  OK    sway floats and centres lazyos-task
+  OK    the alphabet's font is the one it was generated from (Symbols Nerd Font Mono, Nerd Fonts 3.5.1)
+  OK    the frame's characters render (no installed font is missing one)
+  OK    the rows' glyphs render (105 codepoints, every one in Symbols Nerd Font Mono)
+  OK    8 names the symbol set does not draw render text, not boxes
+  OK    every command draws through the App shell (no Frame in lazyos-cli)
+  OK    every notify-send in ~/.config/bin that names an app also names a picture (-i)
+  OK    mako's icon-path names the LazyOS theme root (a notification draws its picture)
+  OK    lazyos --help lists notify (a card from the command line, with the house rules)
+  OK    the LazyOS theme draws every picture a card can ask for (39 names)
+  OK    no Rust call site builds a card without a picture (no_icon() is only asked for explicitly)
+
+==> The theme engine
+  OK    the active theme is solarized (Solarized Dark)
+  OK    every surface is generated and carries the theme header
+  OK    every surface is byte-identical to a fresh render
+  OK    every built-in theme parses and clears its contrast floor
+  OK    the binding for `lazyos theme next` is present
+  OK    the binding for `lazyos theme wallpaper next` is present
+
+==> The agent's tools (lazyos mcp)
+  OK    lazyos mcp serves 18 tools, manifest m-8fb2464cc9b93288
+  OK    no apply-level tool is exposed (every tool is read, act or propose)
+  OK    lazyos mcp answers initialize and tools/list (18 tools)
+  OK    every window a tool opens is installed and executable
+  OK    OpenCode registers lazyos mcp as a local server
+  OK    the agent's instructions describe this manifest (m-8fb2464cc9b93288)
+  OK    07-agents.md explains what the agent can read, do and only propose
+  OK    no screenshot outlived the server that took it
+
+==> The brand
+  OK    os-release says LazyOS 0.4.1 (ID=lazyos)
+  OK    desktop wallpaper present
+  OK    sway paints the brand wallpaper
+  OK    lock screen wallpaper present
+  OK    lock screen keeps the mountain wallpaper
+  OK    the theme carries the mark (lazyos.png, lazyos.svg)
+  OK    fastfetch config present
+  OK    fastfetch wordmark present
+  OK    the greeter greets with lazy by design
+  OK    virtual terminals greet LazyOS
+  OK    no org.nureb.* entries survive
+
+==> Fonts and icons
+  OK    font family present: JetBrains Mono
+  OK    font family present: FontAwesome
+  OK    font family present: Material Design Icons
+  OK    font family present: Symbols Nerd Font
+  OK    menu alphabet renders (59 glyphs, every codepoint covered by a font)
+  OK    launcher icons complete (LazyOS theme, every session entry resolves)
+  OK    command palette icons present (the run mode resolves binaries by name)
+  OK    rofi shows icons from the LazyOS theme (show-icons, icon-theme)
+
+==> Declared packages
+  OK    all 140 declared package(s) are installed
+
+==> Journal
+  SKIP  journalctl needs sudo -n here: the error-priority count is not read
+
+==> Summary  329 OK, 4 WARN, 1 FAIL
