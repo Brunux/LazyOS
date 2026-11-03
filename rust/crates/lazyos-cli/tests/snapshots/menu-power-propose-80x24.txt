@@ -1,14 +1,14 @@
 LazyOS · Power                                               Cancel is selected
 ────────────────────────────────────────────────────────────────────────────────
 ╭ Power ───────────────────────────────────────────────────────────────────────╮
-│ Each of these ends the session, and asks once more first.                    │
+│ Lock and sleep act at once; the last three ask once more first.              │
 │                                                                              │
-│    Log out  back to the greeter                                             │
-│ ▍  Reboot  asks first                                                       │
-│   ⏻ Shut d╭ Power ───────────────────────────────────────────────╮           │
-│           │                 Reboot the machine?                  │           │
-│           │                                                      │           │
-│           │                                                      │           │
+│    Lock  the session lock, now                                              │
+│    Suspend  lock, then sleep                                                │
+│    Hibern╭ Power ───────────────────────────────────────────────╮           │
+│    Log ou│  back to the greReboot the machine?                  │           │
+│ ▍  Reboot│ asks first                                           │           │
+│   ⏻ Shut d│wn  asks first                                        │           │
 │           │                                                      │           │
 │           │                                                      │           │
 │           │                                                      │           │

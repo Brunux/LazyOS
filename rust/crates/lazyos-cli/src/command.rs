@@ -97,6 +97,19 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &["lazyos-menu", "bar-menu"],
     },
     CommandSpec {
+        // `rofi-power`: lock, suspend, hibernate, log out, reboot, shut down.
+        // The first three act at once and the last three ask with Cancel
+        // first, which is the confirm `--power ACTION` also opens (spec 010).
+        // It stays one implementation: `menu power`, `menu --power` and
+        // `menu --power ACTION` are the same screen, entered at a different
+        // row.
+        path: "menu power",
+        summary: "lock, sleep, hibernate, log out, reboot or shut down (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-power"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.
@@ -302,6 +315,28 @@ mod tests {
         assert_eq!(
             resolve("/usr/bin/lazyos-menu", &[]).unwrap().spec.path,
             "menu"
+        );
+    }
+
+    #[test]
+    fn the_power_list_is_one_command_reached_two_ways() {
+        // `rofi-power` and `lazyos menu power` are the same handler, and the
+        // words win over the link so both keep working while the link is
+        // being installed.
+        assert_eq!(resolve("rofi-power", &[]).unwrap().spec.path, "menu power");
+        assert_eq!(
+            resolve("lazyos", &args(&["menu", "power"]))
+                .unwrap()
+                .spec
+                .path,
+            "menu power"
+        );
+        // It is a link to this binary and not a row of the root menu: the
+        // root menu owns `lock`, `suspend` and `hibernate` already.
+        assert!(
+            COMMANDS
+                .iter()
+                .any(|spec| spec.path == "menu power" && spec.symlinks.contains(&"rofi-power"))
         );
     }
 
