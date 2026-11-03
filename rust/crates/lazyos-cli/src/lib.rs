@@ -29,6 +29,7 @@ pub mod mcp;
 pub mod menu;
 mod notify;
 pub mod paths;
+pub mod system;
 pub mod task_cmd;
 pub mod term;
 mod theme;
