@@ -31,6 +31,7 @@
 
 pub mod disk;
 pub mod display;
+pub mod dns;
 pub mod format;
 pub mod fstab;
 pub mod pick;

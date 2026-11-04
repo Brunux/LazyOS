@@ -149,6 +149,17 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // `rofi-dns`: point the active connection at a resolver (Cloudflare,
+        // Google, Quad9, AdGuard) or back at DHCP. The change is applied by
+        // modifying the connection and bringing it up again; the read-back
+        // shows what NetworkManager is actually using.
+        path: "menu dns",
+        summary: "set DNS resolvers for the active connection (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-dns"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.
