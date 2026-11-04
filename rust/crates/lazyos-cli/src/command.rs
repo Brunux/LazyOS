@@ -120,6 +120,16 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // `rofi-swap`: the same candidate list as Format a disk, then the size
+        // and a confirm. The fstab block is replaced, not appended, and
+        // activation is verified by reading the kernel's swap list back.
+        path: "menu swap",
+        summary: "prepare a card as auxiliary swap, label lazyos_swap (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-swap"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.

@@ -65,6 +65,24 @@ impl Failed {
     }
 }
 
+impl From<String> for Failed {
+    fn from(reason: String) -> Self {
+        Failed {
+            step: "unknown",
+            reason,
+        }
+    }
+}
+
+impl From<&str> for Failed {
+    fn from(reason: &str) -> Self {
+        Failed {
+            step: "unknown",
+            reason: reason.to_string(),
+        }
+    }
+}
+
 /// Run the steps in order and stop at the first failure.
 pub fn run(steps: &[Step]) -> Result<(), Failed> {
     for step in steps {

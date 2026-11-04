@@ -4,7 +4,7 @@
 # a codepoint turns that row into an empty box, and nothing logs it.
 family=Symbols Nerd Font Mono
 file=SymbolsNerdFontMono-Regular.ttf
-sha256=9536496476507f7621d05fb6f42dc53cd6e736267329c7b30e2772bab4281740
+sha256=b5c6ae7c7542b07abba3f13077f1a095e4ccaff7fe3c2128d25a3561aaefd7d2
 nerd=3.5.1
 drawn=93
 fallback=8

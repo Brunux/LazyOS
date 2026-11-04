@@ -35,6 +35,7 @@ pub mod fstab;
 pub mod pick;
 pub mod power;
 pub mod step;
+pub mod swap;
 
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -126,6 +127,12 @@ pub fn say(title: &str, body: impl Into<String>, urgency: Urgency, glyph: Glyph)
 pub fn print(line: &str) {
     let mut out = std::io::stdout();
     let _ = writeln!(out, "{line}");
+}
+
+/// Wait for a path to exist (for the partition node after parted).
+/// Used by format and swap.
+pub fn wait_for(node: &str) -> bool {
+    crate::system::format::wait_for(node)
 }
 
 #[cfg(test)]

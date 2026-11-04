@@ -103,21 +103,10 @@ pub fn apply(dev: &str, fs: &str) -> Result<String, Failed> {
     Ok(format!("{dev} is empty ({fs}, label {LABEL})"))
 }
 
-/// The rows of the disk question: the device, then what it is.
-fn disk_rows(found: &[Disk]) -> (Vec<lazyos_ui::Row>, Vec<String>) {
-    (
-        found
-            .iter()
-            .map(|d| row(d.dev(), format!("{} · {}", d.model, d.size), Glyph::Disk))
-            .collect(),
-        found.iter().map(Disk::dev).collect(),
-    )
-}
-
 /// The questions a format asks, given the candidates: the disk, the
 /// filesystem, and the confirm that names both.
 pub fn questions(found: &[Disk]) -> Vec<Question> {
-    let (rows, keys) = disk_rows(found);
+    let (rows, keys) = disk::rows(found);
     vec![
         Question::choose(
             "Which disk?",

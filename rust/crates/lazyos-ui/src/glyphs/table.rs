@@ -19,7 +19,7 @@ use super::Glyph;
 /// the report, not turn a row into a hole.
 pub const FONT_FAMILY: &str = "Symbols Nerd Font Mono";
 pub const FONT_FILE: &str = "SymbolsNerdFontMono-Regular.ttf";
-pub const FONT_SHA256: &str = "9536496476507f7621d05fb6f42dc53cd6e736267329c7b30e2772bab4281740";
+pub const FONT_SHA256: &str = "b5c6ae7c7542b07abba3f13077f1a095e4ccaff7fe3c2128d25a3561aaefd7d2";
 
 /// The Nerd Fonts release the candidate codepoints come from.
 pub const NERD_VERSION: &str = "3.5.1";

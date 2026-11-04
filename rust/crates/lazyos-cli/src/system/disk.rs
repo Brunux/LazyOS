@@ -29,6 +29,9 @@
 
 use std::collections::BTreeMap;
 
+use super::pick::row;
+use lazyos_ui::Glyph;
+
 /// The ChromeOS kernel partition type: a disk carrying one is a disk this
 /// firmware can load a kernel from, and never one a menu erases.
 pub const KERNEL_TYPE: &str = "fe3a2a5d-4f32-41a7-b725-accc3285a309";
@@ -338,6 +341,17 @@ pub fn partition(dev: &str) -> String {
     } else {
         format!("{dev}1")
     }
+}
+
+/// The rows of the disk question: the device, then what it is.
+pub fn rows(found: &[Disk]) -> (Vec<lazyos_ui::Row>, Vec<String>) {
+    (
+        found
+            .iter()
+            .map(|d| row(d.dev(), format!("{} · {}", d.model, d.size), Glyph::Disk))
+            .collect(),
+        found.iter().map(Disk::dev).collect(),
+    )
 }
 
 #[cfg(test)]

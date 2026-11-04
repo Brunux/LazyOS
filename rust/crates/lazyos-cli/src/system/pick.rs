@@ -58,6 +58,15 @@ pub enum Question {
         rows: Vec<Row>,
         keys: Vec<String>,
     },
+    /// Rows built dynamically from the previous answer (e.g., the size
+    /// question for swap depends on the chosen disk's capacity). The builder
+    /// receives the answers so far and returns (rows, keys).
+    #[allow(clippy::type_complexity)]
+    Rows {
+        title: String,
+        note: String,
+        build: fn(&[String]) -> (Vec<Row>, Vec<String>),
+    },
     /// The answer that writes something: Cancel is selected, and the verb is
     /// only reachable by moving to it.
     Ask {
@@ -87,6 +96,19 @@ impl Question {
 
     /// The last question of a destructive picker. `answer` is what the caller
     /// reads back to know the person said yes.
+    #[allow(clippy::type_complexity)]
+    pub fn rows(
+        title: impl Into<String>,
+        note: impl Into<String>,
+        build: fn(&[String]) -> (Vec<Row>, Vec<String>),
+    ) -> Self {
+        Question::Rows {
+            title: title.into(),
+            note: note.into(),
+            build,
+        }
+    }
+
     pub fn ask(
         title: impl Into<String>,
         note: impl Into<String>,
@@ -105,13 +127,17 @@ impl Question {
 
     pub fn title(&self) -> &str {
         match self {
-            Question::Choose { title, .. } | Question::Ask { title, .. } => title,
+            Question::Choose { title, .. }
+            | Question::Ask { title, .. }
+            | Question::Rows { title, .. } => title,
         }
     }
 
     pub fn note(&self) -> &str {
         match self {
-            Question::Choose { note, .. } | Question::Ask { note, .. } => note,
+            Question::Choose { note, .. }
+            | Question::Ask { note, .. }
+            | Question::Rows { note, .. } => note,
         }
     }
 }
@@ -164,6 +190,12 @@ impl Picker {
         &self.answers
     }
 
+    /// Set the answers directly (used when reconstructing a picker with
+    /// pre-filled answers, e.g., after the first question is answered).
+    pub fn set_answers(&mut self, answers: Vec<String>) {
+        self.answers = answers;
+    }
+
     fn load(&mut self) {
         self.list = ListState::new();
         self.confirm = None;
@@ -176,6 +208,23 @@ impl Picker {
                     // once instead of repeating the keybar's two words: after
                     // this row the picker asks again, and only the last
                     // question writes anything.
+                    let status = if matches!(
+                        self.questions.last(),
+                        Some(Question::Ask { .. }) | Some(Question::Rows { .. })
+                    ) {
+                        "nothing is written until the last question".to_string()
+                    } else {
+                        "Enter picks · Escape goes back".to_string()
+                    };
+                    (
+                        fill(title, &answers),
+                        status,
+                        vec![("Enter", "pick"), ("Esc", "back")],
+                    )
+                }
+                Some(Question::Rows { title, build, .. }) => {
+                    let (rows, _keys) = build(&answers);
+                    self.list.set_rows(rows);
                     let status = if matches!(self.questions.last(), Some(Question::Ask { .. })) {
                         "nothing is written until the last question".to_string()
                     } else {
@@ -264,7 +313,7 @@ impl Screen for Picker {
             ctx.design.style(TextStyle::Dim),
         );
         match question {
-            Question::Choose { .. } => {
+            Question::Choose { .. } | Question::Rows { .. } => {
                 self.rows_height.set(rows.height);
                 self.list.render(rows, ctx.buf, ctx.design, true);
             }
@@ -284,7 +333,7 @@ impl Screen for Picker {
             return Outcome::Done(1);
         };
         match question {
-            Question::Choose { .. } => match key.code {
+            Question::Choose { .. } | Question::Rows { .. } => match key.code {
                 KeyCode::Esc => self.back(),
                 _ => {
                     let typed = matches!(key.code, KeyCode::Char(_) | KeyCode::Backspace)
