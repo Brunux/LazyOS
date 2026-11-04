@@ -37,6 +37,7 @@ pub mod fstab;
 pub mod pick;
 pub mod power;
 pub mod settings;
+pub mod ssh;
 pub mod step;
 pub mod swap;
 pub mod tz;

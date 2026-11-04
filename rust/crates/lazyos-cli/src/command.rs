@@ -182,6 +182,16 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // `rofi-ssh`: remote login status (ssh.service enabled/running).
+        // The image runs openssh-server with ssh.service enabled on every boot.
+        // This menu shows the status and the commands to change it.
+        path: "menu ssh",
+        summary: "remote login status: ssh.service enabled/running (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-ssh"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.
