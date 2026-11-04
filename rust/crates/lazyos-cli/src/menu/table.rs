@@ -303,10 +303,7 @@ pub const ROOT: &[MenuItem] = &[
         "hosts from ~/.ssh/config",
         Glyph::Server,
         Open,
-        Action::Run {
-            program: Program::System("rofi"),
-            args: &[Arg::Lit("-show"), Arg::Lit("ssh")],
-        },
+        session("rofi-ssh"),
     ),
     // The AI group opens with the two actions an agent is for: a session, and
     // one question. Both follow the default the Agents menu marks with `●`.
@@ -442,6 +439,22 @@ pub const ROOT: &[MenuItem] = &[
         Glyph::Chip,
         System,
         session("rofi-swap"),
+    ),
+    item(
+        "format",
+        "Format a disk",
+        "erase a stick or a card",
+        Glyph::Disk,
+        System,
+        session("rofi-format"),
+    ),
+    item(
+        "display",
+        "Display arrangement",
+        "the external monitor",
+        Glyph::Display,
+        System,
+        session("rofi-display"),
     ),
     // The one row here that rewrites a disk. Like Power it asks again where it
     // lands: `rofi-install` confirms and then wants the disk's name typed.

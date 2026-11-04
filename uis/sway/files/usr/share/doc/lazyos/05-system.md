@@ -171,6 +171,26 @@ state is never a surprise, and to turn it off:
 sudo systemctl disable --now ssh
 ```
 
+
+## Time zone
+
+The **Time zone** menu (Settings → *Time zone*, and the root menu) lists every zone tzdata knows (400-odd rows, filtered by typing). The current zone is marked. The network-time switch at the end toggles `systemd-timesyncd` (which is in packages/base.list for this reason).
+
+Picking a zone runs `timedatectl set-timezone` and restarts waybar so the bar clock updates (glibc caches the zone at the first `localtime()` call in a process). The notification shows the new local time so the change is visible even before the bar restarts.
+
+The `--status` subcommand returns the current zone and NTP state.
+
+
+## DNS resolvers
+
+The **DNS** menu (Settings → *DNS*, and the root menu) points the active connection at a resolver or back at DHCP. NetworkManager keeps `/etc/resolv.conf`, so the switch is two nmcli properties on the connection that is up: `ipv4.dns` and `ipv4.ignore-auto-dns`, followed by bringing that connection up again so the change is applied at once.
+
+The re-activation is why this says something before it acts: a Wi-Fi connection that comes back up costs a second or two, and a menu that is already closed while the network blinks is indistinguishable from a bug. The `busy` card stays until the connection answers again and then becomes the read-back from NetworkManager, not the value that was asked for.
+
+The menu offers Automatic (DHCP), Cloudflare, Google, Quad9, AdGuard, and a custom entry. It does not touch IPv6 DNS. The card registers no stop command — killing `nmcli connection up` is safe but leaves the profile saying one thing while resolv.conf holds another.
+
+The `--status` subcommand returns the current servers and ignore-auto-dns state.
+
 ## Looking at the screen from another machine
 
 `wayvnc` serves this session as VNC, so a screen that is misbehaving can be
