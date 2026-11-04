@@ -117,7 +117,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "erase a stick or a card and make it one filesystem (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-format"],
-        installed: &[],
+        installed: &["rofi-format"],
     },
     CommandSpec {
         // `rofi-swap`: the same candidate list as Format a disk, then the size
@@ -127,7 +127,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "prepare a card as auxiliary swap, label lazyos_swap (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-swap"],
-        installed: &[],
+        installed: &["rofi-swap"],
     },
     CommandSpec {
         // `rofi-display`: the external monitor arrangement (position, resolution,
@@ -137,7 +137,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "arrange the external monitor: position, resolution, scale (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-display"],
-        installed: &[],
+        installed: &["rofi-display"],
     },
     CommandSpec {
         // `rofi-tz`: timedatectl list-timezones (400-odd rows, filtered) plus the
@@ -146,7 +146,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "set the time zone and network time sync (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-tz"],
-        installed: &[],
+        installed: &["rofi-tz"],
     },
     CommandSpec {
         // `rofi-dns`: point the active connection at a resolver (Cloudflare,
@@ -157,7 +157,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "set DNS resolvers for the active connection (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-dns"],
-        installed: &[],
+        installed: &["rofi-dns"],
     },
     CommandSpec {
         // `rofi-vnc`: wayvnc on loopback, read-only, nothing resident. The
@@ -167,7 +167,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "share this screen read-only over ssh (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-vnc"],
-        installed: &[],
+        installed: &["rofi-vnc"],
     },
     CommandSpec {
         // `rofi-quick`: the radio switches (Wi-Fi, Bluetooth, night light,
@@ -179,7 +179,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "quick settings: Wi-Fi, BT, night light, DND, touchpad, tablet mode, display, automount, keyboard, translate, audio, media, battery (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-quick"],
-        installed: &[],
+        installed: &["rofi-quick"],
     },
     CommandSpec {
         // `rofi-ssh`: remote login status (ssh.service enabled/running).
@@ -189,7 +189,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "remote login status: ssh.service enabled/running (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-ssh"],
-        installed: &[],
+        installed: &["rofi-ssh"],
     },
     CommandSpec {
         // Every row the menu has, plus the commands that need no question and

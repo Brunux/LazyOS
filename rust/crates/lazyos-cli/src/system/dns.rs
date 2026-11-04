@@ -67,10 +67,28 @@ pub fn status() -> String {
 
     let current = out(&["nmcli", "-g", "IP4.DNS", "device", "show", &dev]).unwrap_or_default();
     let current = current.lines().collect::<Vec<_>>().join(", ");
-    let auto = out(&["nmcli", "-g", "ipv4.ignore-auto-dns", "connection", "show", &con]).unwrap_or_default();
+    let auto = out(&[
+        "nmcli",
+        "-g",
+        "ipv4.ignore-auto-dns",
+        "connection",
+        "show",
+        &con,
+    ])
+    .unwrap_or_default();
     let auto = if auto == "no" { "no" } else { "yes" };
 
-    format!("On {} ({}) · now: {} · ignore-auto-dns: {}", con, dev, if current.is_empty() { "automatic".to_string() } else { current }, auto)
+    format!(
+        "On {} ({}) · now: {} · ignore-auto-dns: {}",
+        con,
+        dev,
+        if current.is_empty() {
+            "automatic".to_string()
+        } else {
+            current
+        },
+        auto
+    )
 }
 
 /// `lazyos menu dns` (`rofi-dns`): the DNS picker.
@@ -79,14 +97,24 @@ pub fn menu(
     design: &Design,
 ) -> Result<i32, crate::Failure> {
     if let Some(said) = missing(NEEDED) {
-        say("DNS", format!("{said} (NetworkManager)"), Urgency::Critical, Glyph::Cloud);
+        say(
+            "DNS",
+            format!("{said} (NetworkManager)"),
+            Urgency::Critical,
+            Glyph::Cloud,
+        );
         return Ok(3);
     }
 
     let dev = match active_device() {
         Some(d) => d,
         None => {
-            say("DNS", "No connection is up, so there is nothing to change".to_string(), Urgency::Critical, Glyph::Cloud);
+            say(
+                "DNS",
+                "No connection is up, so there is nothing to change".to_string(),
+                Urgency::Critical,
+                Glyph::Cloud,
+            );
             return Ok(3);
         }
     };
@@ -94,7 +122,12 @@ pub fn menu(
     let con = match active_connection(&dev) {
         Some(c) => c,
         None => {
-            say("DNS", format!("{} has no active connection", dev), Urgency::Critical, Glyph::Cloud);
+            say(
+                "DNS",
+                format!("{} has no active connection", dev),
+                Urgency::Critical,
+                Glyph::Cloud,
+            );
             return Ok(3);
         }
     };
@@ -102,7 +135,15 @@ pub fn menu(
     // What is in use right now, and how it got there.
     let current = out(&["nmcli", "-g", "IP4.DNS", "device", "show", &dev]).unwrap_or_default();
     let current = current.lines().collect::<Vec<_>>().join(" ");
-    let auto = out(&["nmcli", "-g", "ipv4.ignore-auto-dns", "connection", "show", &con]).unwrap_or_default();
+    let auto = out(&[
+        "nmcli",
+        "-g",
+        "ipv4.ignore-auto-dns",
+        "connection",
+        "show",
+        &con,
+    ])
+    .unwrap_or_default();
     let auto = if auto == "no" { "no" } else { "yes" };
 
     let mut rows = Vec::new();
@@ -110,11 +151,23 @@ pub fn menu(
 
     // Automatic (DHCP)
     if auto == "no" && current.is_empty() {
-        rows.push(row("Automatic (the network)", "no static servers · in use", Glyph::Cloud));
+        rows.push(row(
+            "Automatic (the network)",
+            "no static servers · in use",
+            Glyph::Cloud,
+        ));
     } else if auto == "no" && !current.is_empty() {
-        rows.push(row("Automatic (the network)", format!("{} · in use", current), Glyph::Cloud));
+        rows.push(row(
+            "Automatic (the network)",
+            format!("{} · in use", current),
+            Glyph::Cloud,
+        ));
     } else {
-        rows.push(row("Automatic (the network)", "what DHCP hands out", Glyph::Cloud));
+        rows.push(row(
+            "Automatic (the network)",
+            "what DHCP hands out",
+            Glyph::Cloud,
+        ));
     }
     keys.push("automatic".to_string());
 
@@ -137,14 +190,27 @@ pub fn menu(
     }
 
     // Custom
-    rows.push(row("Type the servers", "comma or space separated", Glyph::Search));
+    rows.push(row(
+        "Type the servers",
+        "comma or space separated",
+        Glyph::Search,
+    ));
     keys.push("custom".to_string());
 
     let mut picker = Picker::new(
         "DNS",
         vec![Question::choose(
             "DNS",
-            format!("On {} ({}) · now: {}", con, dev, if current.is_empty() { "automatic".to_string() } else { current }),
+            format!(
+                "On {} ({}) · now: {}",
+                con,
+                dev,
+                if current.is_empty() {
+                    "automatic".to_string()
+                } else {
+                    current
+                }
+            ),
             rows,
             keys,
         )],
@@ -166,12 +232,18 @@ pub fn menu(
         k if k.starts_with("dns:") => k[4..].to_string(),
         "custom" => {
             // Use the free-text picker for custom servers
-            let input = out(&["sh", "-c", "lazyos menu --ask 'DNS servers' 'IPv4 addresses, comma or space separated'"]).unwrap_or_default();
+            let input = out(&[
+                "sh",
+                "-c",
+                "lazyos menu --ask 'DNS servers' 'IPv4 addresses, comma or space separated'",
+            ])
+            .unwrap_or_default();
             let input = input.trim();
             if input.is_empty() {
                 return Ok(1);
             }
-            input.replace([' ', ','], "\n")
+            input
+                .replace([' ', ','], "\n")
                 .lines()
                 .filter(|l| !l.is_empty())
                 .collect::<Vec<_>>()
@@ -182,19 +254,51 @@ pub fn menu(
 
     // Check for root/sudo
     if !sudo_available() {
-        say("DNS", "Changing a connection needs root and sudo asks for a password here".to_string(), Urgency::Critical, Glyph::Cloud);
+        say(
+            "DNS",
+            "Changing a connection needs root and sudo asks for a password here".to_string(),
+            Urgency::Critical,
+            Glyph::Cloud,
+        );
         return Ok(3);
     }
 
-    let label = if servers.is_empty() { "Automatic (DHCP)".to_string() } else { servers.replace(',', " ") };
-    say("DNS", format!("Applying {}", label), Urgency::Normal, Glyph::Cloud);
+    let label = if servers.is_empty() {
+        "Automatic (DHCP)".to_string()
+    } else {
+        servers.replace(',', " ")
+    };
+    say(
+        "DNS",
+        format!("Applying {}", label),
+        Urgency::Normal,
+        Glyph::Cloud,
+    );
 
     let result = if servers.is_empty() {
-        sudo(&["nmcli", "connection", "modify", &con, "ipv4.ignore-auto-dns", "no", "ipv4.dns", ""])
-            .and_then(|_| sudo(&["nmcli", "connection", "up", &con]))
+        sudo(&[
+            "nmcli",
+            "connection",
+            "modify",
+            &con,
+            "ipv4.ignore-auto-dns",
+            "no",
+            "ipv4.dns",
+            "",
+        ])
+        .and_then(|_| sudo(&["nmcli", "connection", "up", &con]))
     } else {
-        sudo(&["nmcli", "connection", "modify", &con, "ipv4.dns", &servers, "ipv4.ignore-auto-dns", "yes"])
-            .and_then(|_| sudo(&["nmcli", "connection", "up", &con]))
+        sudo(&[
+            "nmcli",
+            "connection",
+            "modify",
+            &con,
+            "ipv4.dns",
+            &servers,
+            "ipv4.ignore-auto-dns",
+            "yes",
+        ])
+        .and_then(|_| sudo(&["nmcli", "connection", "up", &con]))
     };
 
     match result {
@@ -204,14 +308,29 @@ pub fn menu(
             let now = out(&["nmcli", "-g", "IP4.DNS", "device", "show", &dev]).unwrap_or_default();
             let now = now.lines().collect::<Vec<_>>().join(" ");
             if now.is_empty() {
-                say("DNS", "Back on the network's servers".to_string(), Urgency::Normal, Glyph::Cloud);
+                say(
+                    "DNS",
+                    "Back on the network's servers".to_string(),
+                    Urgency::Normal,
+                    Glyph::Cloud,
+                );
             } else {
-                say("DNS", format!("DNS is now {}", now), Urgency::Normal, Glyph::Cloud);
+                say(
+                    "DNS",
+                    format!("DNS is now {}", now),
+                    Urgency::Normal,
+                    Glyph::Cloud,
+                );
             }
             Ok(0)
         }
         Err(e) => {
-            say("DNS", format!("Could not apply: {}", e), Urgency::Critical, Glyph::Cloud);
+            say(
+                "DNS",
+                format!("Could not apply: {}", e),
+                Urgency::Critical,
+                Glyph::Cloud,
+            );
             Ok(3)
         }
     }

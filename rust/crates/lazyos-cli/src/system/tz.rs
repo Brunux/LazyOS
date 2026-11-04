@@ -32,7 +32,12 @@ pub fn menu(
     design: &Design,
 ) -> Result<i32, crate::Failure> {
     if let Some(said) = missing(NEEDED) {
-        say("Time zone", format!("{said} (systemd)"), Urgency::Critical, Glyph::Clock);
+        say(
+            "Time zone",
+            format!("{said} (systemd)"),
+            Urgency::Critical,
+            Glyph::Clock,
+        );
         return Ok(3);
     }
 
@@ -89,7 +94,12 @@ pub fn menu(
         k if k.starts_with("set:") => {
             let zone = &k[4..];
             if let Err(e) = sudo(&["timedatectl", "set-timezone", zone]) {
-                say("Time zone", format!("Could not set {}: {}", zone, e), Urgency::Critical, Glyph::Clock);
+                say(
+                    "Time zone",
+                    format!("Could not set {}: {}", zone, e),
+                    Urgency::Critical,
+                    Glyph::Clock,
+                );
                 return Ok(3);
             }
             // timedatectl rewrites /etc/localtime, and that is all it does for a
@@ -104,16 +114,31 @@ pub fn menu(
                 let _ = std::process::Command::new("setsid").arg("waybar").spawn();
             }
             let now = out(&["sh", "-c", &format!("TZ={} date '+%H:%M'", zone)]).unwrap_or_default();
-            say("Time zone", format!("Now {} · {}", zone, now), Urgency::Normal, Glyph::Clock);
+            say(
+                "Time zone",
+                format!("Now {} · {}", zone, now),
+                Urgency::Normal,
+                Glyph::Clock,
+            );
             Ok(0)
         }
         "ntp:on" | "ntp:off" => {
             let want = if key == "ntp:on" { "true" } else { "false" };
             if let Err(e) = sudo(&["timedatectl", "set-ntp", want]) {
-                say("Time zone", format!("Could not change network time: {}", e), Urgency::Critical, Glyph::Clock);
+                say(
+                    "Time zone",
+                    format!("Could not change network time: {}", e),
+                    Urgency::Critical,
+                    Glyph::Clock,
+                );
                 return Ok(3);
             }
-            say("Time zone", format!("Network time {}", want), Urgency::Normal, Glyph::Clock);
+            say(
+                "Time zone",
+                format!("Network time {}", want),
+                Urgency::Normal,
+                Glyph::Clock,
+            );
             Ok(0)
         }
         _ => Ok(0),

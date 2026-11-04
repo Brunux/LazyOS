@@ -58,7 +58,11 @@ fn log_file() -> std::path::PathBuf {
 fn running() -> Option<u32> {
     let pid_content = std::fs::read_to_string(pid_file()).ok()?;
     let pid: u32 = pid_content.trim().parse().ok()?;
-    if std::process::Command::new("kill").args(["-0", &pid.to_string()]).status().ok()?.success()
+    if std::process::Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .status()
+        .ok()?
+        .success()
         && let Ok(comm) = std::fs::read_to_string(format!("/proc/{}/comm", pid))
         && comm.trim() == "wayvnc"
     {
@@ -81,7 +85,9 @@ fn sharing() -> bool {
 }
 
 fn tunnel_cmd() -> String {
-    let host = std::process::Command::new("hostname").output().ok()
+    let host = std::process::Command::new("hostname")
+        .output()
+        .ok()
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_string())
         .unwrap_or_else(|| "lazyos".to_string());
@@ -106,7 +112,10 @@ pub fn status() -> String {
 pub fn status_bar() -> String {
     const EYE: &str = "\u{f06e}"; // Font Awesome eye
     if sharing() {
-        format!("{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span>\",\"class\":\"on\",\"tooltip\":\"sharing this screen read-only on localhost:{}\\nclick for the menu, right click to stop\"}}", EYE, PORT)
+        format!(
+            "{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span>\",\"class\":\"on\",\"tooltip\":\"sharing this screen read-only on localhost:{}\\nclick for the menu, right click to stop\"}}",
+            EYE, PORT
+        )
     } else {
         "{\"text\":\"\",\"class\":\"empty\",\"tooltip\":\"share this screen\"}".to_string()
     }
@@ -129,8 +138,13 @@ fn start() -> Result<(), String> {
     // SIGHUP, so the pid is right in both cases and a closed terminal cannot
     // take the server with it. At logout the session's cgroup takes it.
     let mut cmd = std::process::Command::new("nohup");
-    cmd.arg("wayvnc").arg("--disable-input").arg("127.0.0.1").arg(PORT.to_string());
-    cmd.stdout(std::process::Stdio::from(std::fs::File::create(log_file()).map_err(|e| e.to_string())?));
+    cmd.arg("wayvnc")
+        .arg("--disable-input")
+        .arg("127.0.0.1")
+        .arg(PORT.to_string());
+    cmd.stdout(std::process::Stdio::from(
+        std::fs::File::create(log_file()).map_err(|e| e.to_string())?,
+    ));
     cmd.stderr(std::process::Stdio::inherit());
     let child = cmd.spawn().map_err(|e| e.to_string())?;
     let pid = child.id();
@@ -141,9 +155,18 @@ fn start() -> Result<(), String> {
     if !sharing() {
         let reason = std::fs::read_to_string(log_file()).unwrap_or_default();
         let reason = reason.lines().rev().take(2).collect::<Vec<_>>().join(" ");
-        let _ = std::process::Command::new("kill").args([&pid.to_string()]).status();
+        let _ = std::process::Command::new("kill")
+            .args([&pid.to_string()])
+            .status();
         let _ = std::fs::remove_file(pid_file());
-        return Err(format!("It did not start: {}", if reason.is_empty() { "wayvnc exited without a message" } else { &reason }));
+        return Err(format!(
+            "It did not start: {}",
+            if reason.is_empty() {
+                "wayvnc exited without a message"
+            } else {
+                &reason
+            }
+        ));
     }
     signal_bar();
     Ok(())
@@ -159,14 +182,23 @@ fn stop() -> Result<(), String> {
             return Ok(());
         }
     };
-    let _ = std::process::Command::new("kill").args(["-TERM", &pid.to_string()]).status();
+    let _ = std::process::Command::new("kill")
+        .args(["-TERM", &pid.to_string()])
+        .status();
     for _ in 0..30 {
-        if std::process::Command::new("kill").args(["-0", &pid.to_string()]).status().map(|s| !s.success()).unwrap_or(true) {
+        if std::process::Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .status()
+            .map(|s| !s.success())
+            .unwrap_or(true)
+        {
             break;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
-    let _ = std::process::Command::new("kill").args(["-KILL", &pid.to_string()]).status();
+    let _ = std::process::Command::new("kill")
+        .args(["-KILL", &pid.to_string()])
+        .status();
     let _ = std::fs::remove_file(pid_file());
     signal_bar();
     Ok(())
@@ -178,7 +210,12 @@ pub fn menu(
     design: &Design,
 ) -> Result<i32, crate::Failure> {
     if let Some(said) = missing(NEEDED) {
-        say("Share this screen", format!("{said} (wayvnc, iproute2)"), Urgency::Critical, Glyph::Eye);
+        say(
+            "Share this screen",
+            format!("{said} (wayvnc, iproute2)"),
+            Urgency::Critical,
+            Glyph::Eye,
+        );
         return Ok(3);
     }
 
@@ -212,10 +249,18 @@ pub fn menu(
                 "sharing",
                 "Enter acts · Escape closes",
                 vec![
-                    row("Sharing this screen", format!("localhost:{} · read-only", PORT), Glyph::Eye),
+                    row(
+                        "Sharing this screen",
+                        format!("localhost:{} · read-only", PORT),
+                        Glyph::Eye,
+                    ),
                     row("Stop sharing", "the viewer loses the picture", Glyph::Stop),
                     row("Copy the tunnel command", tunnel_cmd(), Glyph::Link),
-                    row("What this does", "a viewer looks; it cannot type, and only over ssh", Glyph::Info),
+                    row(
+                        "What this does",
+                        "a viewer looks; it cannot type, and only over ssh",
+                        Glyph::Info,
+                    ),
                 ],
                 vec!["none".into(), "stop".into(), "tunnel".into(), "info".into()],
             )],
@@ -231,21 +276,47 @@ pub fn menu(
         match answers[0].as_str() {
             "stop" => {
                 if let Err(e) = stop() {
-                    say("Share this screen", format!("Could not stop: {}", e), Urgency::Critical, Glyph::Eye);
+                    say(
+                        "Share this screen",
+                        format!("Could not stop: {}", e),
+                        Urgency::Critical,
+                        Glyph::Eye,
+                    );
                     return Ok(3);
                 }
-                say("Share this screen", "Stopped. The viewer loses the picture.".to_string(), Urgency::Normal, Glyph::Eye);
+                say(
+                    "Share this screen",
+                    "Stopped. The viewer loses the picture.".to_string(),
+                    Urgency::Normal,
+                    Glyph::Eye,
+                );
                 Ok(0)
             }
             "tunnel" => {
                 // Copy to clipboard
                 let cmd = tunnel_cmd();
                 let _ = out(&["wl-copy", &cmd]);
-                say("Share this screen", format!("Run on the other machine, then open a VNC viewer on localhost:{}", PORT), Urgency::Normal, Glyph::Eye);
+                say(
+                    "Share this screen",
+                    format!(
+                        "Run on the other machine, then open a VNC viewer on localhost:{}",
+                        PORT
+                    ),
+                    Urgency::Normal,
+                    Glyph::Eye,
+                );
                 Ok(0)
             }
             "info" => {
-                say("Share this screen", format!("wayvnc serves this session on 127.0.0.1:{}, read-only: the viewer sees the screen and cannot type. It is loopback only because wayvnc 0.10 needs a certificate and a password file to serve a network, which this image does not ship - the ssh login is what authenticates, and the tunnel row has the command. Nothing runs until it is started, and the bar keeps an eye while it is.", PORT), Urgency::Normal, Glyph::Eye);
+                say(
+                    "Share this screen",
+                    format!(
+                        "wayvnc serves this session on 127.0.0.1:{}, read-only: the viewer sees the screen and cannot type. It is loopback only because wayvnc 0.10 needs a certificate and a password file to serve a network, which this image does not ship - the ssh login is what authenticates, and the tunnel row has the command. Nothing runs until it is started, and the bar keeps an eye while it is.",
+                        PORT
+                    ),
+                    Urgency::Normal,
+                    Glyph::Eye,
+                );
                 Ok(0)
             }
             _ => Ok(0),
@@ -258,9 +329,17 @@ pub fn menu(
                 "Share this screen",
                 "read-only · localhost:5900 · watched from another machine",
                 vec![
-                    row("Share this screen", "read-only · localhost:5900 · watched from another machine", Glyph::Eye),
+                    row(
+                        "Share this screen",
+                        "read-only · localhost:5900 · watched from another machine",
+                        Glyph::Eye,
+                    ),
                     row("Copy the tunnel command", tunnel_cmd(), Glyph::Link),
-                    row("What this does", "a viewer looks; it cannot type, and only over ssh", Glyph::Info),
+                    row(
+                        "What this does",
+                        "a viewer looks; it cannot type, and only over ssh",
+                        Glyph::Info,
+                    ),
                 ],
                 vec!["start".into(), "tunnel".into(), "info".into()],
             )],
@@ -276,20 +355,50 @@ pub fn menu(
         match answers[0].as_str() {
             "start" => {
                 if let Err(e) = start() {
-                    say("Share this screen", format!("It did not start: {}", e), Urgency::Critical, Glyph::Eye);
+                    say(
+                        "Share this screen",
+                        format!("It did not start: {}", e),
+                        Urgency::Critical,
+                        Glyph::Eye,
+                    );
                     return Ok(3);
                 }
-                say("Share this screen", format!("Read-only on localhost:{}. From the other machine: {}", PORT, tunnel_cmd()), Urgency::Normal, Glyph::Eye);
+                say(
+                    "Share this screen",
+                    format!(
+                        "Read-only on localhost:{}. From the other machine: {}",
+                        PORT,
+                        tunnel_cmd()
+                    ),
+                    Urgency::Normal,
+                    Glyph::Eye,
+                );
                 Ok(0)
             }
             "tunnel" => {
                 let cmd = tunnel_cmd();
                 let _ = out(&["wl-copy", &cmd]);
-                say("Share this screen", format!("Run on the other machine, then open a VNC viewer on localhost:{}", PORT), Urgency::Normal, Glyph::Eye);
+                say(
+                    "Share this screen",
+                    format!(
+                        "Run on the other machine, then open a VNC viewer on localhost:{}",
+                        PORT
+                    ),
+                    Urgency::Normal,
+                    Glyph::Eye,
+                );
                 Ok(0)
             }
             "info" => {
-                say("Share this screen", format!("wayvnc serves this session on 127.0.0.1:{}, read-only: the viewer sees the screen and cannot type. It is loopback only because wayvnc 0.10 needs a certificate and a password file to serve a network, which this image does not ship - the ssh login is what authenticates, and the tunnel row has the command. Nothing runs until it is started, and the bar keeps an eye while it is.", PORT), Urgency::Normal, Glyph::Eye);
+                say(
+                    "Share this screen",
+                    format!(
+                        "wayvnc serves this session on 127.0.0.1:{}, read-only: the viewer sees the screen and cannot type. It is loopback only because wayvnc 0.10 needs a certificate and a password file to serve a network, which this image does not ship - the ssh login is what authenticates, and the tunnel row has the command. Nothing runs until it is started, and the bar keeps an eye while it is.",
+                        PORT
+                    ),
+                    Urgency::Normal,
+                    Glyph::Eye,
+                );
                 Ok(0)
             }
             _ => Ok(0),

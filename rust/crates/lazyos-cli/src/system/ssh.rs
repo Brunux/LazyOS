@@ -15,12 +15,21 @@ pub const NEEDED: &[&str] = &["systemctl", "sshd"];
 
 /// The `--status` output.
 pub fn status() -> String {
-    let enabled = out(&["systemctl", "is-enabled", "ssh"]).map(|s| s.trim() == "enabled").unwrap_or(false);
-    let active = out(&["systemctl", "is-active", "ssh"]).map(|s| s.trim() == "active").unwrap_or(false);
-    let port = out(&["ss", "-ltnH", "sport = :22"]).map(|s| s.contains("0.0.0.0:22")).unwrap_or(false);
+    let enabled = out(&["systemctl", "is-enabled", "ssh"])
+        .map(|s| s.trim() == "enabled")
+        .unwrap_or(false);
+    let active = out(&["systemctl", "is-active", "ssh"])
+        .map(|s| s.trim() == "active")
+        .unwrap_or(false);
+    let port = out(&["ss", "-ltnH", "sport = :22"])
+        .map(|s| s.contains("0.0.0.0:22"))
+        .unwrap_or(false);
 
     let mut parts = Vec::new();
-    parts.push(format!("ssh.service: {}", if enabled { "enabled" } else { "disabled" }));
+    parts.push(format!(
+        "ssh.service: {}",
+        if enabled { "enabled" } else { "disabled" }
+    ));
     parts.push(format!("running: {}", if active { "yes" } else { "no" }));
     if port {
         parts.push("listening on 0.0.0.0:22".to_string());
@@ -34,26 +43,51 @@ pub fn menu(
     design: &Design,
 ) -> Result<i32, crate::Failure> {
     if let Some(said) = missing(NEEDED) {
-        say("Remote login (ssh)", format!("{said} (systemd, openssh)"), Urgency::Critical, Glyph::Key);
+        say(
+            "Remote login (ssh)",
+            format!("{said} (systemd, openssh)"),
+            Urgency::Critical,
+            Glyph::Key,
+        );
         return Ok(3);
     }
 
-    let enabled = out(&["systemctl", "is-enabled", "ssh"]).map(|s| s.trim() == "enabled").unwrap_or(false);
-    let active = out(&["systemctl", "is-active", "ssh"]).map(|s| s.trim() == "active").unwrap_or(false);
+    let enabled = out(&["systemctl", "is-enabled", "ssh"])
+        .map(|s| s.trim() == "enabled")
+        .unwrap_or(false);
+    let active = out(&["systemctl", "is-active", "ssh"])
+        .map(|s| s.trim() == "active")
+        .unwrap_or(false);
 
     let mut rows = Vec::new();
     let mut keys = Vec::new();
 
-    rows.push(row("ssh.service", if enabled { "enabled" } else { "disabled" }, Glyph::Key));
+    rows.push(row(
+        "ssh.service",
+        if enabled { "enabled" } else { "disabled" },
+        Glyph::Key,
+    ));
     keys.push("service".to_string());
 
-    rows.push(row("running", if active { "yes" } else { "no" }, if active { Glyph::Check } else { Glyph::Lock }));
+    rows.push(row(
+        "running",
+        if active { "yes" } else { "no" },
+        if active { Glyph::Check } else { Glyph::Lock },
+    ));
     keys.push("running".to_string());
 
-    rows.push(row("Disable ssh", "sudo systemctl disable --now ssh", Glyph::Lock));
+    rows.push(row(
+        "Disable ssh",
+        "sudo systemctl disable --now ssh",
+        Glyph::Lock,
+    ));
     keys.push("disable".to_string());
 
-    rows.push(row("Enable ssh", "sudo systemctl enable --now ssh", Glyph::Unlock));
+    rows.push(row(
+        "Enable ssh",
+        "sudo systemctl enable --now ssh",
+        Glyph::Unlock,
+    ));
     keys.push("enable".to_string());
 
     let mut picker = Picker::new(
@@ -81,18 +115,38 @@ pub fn menu(
     match key.as_str() {
         "disable" => {
             if let Err(e) = sudo(&["systemctl", "disable", "--now", "ssh"]) {
-                say("Remote login (ssh)", format!("Could not disable ssh: {}", e), Urgency::Critical, Glyph::Lock);
+                say(
+                    "Remote login (ssh)",
+                    format!("Could not disable ssh: {}", e),
+                    Urgency::Critical,
+                    Glyph::Lock,
+                );
                 return Ok(3);
             }
-            say("Remote login (ssh)", "ssh disabled".to_string(), Urgency::Normal, Glyph::Lock);
+            say(
+                "Remote login (ssh)",
+                "ssh disabled".to_string(),
+                Urgency::Normal,
+                Glyph::Lock,
+            );
             Ok(0)
         }
         "enable" => {
             if let Err(e) = sudo(&["systemctl", "enable", "--now", "ssh"]) {
-                say("Remote login (ssh)", format!("Could not enable ssh: {}", e), Urgency::Critical, Glyph::Unlock);
+                say(
+                    "Remote login (ssh)",
+                    format!("Could not enable ssh: {}", e),
+                    Urgency::Critical,
+                    Glyph::Unlock,
+                );
                 return Ok(3);
             }
-            say("Remote login (ssh)", "ssh enabled".to_string(), Urgency::Normal, Glyph::Unlock);
+            say(
+                "Remote login (ssh)",
+                "ssh enabled".to_string(),
+                Urgency::Normal,
+                Glyph::Unlock,
+            );
             Ok(0)
         }
         _ => Ok(0),

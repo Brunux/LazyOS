@@ -29,29 +29,37 @@ pub fn status() -> String {
     let dnd = if dnd_on() { "dnd" } else { "allowed" };
     let tp = if touchpad_on() { "enabled" } else { "disabled" };
     let am = if automount_on() { "on" } else { "off" };
-    format!("Wi-Fi: {} · BT: {} · Night: {} · DND: {} · TP: {} · AM: {}", wifi, bt, night, dnd, tp, am)
+    format!(
+        "Wi-Fi: {} · BT: {} · Night: {} · DND: {} · TP: {} · AM: {}",
+        wifi, bt, night, dnd, tp, am
+    )
 }
 
 fn wifi_on() -> bool {
-    out(&["nmcli", "radio", "wifi"]).map(|s| s.trim() == "enabled").unwrap_or(false)
+    out(&["nmcli", "radio", "wifi"])
+        .map(|s| s.trim() == "enabled")
+        .unwrap_or(false)
 }
 
 fn wifi_if() -> Option<String> {
-    out(&["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"])
-        .and_then(|s| s.lines().find_map(|l| {
+    out(&["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"]).and_then(|s| {
+        s.lines().find_map(|l| {
             let parts: Vec<&str> = l.split(':').collect();
             if parts.len() == 2 && parts[1] == "wifi" {
                 Some(parts[0].to_string())
             } else {
                 None
             }
-        }))
+        })
+    })
 }
 
 fn ssid() -> Option<String> {
     wifi_if().and_then(|dev| {
-        out(&["iw", "dev", &dev, "link"])
-            .and_then(|s| s.lines().find_map(|l| l.strip_prefix("SSID:").map(|s| s.trim().to_string())))
+        out(&["iw", "dev", &dev, "link"]).and_then(|s| {
+            s.lines()
+                .find_map(|l| l.strip_prefix("SSID:").map(|s| s.trim().to_string()))
+        })
     })
 }
 
@@ -68,14 +76,28 @@ fn wifi_detail() -> String {
 fn bt_on() -> bool {
     // busctl is one property read; bluetoothctl connects a whole D-Bus client
     // and asks bluez for everything, which is the slow half of this panel.
-    let powered = out(&["busctl", "--system", "get-property", "org.bluez", "/org/bluez/hci0", "org.bluez.Adapter1", "Powered"])
-        .and_then(|s| s.lines().find_map(|l| l.strip_prefix('b').map(|s| s.trim().to_string())))
-        .map(|s| s == "true");
+    let powered = out(&[
+        "busctl",
+        "--system",
+        "get-property",
+        "org.bluez",
+        "/org/bluez/hci0",
+        "org.bluez.Adapter1",
+        "Powered",
+    ])
+    .and_then(|s| {
+        s.lines()
+            .find_map(|l| l.strip_prefix('b').map(|s| s.trim().to_string()))
+    })
+    .map(|s| s == "true");
     if let Some(p) = powered {
         return p;
     }
     out(&["bluetoothctl", "show"])
-        .and_then(|s| s.lines().find_map(|l| l.strip_prefix("Powered:").map(|s| s.trim().to_string())))
+        .and_then(|s| {
+            s.lines()
+                .find_map(|l| l.strip_prefix("Powered:").map(|s| s.trim().to_string()))
+        })
         .map(|s| s == "yes")
         .unwrap_or(false)
 }
@@ -112,7 +134,8 @@ fn touchpad_on() -> bool {
         .and_then(|s| {
             let v: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&s);
             v.ok().and_then(|inputs| {
-                inputs.iter()
+                inputs
+                    .iter()
                     .filter(|i| i["type"].as_str() == Some("touchpad"))
                     .map(|i| i["libinput"]["send_events"].as_str().unwrap_or("enabled"))
                     .collect::<Vec<_>>()
@@ -128,7 +151,8 @@ fn rotation_name() -> String {
         .and_then(|s| {
             let v: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&s);
             v.ok().and_then(|outputs| {
-                outputs.iter()
+                outputs
+                    .iter()
                     .find(|o| o["focused"].as_bool().unwrap_or(false))
                     .and_then(|o| o["transform"].as_str())
                     .map(|s| s.to_string())
@@ -157,7 +181,10 @@ fn automount_conf() -> std::path::PathBuf {
 fn automount_on() -> bool {
     std::fs::read_to_string(automount_conf())
         .ok()
-        .and_then(|s| s.lines().find_map(|l| l.strip_prefix("enabled=").map(|s| s.to_string())))
+        .and_then(|s| {
+            s.lines()
+                .find_map(|l| l.strip_prefix("enabled=").map(|s| s.to_string()))
+        })
         .map(|v| v != "no")
         .unwrap_or(true)
 }
@@ -179,9 +206,14 @@ fn audio_detail() -> String {
 }
 
 fn media_detail() -> String {
-    out(&["playerctl", "metadata", "--format", "{{artist}} — {{title}}"])
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "nothing playing".to_string())
+    out(&[
+        "playerctl",
+        "metadata",
+        "--format",
+        "{{artist}} — {{title}}",
+    ])
+    .filter(|s| !s.is_empty())
+    .unwrap_or_else(|| "nothing playing".to_string())
 }
 
 fn battery_detail() -> String {
@@ -247,7 +279,8 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
     }
 
     // VNC screen sharing
-    let vnc_status = out(&["sh", "-c", "lazyos-vnc status 2>/dev/null || echo off"]).unwrap_or_else(|| "off".to_string());
+    let vnc_status = out(&["sh", "-c", "lazyos-vnc status 2>/dev/null || echo off"])
+        .unwrap_or_else(|| "off".to_string());
     rows.push(row("Share this screen", vnc_status, Glyph::Eye));
     keys.push("vnc".to_string());
 
@@ -265,16 +298,29 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
     keys.push("rotation".to_string());
 
     // Display arrangement
-    let display_status = out(&["sh", "-c", "lazyos-display --status 2>/dev/null || echo unknown"]).unwrap_or_else(|| "unknown".to_string());
+    let display_status = out(&[
+        "sh",
+        "-c",
+        "lazyos-display --status 2>/dev/null || echo unknown",
+    ])
+    .unwrap_or_else(|| "unknown".to_string());
     rows.push(row("Display arrangement", display_status, Glyph::Display));
     keys.push("display".to_string());
 
     // Auto-mount USB drives
     if automount_on() {
-        rows.push(row("Auto-mount USB drives", "a plugged stick mounts itself", Glyph::Disk));
+        rows.push(row(
+            "Auto-mount USB drives",
+            "a plugged stick mounts itself",
+            Glyph::Disk,
+        ));
         keys.push("automount".to_string());
     } else {
-        rows.push(row("Auto-mount USB drives", "off · Places mounts a stick when you pick it", Glyph::Disk));
+        rows.push(row(
+            "Auto-mount USB drives",
+            "off · Places mounts a stick when you pick it",
+            Glyph::Disk,
+        ));
         keys.push("automount".to_string());
     }
 
@@ -287,7 +333,12 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
         rows.push(row("Tablet mode", tm, Glyph::Keyboard));
         keys.push("tablet".to_string());
         // Calibrate rotation
-        let calib = out(&["sh", "-c", "lazyos-tablet-mode calibration 2>/dev/null || echo unknown"]).unwrap_or_else(|| "unknown".to_string());
+        let calib = out(&[
+            "sh",
+            "-c",
+            "lazyos-tablet-mode calibration 2>/dev/null || echo unknown",
+        ])
+        .unwrap_or_else(|| "unknown".to_string());
         rows.push(row("Calibrate rotation", calib, Glyph::Rotate));
         keys.push("tablet-calibrate".to_string());
     }
@@ -297,7 +348,8 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
         .and_then(|s| {
             let v: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&s);
             v.ok().and_then(|inputs| {
-                inputs.iter()
+                inputs
+                    .iter()
                     .find(|i| i["type"].as_str() == Some("keyboard"))
                     .and_then(|i| i["xkb_active_layout_name"].as_str())
                     .map(|s| s.to_string())
@@ -308,8 +360,17 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
     keys.push("layout".to_string());
 
     // Translate
-    let translate_target = out(&["sh", "-c", "lazyos-translate --target-name 2>/dev/null || echo English"]).unwrap_or_else(|| "English".to_string());
-    rows.push(row("Translate", format!("into {}", translate_target), Glyph::Globe));
+    let translate_target = out(&[
+        "sh",
+        "-c",
+        "lazyos-translate --target-name 2>/dev/null || echo English",
+    ])
+    .unwrap_or_else(|| "English".to_string());
+    rows.push(row(
+        "Translate",
+        format!("into {}", translate_target),
+        Glyph::Globe,
+    ));
     keys.push("translate".to_string());
 
     // Audio output
@@ -337,7 +398,12 @@ pub fn menu(
     design: &Design,
 ) -> Result<i32, crate::Failure> {
     if let Some(said) = missing(NEEDED) {
-        say("Settings", format!("{said} (network, bluetooth, sway, mako, iw)"), Urgency::Critical, Glyph::Sliders);
+        say(
+            "Settings",
+            format!("{said} (network, bluetooth, sway, mako, iw)"),
+            Urgency::Critical,
+            Glyph::Sliders,
+        );
         return Ok(3);
     }
 
@@ -372,25 +438,58 @@ pub fn menu(
         "wifi-radio" => {
             let on = wifi_on();
             let action = if on { "off" } else { "on" };
-            let msg = if on { "Turning the radio off…" } else { "Turning the radio on…" };
+            let msg = if on {
+                "Turning the radio off…"
+            } else {
+                "Turning the radio on…"
+            };
             say("Wi-Fi", msg.to_string(), Urgency::Normal, Glyph::Wifi);
             if let Err(_e) = sudo(&["nmcli", "radio", "wifi", action]) {
-                say("Wi-Fi", format!("Could not turn the radio {}", action), Urgency::Critical, Glyph::Wifi);
+                say(
+                    "Wi-Fi",
+                    format!("Could not turn the radio {}", action),
+                    Urgency::Critical,
+                    Glyph::Wifi,
+                );
                 return Ok(3);
             }
-            say("Wi-Fi", format!("Wi-Fi {}", action), Urgency::Normal, Glyph::Wifi);
+            say(
+                "Wi-Fi",
+                format!("Wi-Fi {}", action),
+                Urgency::Normal,
+                Glyph::Wifi,
+            );
             Ok(0)
         }
         "bt-radio" => {
             let on = bt_on();
             let action = if on { "off" } else { "on" };
-            let msg = if on { "Powering the controller off…" } else { "Powering the controller on…" };
-            say("Bluetooth", msg.to_string(), Urgency::Normal, Glyph::Bluetooth);
+            let msg = if on {
+                "Powering the controller off…"
+            } else {
+                "Powering the controller on…"
+            };
+            say(
+                "Bluetooth",
+                msg.to_string(),
+                Urgency::Normal,
+                Glyph::Bluetooth,
+            );
             if let Err(_e) = sudo(&["bluetoothctl", "power", action]) {
-                say("Bluetooth", format!("Could not power the controller {}", action), Urgency::Critical, Glyph::Bluetooth);
+                say(
+                    "Bluetooth",
+                    format!("Could not power the controller {}", action),
+                    Urgency::Critical,
+                    Glyph::Bluetooth,
+                );
                 return Ok(3);
             }
-            say("Bluetooth", action.to_string(), Urgency::Normal, Glyph::Bluetooth);
+            say(
+                "Bluetooth",
+                action.to_string(),
+                Urgency::Normal,
+                Glyph::Bluetooth,
+            );
             Ok(0)
         }
         "wifi" => {
@@ -416,11 +515,17 @@ pub fn menu(
             Ok(0)
         }
         "notify" => {
-            let _ = std::process::Command::new("lazyos").arg("menu").arg("notify").spawn();
+            let _ = std::process::Command::new("lazyos")
+                .arg("menu")
+                .arg("notify")
+                .spawn();
             Ok(0)
         }
         "vnc" => {
-            let _ = std::process::Command::new("lazyos").arg("menu").arg("vnc").spawn();
+            let _ = std::process::Command::new("lazyos")
+                .arg("menu")
+                .arg("vnc")
+                .spawn();
             Ok(0)
         }
         "touchpad" => {
@@ -428,11 +533,17 @@ pub fn menu(
             Ok(0)
         }
         "rotation" => {
-            let _ = std::process::Command::new("lazyos").arg("menu").arg("--rotation-menu").spawn();
+            let _ = std::process::Command::new("lazyos")
+                .arg("menu")
+                .arg("--rotation-menu")
+                .spawn();
             Ok(0)
         }
         "display" => {
-            let _ = std::process::Command::new("lazyos").arg("menu").arg("display").spawn();
+            let _ = std::process::Command::new("lazyos")
+                .arg("menu")
+                .arg("display")
+                .spawn();
             Ok(0)
         }
         "automount" => {
@@ -448,10 +559,20 @@ pub fn menu(
                 && std::fs::write(&part, format!("enabled={}\n", value)).is_ok()
                 && std::fs::rename(&part, &conf).is_ok()
             {
-                say("Auto-mount", format!("USB drives: {}", word), Urgency::Normal, Glyph::Disk);
+                say(
+                    "Auto-mount",
+                    format!("USB drives: {}", word),
+                    Urgency::Normal,
+                    Glyph::Disk,
+                );
             } else {
                 let _ = std::fs::remove_file(&part);
-                say("Auto-mount", format!("Could not write {}", conf_display), Urgency::Critical, Glyph::Warning);
+                say(
+                    "Auto-mount",
+                    format!("Could not write {}", conf_display),
+                    Urgency::Critical,
+                    Glyph::Warning,
+                );
                 return Ok(3);
             }
             Ok(0)
@@ -465,7 +586,10 @@ pub fn menu(
             Ok(0)
         }
         "layout" => {
-            let _ = std::process::Command::new("lazyos").arg("menu").arg("layout").spawn();
+            let _ = std::process::Command::new("lazyos")
+                .arg("menu")
+                .arg("layout")
+                .spawn();
             Ok(0)
         }
         "translate" => {
@@ -473,7 +597,10 @@ pub fn menu(
             Ok(0)
         }
         "audio" => {
-            let _ = std::process::Command::new("lazyos").arg("menu").arg("audio").spawn();
+            let _ = std::process::Command::new("lazyos")
+                .arg("menu")
+                .arg("audio")
+                .spawn();
             Ok(0)
         }
         "mixer" => {
@@ -481,11 +608,17 @@ pub fn menu(
             Ok(0)
         }
         "media" => {
-            let _ = std::process::Command::new("lazyos").arg("menu").arg("media").spawn();
+            let _ = std::process::Command::new("lazyos")
+                .arg("menu")
+                .arg("media")
+                .spawn();
             Ok(0)
         }
         "power" => {
-            let _ = std::process::Command::new("lazyos").arg("menu").arg("power").spawn();
+            let _ = std::process::Command::new("lazyos")
+                .arg("menu")
+                .arg("power")
+                .spawn();
             Ok(0)
         }
         _ => Ok(0),
