@@ -160,6 +160,16 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // `rofi-vnc`: wayvnc on loopback, read-only, nothing resident. The
+        // tunnel command is copied for the other machine. The bar's eye is a
+        // state file, not a process.
+        path: "menu vnc",
+        summary: "share this screen read-only over ssh (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-vnc"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.

@@ -39,6 +39,7 @@ pub mod power;
 pub mod step;
 pub mod swap;
 pub mod tz;
+pub mod vnc;
 
 use std::io::Write;
 use std::process::{Command, Stdio};
