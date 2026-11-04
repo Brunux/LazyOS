@@ -130,6 +130,16 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // `rofi-display`: the external monitor arrangement (position, resolution,
+        // scale), saved to config.d/40-display.conf, with wdisplays as a row and
+        // --panel-on as a blind key (spec 010).
+        path: "menu display",
+        summary: "arrange the external monitor: position, resolution, scale (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-display"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.

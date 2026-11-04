@@ -30,6 +30,7 @@
 //! of keys, and a destructive row that cannot be reached without the confirm.
 
 pub mod disk;
+pub mod display;
 pub mod format;
 pub mod fstab;
 pub mod pick;
