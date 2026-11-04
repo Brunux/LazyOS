@@ -97,6 +97,101 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &["lazyos-menu", "bar-menu"],
     },
     CommandSpec {
+        // `rofi-power`: lock, suspend, hibernate, log out, reboot, shut down.
+        // The first three act at once and the last three ask with Cancel
+        // first, which is the confirm `--power ACTION` also opens (spec 010).
+        // It stays one implementation: `menu power`, `menu --power` and
+        // `menu --power ACTION` are the same screen, entered at a different
+        // row.
+        path: "menu power",
+        summary: "lock, sleep, hibernate, log out, reboot or shut down (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-power"],
+        installed: &[],
+    },
+    CommandSpec {
+        // `rofi-format`: only disks with nothing mounted, never a built-in one
+        // and never the disk this system runs from. The list is the safety;
+        // the confirm with Cancel selected is the last gate (spec 010).
+        path: "menu format",
+        summary: "erase a stick or a card and make it one filesystem (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-format"],
+        installed: &["rofi-format"],
+    },
+    CommandSpec {
+        // `rofi-swap`: the same candidate list as Format a disk, then the size
+        // and a confirm. The fstab block is replaced, not appended, and
+        // activation is verified by reading the kernel's swap list back.
+        path: "menu swap",
+        summary: "prepare a card as auxiliary swap, label lazyos_swap (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-swap"],
+        installed: &["rofi-swap"],
+    },
+    CommandSpec {
+        // `rofi-display`: the external monitor arrangement (position, resolution,
+        // scale), saved to config.d/40-display.conf, with wdisplays as a row and
+        // --panel-on as a blind key (spec 010).
+        path: "menu display",
+        summary: "arrange the external monitor: position, resolution, scale (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-display"],
+        installed: &["rofi-display"],
+    },
+    CommandSpec {
+        // `rofi-tz`: timedatectl list-timezones (400-odd rows, filtered) plus the
+        // network-time switch. Restarts waybar so the bar clock updates.
+        path: "menu tz",
+        summary: "set the time zone and network time sync (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-tz"],
+        installed: &["rofi-tz"],
+    },
+    CommandSpec {
+        // `rofi-dns`: point the active connection at a resolver (Cloudflare,
+        // Google, Quad9, AdGuard) or back at DHCP. The change is applied by
+        // modifying the connection and bringing it up again; the read-back
+        // shows what NetworkManager is actually using.
+        path: "menu dns",
+        summary: "set DNS resolvers for the active connection (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-dns"],
+        installed: &["rofi-dns"],
+    },
+    CommandSpec {
+        // `rofi-vnc`: wayvnc on loopback, read-only, nothing resident. The
+        // tunnel command is copied for the other machine. The bar's eye is a
+        // state file, not a process.
+        path: "menu vnc",
+        summary: "share this screen read-only over ssh (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-vnc"],
+        installed: &["rofi-vnc"],
+    },
+    CommandSpec {
+        // `rofi-quick`: the radio switches (Wi-Fi, Bluetooth, night light,
+        // DND, touchpad, tablet mode, rotation, automount, audio, media),
+        // each showing real state from the same probes as today. Delegates to
+        // the existing pickers/panels (bar-net, bar-bt, bar-audio, bar-power,
+        // rofi-display, rofi-vnc, etc.) instead of duplicating them.
+        path: "menu settings",
+        summary: "quick settings: Wi-Fi, BT, night light, DND, touchpad, tablet mode, display, automount, keyboard, translate, audio, media, battery (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-quick"],
+        installed: &["rofi-quick"],
+    },
+    CommandSpec {
+        // `rofi-ssh`: remote login status (ssh.service enabled/running).
+        // The image runs openssh-server with ssh.service enabled on every boot.
+        // This menu shows the status and the commands to change it.
+        path: "menu ssh",
+        summary: "remote login status: ssh.service enabled/running (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-ssh"],
+        installed: &["rofi-ssh"],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.
@@ -302,6 +397,28 @@ mod tests {
         assert_eq!(
             resolve("/usr/bin/lazyos-menu", &[]).unwrap().spec.path,
             "menu"
+        );
+    }
+
+    #[test]
+    fn the_power_list_is_one_command_reached_two_ways() {
+        // `rofi-power` and `lazyos menu power` are the same handler, and the
+        // words win over the link so both keep working while the link is
+        // being installed.
+        assert_eq!(resolve("rofi-power", &[]).unwrap().spec.path, "menu power");
+        assert_eq!(
+            resolve("lazyos", &args(&["menu", "power"]))
+                .unwrap()
+                .spec
+                .path,
+            "menu power"
+        );
+        // It is a link to this binary and not a row of the root menu: the
+        // root menu owns `lock`, `suspend` and `hibernate` already.
+        assert!(
+            COMMANDS
+                .iter()
+                .any(|spec| spec.path == "menu power" && spec.symlinks.contains(&"rofi-power"))
         );
     }
 

@@ -350,6 +350,9 @@ yet present in `scripts/` as not implemented.
   and root). A criterion that cannot name how it is observed is not a criterion, and editing
   the criteria to match the code is how a spec stops being one.
 
+
+- **The system pickers share one safety module** (`disk::is_system_disk`, `disk::candidates`, `power::Hibernate`): the nine `rofi-*` scripts each re-implemented their own disk rules and confirmations, and the shell got these right only after hardware reports (the eMMC's boot partitions, the SPI flash, the microSD that installed the eMMC were all offered at one point). The port consolidates the rules in `crates/lazyos-cli/src/system/` as pure functions with fixtures from real `lsblk`/`findmnt`/`swapon` output, so a changed tool output is a failing test instead of a wrong answer. Every destructive action (`format`, `swap`, `power`) is a `Confirm` whose first answer is Cancel, and the `Picker` queue lets Escape step back one question — a stray Enter costs a step, never a disk.
+
 ## Critical upstream facts
 
 - **Nura is postmarketOS renamed** (rebrand 2026). Old names `postmarketOS`, `pmOS`, `pmaports`,

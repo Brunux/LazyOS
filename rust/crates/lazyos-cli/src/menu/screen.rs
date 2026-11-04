@@ -39,7 +39,8 @@ pub enum Picked {
     /// A new password onto the clipboard, through the secret card.
     Password { key: String },
     /// Log out, reboot or shut down - only ever set by the confirm's second
-    /// answer.
+    /// answer - or lock, suspend or hibernate, which the Power list sets
+    /// directly.
     Session(SessionAction),
 }
 
@@ -74,6 +75,10 @@ pub struct Setup {
     /// Open on the Power list (`--power`), or straight on one action's confirm
     /// with Cancel selected (`--power reboot`, what `power_propose` opens).
     pub power: Option<Option<SessionAction>>,
+    /// Why this machine cannot hibernate, from [`crate::system::power`] when
+    /// the window opened. The Hibernate row carries the reason and Enter
+    /// explains it instead of trying; `None` is a machine that can.
+    pub hibernate_gate: Option<String>,
 }
 
 /// The question that ends the session, Cancel first: the one gate the Power
@@ -112,10 +117,17 @@ impl MenuScreen {
                 .collect(),
         );
         let mut power = ListState::new();
+        let gate = setup.hibernate_gate.clone();
         power.set_rows(
             table::POWER
                 .iter()
-                .map(|item| Row::new(item.label).glyph(item.glyph).detail(item.detail))
+                .map(|item| {
+                    let detail = match (item.action, &gate) {
+                        (Action::Session(SessionAction::Hibernate), Some(reason)) => reason.clone(),
+                        _ => item.detail.to_string(),
+                    };
+                    Row::new(item.label).glyph(item.glyph).detail(detail)
+                })
                 .collect(),
         );
         // Behind a confirm opened straight on one action, the list points at
@@ -172,7 +184,7 @@ impl MenuScreen {
             ),
             Mode::Power => (
                 "Power",
-                "each asks first".to_string(),
+                "the last three ask first".to_string(),
                 vec![("Enter", "choose"), ("Esc", "back")],
             ),
             Mode::Confirm(..) => (
@@ -383,7 +395,7 @@ impl MenuScreen {
             ctx.buf,
             filter.x,
             filter.y,
-            "Each of these ends the session, and asks once more first.",
+            "Lock and sleep act at once; the last three ask once more first.",
             filter.width,
             ctx.design.style(TextStyle::Dim),
         );
@@ -505,12 +517,29 @@ impl Screen for MenuScreen {
                 }
                 _ => match self.power.handle(key, 10, design) {
                     ListAction::Activated(index) => {
+                        let mut outcome = Outcome::Continue;
                         if let Some(item) = table::POWER.get(index)
                             && let Action::Session(action) = item.action
                         {
-                            self.mode = Mode::Confirm(action, confirm_for(action));
+                            if action.ends_session() {
+                                self.mode = Mode::Confirm(action, confirm_for(action));
+                            } else if action == SessionAction::Hibernate
+                                && let Some(reason) = self.setup.hibernate_gate.clone()
+                            {
+                                // The row already says why; Enter says it
+                                // whole, and the list stays open.
+                                crate::system::say(
+                                    "Hibernate",
+                                    reason,
+                                    lazyos_ui::Urgency::Critical,
+                                    Glyph::Save,
+                                );
+                            } else {
+                                self.chosen = Some(Picked::Session(action));
+                                outcome = Outcome::Done(OK);
+                            }
                         }
-                        Outcome::Continue
+                        outcome
                     }
                     _ => Outcome::Continue,
                 },

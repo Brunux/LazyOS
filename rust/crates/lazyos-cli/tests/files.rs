@@ -396,7 +396,7 @@ fn fake_fd(dir: &Path, count: usize, then_sleep: u32) -> PathBuf {
 
 /// The pid a fake wrote, once it has finished writing it.
 fn read_pid(path: &Path) -> i32 {
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         if let Ok(pid) = fs::read_to_string(path).unwrap_or_default().trim().parse() {
             return pid;

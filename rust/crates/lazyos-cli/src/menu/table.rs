@@ -59,19 +59,31 @@ pub enum Program {
     Lazyos,
 }
 
-/// The three actions that end the session. They are only reachable through a
+/// A thing the Power list does to the session.
+///
+/// The last three end it, and they are only reachable through a
 /// [`lazyos_ui::Confirm`] whose first answer is Cancel (spec 007: a stray Enter
-/// runs nothing), and they run the commands `rofi-power` runs.
+/// runs nothing). [`Lock`](Self::Lock), [`Suspend`](Self::Suspend) and
+/// [`Hibernate`](Self::Hibernate) act on Enter, the way `rofi-power` ran them:
+/// the list is already the gate, and the lock is what makes a suspend safe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionAction {
+    Lock,
+    Suspend,
+    Hibernate,
     Logout,
     Reboot,
     Poweroff,
 }
 
 impl SessionAction {
+    /// The question a session-ending row asks. Only those three reach a
+    /// confirm; the rest answer something true for the same list.
     pub fn question(self) -> &'static str {
         match self {
+            SessionAction::Lock => "Lock the screen?",
+            SessionAction::Suspend => "Suspend the machine?",
+            SessionAction::Hibernate => "Hibernate the machine?",
             SessionAction::Logout => "Log out of the session?",
             SessionAction::Reboot => "Reboot the machine?",
             SessionAction::Poweroff => "Shut the machine down?",
@@ -81,10 +93,21 @@ impl SessionAction {
     /// The answer that does it, after `Cancel`.
     pub fn verb(self) -> &'static str {
         match self {
+            SessionAction::Lock => "Lock",
+            SessionAction::Suspend => "Suspend",
+            SessionAction::Hibernate => "Hibernate",
             SessionAction::Logout => "Log out",
             SessionAction::Reboot => "Reboot",
             SessionAction::Poweroff => "Shut down",
         }
+    }
+
+    /// Whether the row ends the session, i.e. whether it needs the confirm.
+    pub fn ends_session(self) -> bool {
+        matches!(
+            self,
+            SessionAction::Logout | SessionAction::Reboot | SessionAction::Poweroff
+        )
     }
 }
 
@@ -280,10 +303,7 @@ pub const ROOT: &[MenuItem] = &[
         "hosts from ~/.ssh/config",
         Glyph::Server,
         Open,
-        Action::Run {
-            program: Program::System("rofi"),
-            args: &[Arg::Lit("-show"), Arg::Lit("ssh")],
-        },
+        session("rofi-ssh"),
     ),
     // The AI group opens with the two actions an agent is for: a session, and
     // one question. Both follow the default the Agents menu marks with `●`.
@@ -420,6 +440,22 @@ pub const ROOT: &[MenuItem] = &[
         System,
         session("rofi-swap"),
     ),
+    item(
+        "format",
+        "Format a disk",
+        "erase a stick or a card",
+        Glyph::Disk,
+        System,
+        session("rofi-format"),
+    ),
+    item(
+        "display",
+        "Display arrangement",
+        "the external monitor",
+        Glyph::Display,
+        System,
+        session("rofi-display"),
+    ),
     // The one row here that rewrites a disk. Like Power it asks again where it
     // lands: `rofi-install` confirms and then wants the disk's name typed.
     item(
@@ -523,10 +559,34 @@ pub const ROOT: &[MenuItem] = &[
     ),
 ];
 
-/// The Power row's list: the three session-ending actions, in `rofi-power`'s
-/// order. Choosing one opens the confirm; the confirm's second answer is the
-/// only way to its [`Action::Session`].
+/// The Power row's list, in `rofi-power`'s order: the three that act at once,
+/// then the three that ask. Choosing a session-ending row opens the confirm;
+/// the confirm's second answer is the only way to its [`Action::Session`].
 pub const POWER: &[MenuItem] = &[
+    item(
+        "power-lock",
+        "Lock",
+        "the session lock, now",
+        Glyph::Lock,
+        Session,
+        Action::Session(SessionAction::Lock),
+    ),
+    item(
+        "power-suspend",
+        "Suspend",
+        "lock, then sleep",
+        Glyph::Moon,
+        Session,
+        Action::Session(SessionAction::Suspend),
+    ),
+    item(
+        "power-hibernate",
+        "Hibernate",
+        "to a disk swap, if there is one",
+        Glyph::Save,
+        Session,
+        Action::Session(SessionAction::Hibernate),
+    ),
     item(
         "logout",
         "Log out",

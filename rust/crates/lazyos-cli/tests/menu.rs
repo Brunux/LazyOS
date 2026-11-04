@@ -114,6 +114,7 @@ fn setup(home: &Home, surface: Surface, agent: Option<Agent>) -> Setup {
         ask: None,
         filter: None,
         power: None,
+        hibernate_gate: None,
     }
 }
 
@@ -264,11 +265,9 @@ fn snapshots_of_the_menu() {
     snapshot("menu-confirm", || {
         let mut screen = MenuScreen::new(setup(&home, Surface::Root, None));
         let mut keys = typed("power");
-        keys.extend([
-            press(KeyCode::Enter),
-            press(KeyCode::Down),
-            press(KeyCode::Enter),
-        ]);
+        keys.push(press(KeyCode::Enter));
+        keys.extend((0..4).map(|_| press(KeyCode::Down)));
+        keys.push(press(KeyCode::Enter));
         drive(&mut screen, &keys);
         screen
     });
@@ -364,8 +363,10 @@ fn escape_closes_with_exit_one_and_writes_nothing() {
 #[test]
 fn a_stray_enter_on_power_runs_nothing() {
     let home = Home::new("power");
-    for row in 0..3 {
-        // power → Enter → the row → Enter → the confirm, Cancel selected → Enter.
+    // The first three rows act at once (lock, suspend, hibernate); only the
+    // session-ending three are behind the confirm, and a stray Enter there is
+    // Cancel.
+    for row in 3..6 {
         let mut screen = MenuScreen::new(setup(&home, Surface::Root, None));
         let mut keys = typed("power");
         keys.push(press(KeyCode::Enter));
@@ -379,8 +380,13 @@ fn a_stray_enter_on_power_runs_nothing() {
     // only then closes the window.
     let mut screen = MenuScreen::new(setup(&home, Surface::Root, None));
     let mut keys = typed("power");
-    keys.extend([press(KeyCode::Enter), press(KeyCode::Enter)]);
-    keys.extend([press(KeyCode::Esc), press(KeyCode::Esc)]);
+    keys.push(press(KeyCode::Enter));
+    keys.extend((0..3).map(|_| press(KeyCode::Down)));
+    keys.extend([
+        press(KeyCode::Enter),
+        press(KeyCode::Esc),
+        press(KeyCode::Esc),
+    ]);
     assert_eq!(drive(&mut screen, &keys), Outcome::Continue);
     assert_eq!(drive(&mut screen, &[press(KeyCode::Esc)]), Outcome::Done(1));
     assert_eq!(screen.chosen, None);
@@ -388,15 +394,57 @@ fn a_stray_enter_on_power_runs_nothing() {
     // The answer that does it is a deliberate second choice.
     let mut screen = MenuScreen::new(setup(&home, Surface::Root, None));
     let mut keys = typed("power");
+    keys.push(press(KeyCode::Enter));
+    keys.extend((0..4).map(|_| press(KeyCode::Down)));
     keys.extend([
-        press(KeyCode::Enter),
-        press(KeyCode::Down),
         press(KeyCode::Enter),
         press(KeyCode::Right),
         press(KeyCode::Enter),
     ]);
     assert_eq!(drive(&mut screen, &keys), Outcome::Done(0));
     assert_eq!(screen.chosen, Some(Picked::Session(SessionAction::Reboot)));
+}
+
+/// The first three Power rows act on Enter - the list is the gate - and only
+/// the session-ending three open the confirm (spec 010).
+#[test]
+fn lock_suspend_and_hibernate_act_without_a_confirm() {
+    let home = Home::new("power-acts");
+    for (row, action) in [
+        (0, SessionAction::Lock),
+        (1, SessionAction::Suspend),
+        (2, SessionAction::Hibernate),
+    ] {
+        let mut screen = MenuScreen::new(setup(&home, Surface::Root, None));
+        let mut keys = typed("power");
+        keys.push(press(KeyCode::Enter));
+        keys.extend((0..row).map(|_| press(KeyCode::Down)));
+        keys.push(press(KeyCode::Enter));
+        assert_eq!(drive(&mut screen, &keys), Outcome::Done(0), "row {row}");
+        assert_eq!(screen.chosen, Some(Picked::Session(action)), "row {row}");
+    }
+}
+
+/// A machine that cannot hibernate says why in the row and on Enter, and the
+/// list stays open: nothing is written to a swap the next boot cannot find.
+#[test]
+fn a_hibernate_that_cannot_work_explains_instead_of_trying() {
+    let home = Home::new("power-hibernate");
+    let mut s = setup(&home, Surface::Root, None);
+    s.hibernate_gate = Some("No swap on disk.".to_string());
+    let mut screen = MenuScreen::new(s);
+
+    // The reason is the row's detail, so it is visible before Enter.
+    let mut keys = typed("power");
+    keys.push(press(KeyCode::Enter));
+    keys.extend((0..2).map(|_| press(KeyCode::Down)));
+    assert_eq!(drive(&mut screen, &keys), Outcome::Continue);
+
+    // Enter on it keeps the list open and chooses nothing.
+    let mut keys = vec![press(KeyCode::Enter)];
+    assert_eq!(drive(&mut screen, &keys), Outcome::Continue);
+    assert_eq!(screen.chosen, None);
+    keys.clear();
 }
 
 #[test]

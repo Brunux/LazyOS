@@ -1,4 +1,4 @@
-LazyOS · Menu                                                                                                                                   44 rows
+LazyOS · Menu                                                                                                                                   46 rows
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ╭ Menu ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │  type to filter: a name, a word of it, or `system`                                                                                                  │
@@ -35,11 +35,11 @@ LazyOS · Menu                                                                  
 │       Time zone  and network time                                                                                                          system   │
 │       Free space  what is using it, and clean up                                                                                           system   │
 │       Auxiliary swap  a card as more memory, on every boot                                                                                 system   │
+│       Format a disk  erase a stick or a card                                                                                               system   │
+│       Display arrangement  the external monitor                                                                                            system   │
 │       Install LazyOS  copy this system to the internal disk - asks twice                                                                   system   │
 │       End a process  the heaviest twenty                                                                                                   system   │
 │       Packages  search, then install one                                                                                                   system   │
 │       Developer  profile export and restore, diagnostics                                                                                   system   │
-│       Colour  the hex of a pixel, and the palette                                                                                          system   │
-│       About  kernel, uptime, memory, battery                                                                                               system   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close

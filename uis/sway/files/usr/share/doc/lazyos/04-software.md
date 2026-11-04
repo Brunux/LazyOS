@@ -510,6 +510,16 @@ list below says why.
   authorized" is a policy problem, "already mounted" means it is already in the
   list above.
 
+
+
+## Quick settings
+
+The **Settings** menu (Alt+Ctrl+O, and the root menu) is the radio switches for the session: Wi-Fi radio, Bluetooth radio, Night light, Do not disturb, Touchpad, Tablet mode (with Calibrate rotation when on), Display arrangement, Auto-mount USB drives, Keyboard layout, Translate, Audio output, Volume per application (pavucontrol), Media, and Battery/Power. Each row shows the real state from the same probe as today and delegates to the existing pickers/panels (bar-net, bar-bt, bar-audio, bar-power, rofi-display, rofi-vnc) instead of duplicating them.
+
+The VNC row shows the current sharing state. The display row shows the arrangement from `rofi-display --status`. The tablet mode row adds a "Calibrate rotation" sub-row when the mode is on.
+
+The `--status` subcommand returns a one-line summary of all switches.
+
 ## Your profile, on a stick
 
 **Alt+Ctrl+D** - also the root menu's **Developer** row and the launcher entry -

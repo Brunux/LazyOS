@@ -246,9 +246,14 @@ pub fn spawn_detached(argv: &[String], home: &str) -> io::Result<()> {
 }
 
 /// What a session action runs, in order: the commands `rofi-power` runs, the
-/// logind method first and `sudo -n` as the fallback for the two that need it.
+/// logind method first and `sudo -n` as the fallback for the ones that need it.
 pub fn session_attempts(action: SessionAction) -> Vec<Vec<&'static str>> {
     match action {
+        SessionAction::Lock => vec![vec!["sway-lock"]],
+        // The lock is a step of its own in `run_session`: it has to come up
+        // before the machine goes down, and `--wait` is what says it did.
+        SessionAction::Suspend => vec![vec!["sway-suspend"]],
+        SessionAction::Hibernate => vec![vec!["sudo", "-n", "systemctl", "hibernate"]],
         SessionAction::Logout => vec![vec!["swaymsg", "exit"]],
         SessionAction::Reboot => vec![
             vec!["systemctl", "reboot"],
@@ -263,28 +268,51 @@ pub fn session_attempts(action: SessionAction) -> Vec<Vec<&'static str>> {
 
 /// Run a session action; a failure is a critical card, never silence.
 pub fn run_session(action: SessionAction) -> bool {
-    for attempt in session_attempts(action) {
-        let ok = Command::new(attempt[0])
-            .args(&attempt[1..])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-        if ok {
+    // Lock first, then sleep: a resume that lands on an unlocked desktop is a
+    // hole, and `sway-lock --wait` is the bounded wait that makes the lock be
+    // up before the machine goes down (the same order the key binding has).
+    if action == SessionAction::Suspend && !run_one(&["sway-lock", "--wait"]) {
+        let _ = Card::new("Suspend")
+            .body("The screen could not be locked, so the machine was not suspended.")
+            .urgency(lazyos_ui::Urgency::Critical)
+            .send();
+        return false;
+    }
+    let attempts = session_attempts(action);
+    for attempt in &attempts {
+        if run_one(attempt) {
             return true;
         }
     }
+    let first = attempts[0].join(" ");
+    let tried = if attempts.len() > 1 {
+        format!("{first} failed, with or without sudo")
+    } else {
+        format!("{first} failed")
+    };
     let _ = Card::new("Power")
         .body(format!(
-            "Could not {} ({} failed, with or without sudo)",
-            action.verb().to_lowercase(),
-            session_attempts(action)[0].join(" ")
+            "Could not {} ({tried})",
+            action.verb().to_lowercase()
         ))
         .urgency(lazyos_ui::Urgency::Critical)
         .send();
     false
+}
+
+/// One command, its own process group's business, its answer as a bool.
+fn run_one(argv: &[&str]) -> bool {
+    let Some((program, args)) = argv.split_first() else {
+        return false;
+    };
+    Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 /// 16 random bytes as 32 hex characters, from the kernel's generator: no `+`,
@@ -359,7 +387,11 @@ mod tests {
             .copied()
             .filter(|k| !table::BAR_MENU_KEYS.contains(k))
             .collect();
-        assert_eq!(added, vec!["ask"], "the one row this spec adds");
+        assert_eq!(
+            added,
+            vec!["ask", "format", "display"],
+            "the rows spec 010 adds"
+        );
     }
 
     #[test]
@@ -469,7 +501,7 @@ mod tests {
         assert_eq!(runs_of("dev"), "rofi-dev");
         assert_eq!(runs_of("agent"), "rofi-agents --default");
         assert_eq!(runs_of("files-window"), "favnyr ~");
-        assert_eq!(runs_of("ssh"), "rofi -show ssh");
+        assert_eq!(runs_of("ssh"), "rofi-ssh");
         assert_eq!(runs_of("theme-next"), "lazyos theme next");
         assert_eq!(runs_of("theme-nord"), "lazyos theme set nord");
         assert_eq!(runs_of("ask"), "menu:ask");
@@ -490,6 +522,29 @@ mod tests {
             session_attempts(SessionAction::Logout),
             vec![vec!["swaymsg", "exit"]]
         );
+        assert_eq!(
+            session_attempts(SessionAction::Lock),
+            vec![vec!["sway-lock"]]
+        );
+        // The lock is a separate step before this one, not part of it.
+        assert_eq!(
+            session_attempts(SessionAction::Suspend),
+            vec![vec!["sway-suspend"]]
+        );
+        assert_eq!(
+            session_attempts(SessionAction::Hibernate),
+            vec![vec!["sudo", "-n", "systemctl", "hibernate"]]
+        );
+    }
+
+    #[test]
+    fn only_the_three_that_end_the_session_ask() {
+        assert!(!SessionAction::Lock.ends_session());
+        assert!(!SessionAction::Suspend.ends_session());
+        assert!(!SessionAction::Hibernate.ends_session());
+        assert!(SessionAction::Logout.ends_session());
+        assert!(SessionAction::Reboot.ends_session());
+        assert!(SessionAction::Poweroff.ends_session());
     }
 
     #[test]

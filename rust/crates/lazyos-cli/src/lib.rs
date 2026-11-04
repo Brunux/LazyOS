@@ -29,6 +29,7 @@ pub mod mcp;
 pub mod menu;
 mod notify;
 pub mod paths;
+pub mod system;
 pub mod task_cmd;
 pub mod term;
 mod theme;
@@ -331,6 +332,15 @@ fn execute(
 ) -> Result<i32, Failure> {
     match resolved.spec.path {
         "menu" => session_menu(resolved, terminal, design, menu::Surface::Root),
+        "menu power" => session_menu(resolved, terminal, design, menu::Surface::Root),
+        "menu format" => system::format::menu(terminal, design),
+        "menu swap" => system::swap::menu(terminal, design),
+        "menu display" => system::display::menu(terminal, design),
+        "menu tz" => system::tz::menu(terminal, design),
+        "menu dns" => system::dns::menu(terminal, design),
+        "menu vnc" => system::vnc::menu(terminal, design),
+        "menu settings" => system::settings::menu(terminal, design),
+        "menu ssh" => system::ssh::menu(terminal, design),
         "menu palette" => session_menu(resolved, terminal, design, menu::Surface::Palette),
         "ask" => session_menu(resolved, terminal, design, menu::Surface::Root),
         "menu files" => files_menu(resolved, terminal, design),
@@ -357,11 +367,17 @@ fn session_menu(
     surface: menu::Surface,
 ) -> Result<i32, Failure> {
     let asking = resolved.spec.path == "ask";
-    let (filter, power) = if asking {
+    let (filter, mut power) = if asking {
         (None, None)
     } else {
         menu_options(resolved)?
     };
+    // `menu power` is `rofi-power`: the same screen, opened on the Power list
+    // rather than on the root rows. An explicit `--power ACTION` still wins,
+    // so `menu power --power reboot` opens that confirm directly.
+    if resolved.spec.path == "menu power" && power.is_none() {
+        power = Some(None);
+    }
     let vars: BTreeMap<String, String> = std::env::vars().collect();
     let paths = paths::Paths::resolve(&vars).map_err(|error| {
         Failure::new("cannot find the session state directory", error.to_string())
@@ -376,6 +392,7 @@ fn session_menu(
         ask: asking.then(|| resolved.args.join(" ")),
         filter,
         power,
+        hibernate_gate: system::power::Hibernate::from_machine().refusal(),
         state: paths.state,
         exe,
         vars,
@@ -566,7 +583,7 @@ fn dir_arg(
     }
 }
 
-fn run_screen(
+pub(crate) fn run_screen(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     design: &Design,
     title: &str,
