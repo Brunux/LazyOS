@@ -170,6 +170,18 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // `rofi-quick`: the radio switches (Wi-Fi, Bluetooth, night light,
+        // DND, touchpad, tablet mode, rotation, automount, audio, media),
+        // each showing real state from the same probes as today. Delegates to
+        // the existing pickers/panels (bar-net, bar-bt, bar-audio, bar-power,
+        // rofi-display, rofi-vnc, etc.) instead of duplicating them.
+        path: "menu settings",
+        summary: "quick settings: Wi-Fi, BT, night light, DND, touchpad, tablet mode, display, automount, keyboard, translate, audio, media, battery (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-quick"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.

@@ -339,6 +339,7 @@ fn execute(
         "menu tz" => system::tz::menu(terminal, design),
         "menu dns" => system::dns::menu(terminal, design),
         "menu vnc" => system::vnc::menu(terminal, design),
+        "menu settings" => system::settings::menu(terminal, design),
         "menu palette" => session_menu(resolved, terminal, design, menu::Surface::Palette),
         "ask" => session_menu(resolved, terminal, design, menu::Surface::Root),
         "menu files" => files_menu(resolved, terminal, design),
