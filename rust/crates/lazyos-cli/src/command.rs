@@ -140,6 +140,15 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // `rofi-tz`: timedatectl list-timezones (400-odd rows, filtered) plus the
+        // network-time switch. Restarts waybar so the bar clock updates.
+        path: "menu tz",
+        summary: "set the time zone and network time sync (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-tz"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.

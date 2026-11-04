@@ -37,6 +37,7 @@ pub mod pick;
 pub mod power;
 pub mod step;
 pub mod swap;
+pub mod tz;
 
 use std::io::Write;
 use std::process::{Command, Stdio};
