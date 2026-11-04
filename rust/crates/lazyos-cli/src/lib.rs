@@ -333,6 +333,7 @@ fn execute(
     match resolved.spec.path {
         "menu" => session_menu(resolved, terminal, design, menu::Surface::Root),
         "menu power" => session_menu(resolved, terminal, design, menu::Surface::Root),
+        "menu format" => system::format::menu(terminal, design),
         "menu palette" => session_menu(resolved, terminal, design, menu::Surface::Palette),
         "ask" => session_menu(resolved, terminal, design, menu::Surface::Root),
         "menu files" => files_menu(resolved, terminal, design),
@@ -575,7 +576,7 @@ fn dir_arg(
     }
 }
 
-fn run_screen(
+pub(crate) fn run_screen(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     design: &Design,
     title: &str,

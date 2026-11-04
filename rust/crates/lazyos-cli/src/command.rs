@@ -110,6 +110,16 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &[],
     },
     CommandSpec {
+        // `rofi-format`: only disks with nothing mounted, never a built-in one
+        // and never the disk this system runs from. The list is the safety;
+        // the confirm with Cancel selected is the last gate (spec 010).
+        path: "menu format",
+        summary: "erase a stick or a card and make it one filesystem (spec 010)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-format"],
+        installed: &[],
+    },
+    CommandSpec {
         // Every row the menu has, plus the commands that need no question and
         // the built-in themes, under the same ranking. Spec 012 adds the
         // `.desktop` entries and gives it a key.

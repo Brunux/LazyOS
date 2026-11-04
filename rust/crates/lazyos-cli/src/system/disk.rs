@@ -329,6 +329,17 @@ pub fn candidates(listing: &str, facts: &Facts) -> Vec<Disk> {
         .collect()
 }
 
+/// The first partition of a disk: `sda1` but `mmcblk1p1`, because the kernel
+/// inserts a `p` when the device name already ends in a digit. A menu that
+/// wrote `/dev/mmcblk11` would create a device node nobody asked for.
+pub fn partition(dev: &str) -> String {
+    if dev.ends_with(|c: char| c.is_ascii_digit()) {
+        format!("{dev}p1")
+    } else {
+        format!("{dev}1")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -440,6 +451,13 @@ zram0     1.9G
         assert_eq!(found[0].model, "USB DISK 3.0");
         assert_eq!(found[0].tran.as_deref(), Some("usb"));
         assert_eq!(found[0].describe(), "/dev/sda · USB DISK 3.0 · 29.5G · usb");
+    }
+
+    #[test]
+    fn a_partition_of_a_disk_that_ends_in_a_digit_gets_the_p() {
+        assert_eq!(partition("/dev/sda"), "/dev/sda1");
+        assert_eq!(partition("/dev/mmcblk1"), "/dev/mmcblk1p1");
+        assert_eq!(partition("/dev/nvme0n1"), "/dev/nvme0n1p1");
     }
 
     #[test]
