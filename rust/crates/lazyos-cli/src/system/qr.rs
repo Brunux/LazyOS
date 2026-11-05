@@ -2,7 +2,9 @@
 //!
 //! The payload is the Wi-Fi QR format phones understand:
 //!
-//!     WIFI:T:WPA;S:<ssid>;P:<password>;;
+//! ```text
+//! WIFI:T:WPA;S:<ssid>;P:<password>;;
+//! ```
 //!
 //! with `\`, `;`, `,` and `:` escaped, which is what the ZXing reader expects.
 //! The password is read with `nmcli -s` through sudo. The payload is written to
