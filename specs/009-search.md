@@ -3,7 +3,7 @@
 - **Status**: in progress (approved 2026-10-29: the three old scripts become links to the binary in this
   PR, `lazyos-view` becomes `lazyos open` behind a link rather than a generated script, and the
   work is built on `claude-opus-5-5` - one tier above the assignment, recorded as a deviation for
-  §6.2 rather than a re-route)
+  §6.2 rather than a re-route; code merged in PR #24 — one acceptance criterion still unobserved)
 - **Phase**: 3
 - **Depends on**: 001, 002, 003, 005
 - **Model**: `claude-sonnet-5-5` (effort `high`) — an async walk, a preview pipeline and three

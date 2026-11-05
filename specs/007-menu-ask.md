@@ -1,6 +1,7 @@
 # Spec 007 — Root menu, command palette and the Ask strip
 
-- **Status**: in progress (approved 2026-10-28, with the Ask strip on the default agent)
+- **Status**: in progress (approved 2026-10-28, with the Ask strip on the default agent;
+  code merged in PR #21 — three acceptance criteria still unobserved)
 - **Phase**: 2
 - **Depends on**: 002, 003, 005
 - **Model**: `claude-opus-5-5` (effort `high`) — the menu is the session's face: grouping,

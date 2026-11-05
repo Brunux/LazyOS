@@ -1,6 +1,6 @@
 # Spec 016 — A local model on this machine
 
-- **Status**: in progress
+- **Status**: merged (PR #22; evidence in `reports/2026-10-28-local-model-016.md`)
 - **Phase**: not in `docs/plan-ui.md` §16 — the plan's fourteen specs port the session as it is.
   This is a new capability, written after the measurement campaign of 2026-10-28 and the
   maintainer's decision to keep it.

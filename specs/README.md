@@ -32,6 +32,11 @@ it. A spec is small enough that:
 A spec is edited **before** the branch, in its own PR if the change is material (scope, criteria,
 model). Editing acceptance criteria to match the code is how a spec stops being a spec.
 
+The status is the **first word** of the file's `**Status**` line; anything after it in parentheses
+names the evidence or the gap - `in progress (code merged in PR #27; hardware report pending)`.
+That is what lets a spec whose code has landed read as work in flight rather than unstarted, and
+it costs nothing: the index and the CI compare the word, which is the part the lifecycle defines.
+
 ## 3. Branch and PR rules
 
 One spec, one branch, one PR, one reviewer. The branch is created from `main`:
@@ -196,10 +201,18 @@ specs.
 | 007 | [`007-menu-ask.md`](007-menu-ask.md) — root menu, palette, Ask strip | 2 | in progress |
 | 008 | [`008-mcp.md`](008-mcp.md) — `lazyos mcp` and the OpenCode contract | 2 | in progress |
 | 009 | [`009-search.md`](009-search.md) — files, find, grep | 3 | in progress |
-| 010 | [`010-system-pickers.md`](010-system-pickers.md) — system dialogs | 3 | draft |
-| 011 | [`011-media-pickers.md`](011-media-pickers.md) — media and utilities | 3 | draft |
-| 012 | [`012-launcher-reference.md`](012-launcher-reference.md) — launcher, window, run, reference | 4 | draft |
-| 013 | [`013-themes-greeter.md`](013-themes-greeter.md) — 7 themes, wallpapers, greeter | 5 | draft |
+| 010 | [`010-system-pickers.md`](010-system-pickers.md) — system dialogs | 3 | in progress |
+| 011 | [`011-media-pickers.md`](011-media-pickers.md) — media and utilities | 3 | in progress |
+| 012 | [`012-launcher-reference.md`](012-launcher-reference.md) — launcher, window, run, reference | 4 | in progress |
+| 013 | [`013-themes-greeter.md`](013-themes-greeter.md) — 7 themes, wallpapers, greeter | 5 | in progress |
 | 014 | [`014-perf-witnesses.md`](014-perf-witnesses.md) — budget, ledger, closure | 5 | draft |
 | 015 | [`015-browser-bar.md`](015-browser-bar.md) — the browser bar (optional, not on the plan) | - | draft |
-| 016 | [`016-local-models.md`](016-local-models.md) — a local model, measured and pinned | - | in progress |
+| 016 | [`016-local-models.md`](016-local-models.md) — a local model, measured and pinned | - | merged |
+
+The status column is the word that opens each file's `**Status**` line, and CI fails when the two
+disagree (`The index status is the spec's status`, `.github/workflows/specs.yml`). `merged` means
+the PR is merged **and** the witnesses passed on hardware, so a spec whose code landed without a
+hardware report stays `in progress` with the gap named in its parenthetical: the index word moves
+when the report does, not when the diff merges. The same run prints, as notes rather than
+failures, a merged spec with no `reports/*-NNN.md` or with an unticked acceptance criterion -
+`006` is the one that predates the rule, and the notes are what keeps it visible.

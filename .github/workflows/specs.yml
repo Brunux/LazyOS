@@ -74,6 +74,71 @@ jobs:
           done
           exit "$status"
 
+      # The status in the file and the status in the index are one fact
+      # (specs/README.md §2, §9). Only the word before the parenthetical is
+      # compared: the parenthetical names the evidence or the gap, which is
+      # what lets a spec whose code merged read as work in flight.
+      - name: The index status is the spec's status
+        run: |
+          set -eu
+          status=0
+          for file in specs/[0-9][0-9][0-9]-*.md; do
+            name=$(basename "$file")
+            [ "$name" = "000-template.md" ] && continue
+            number=${name%%-*}
+
+            line=$(grep -m1 '^- \*\*Status\*\*:' "$file" || true)
+            if [ -z "$line" ]; then
+              echo "FAIL $name: no Status line"
+              status=1
+              continue
+            fi
+            line=${line#- **Status**: }
+            word=${line%%(*}
+            word=$(printf '%s' "$word" | sed -e 's/[[:space:]]*$//')
+            case "$word" in
+              draft | approved | "in progress" | merged | dropped) ;;
+              *)
+                echo "FAIL $name: status '$word' is not one of specs/README.md §2's states"
+                status=1
+                ;;
+            esac
+
+            row=$(awk '/^## 9\. The index/{f=1} f' specs/README.md |
+              grep -m1 -E "^\| *$number *\|" || true)
+            index_word=$(printf '%s\n' "$row" | awk -F'|' '{print $5}' |
+              sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+            if [ "$word" != "$index_word" ]; then
+              echo "FAIL $name: the file says '$word', specs/README.md §9 says '$index_word'"
+              status=1
+            fi
+          done
+          if [ "$status" -ne 0 ]; then
+            echo "One fact, two places: move the status in the file and in the index together."
+          fi
+          exit "$status"
+
+      # Evidence is not a gate for a spec that already merged - the two that
+      # predate this rule (005, 006) cannot retroactively produce one - but a
+      # merged spec with no hardware report or with an unticked criterion is
+      # drift, and drift that prints on every run is drift somebody fixes.
+      - name: Merged specs carry their evidence
+        run: |
+          set -eu
+          for file in specs/[0-9][0-9][0-9]-*.md; do
+            name=$(basename "$file")
+            [ "$name" = "000-template.md" ] && continue
+            grep -q '^- \*\*Status\*\*: merged' "$file" || continue
+            number=${name%%-*}
+            if ! ls reports/*-"$number".md >/dev/null 2>&1; then
+              echo "note: $name is merged and has no reports/*-$number.md"
+            fi
+            open=$(grep -c '^[[:space:]]*- \[ \]' "$file" || true)
+            if [ "$open" -ne 0 ]; then
+              echo "note: $name is merged with $open acceptance criteria still unticked"
+            fi
+          done
+
       - name: The branch names its spec
         if: github.event_name == 'pull_request'
         env:
