@@ -14,9 +14,14 @@ pub mod contrast;
 pub mod render;
 pub mod store;
 pub mod theme;
+pub mod wallpaper;
 
 pub use store::{Outcome, Paths, SURFACES, Surface};
 pub use theme::{Hex, Motion, Roles, Theme};
+pub use wallpaper::{
+    DEFAULT_HEIGHT, DEFAULT_WIDTH, Wallpaper, generate_thumbnail, generate_wallpaper,
+    get_or_generate,
+};
 
 /// One colour, independent of any terminal library (the UI crate maps it).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

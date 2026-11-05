@@ -355,6 +355,8 @@ yet present in `scripts/` as not implemented.
 
 - **The media and utility pickers share one shape** (`List`/`Task`/`Card`/`Picker`): the ten `rofi-*` scripts each repeated the same rofi plumbing and the same three bugs. The port consolidates the UI into `lazyos menu` subcommands using `List`/`Task`/`Card` from `lazyos-ui`, so a changed tool output is a failing test instead of a wrong answer. The recorder (`wf-recorder`) is the only long-lived child; its pid and file live in `$XDG_RUNTIME_DIR/lazyos-capture`, and start/stop share the same menu.
 
+- **The theme engine is pure data** (`theme.toml` → semantic roles → surfaces): eight built-in themes (Solarized plus Catppuccin, Tokyo Night, Rose Pine, Nord, Gruvbox, Everforest, Kanagawa) each carry the 16 ANSI colours, semantic roles, a wallpaper list and a motion setting. Wallpapers are generated at build time (gradient + wordmark) and cached per-theme at `~/.cache/lazyos/wallpapers/`. The greeter (tuigreet) and lock screen (swaylock) consume the theme via generated flags and templates — no code changes when a theme is added. The theme menu (`lazyos menu theme`) renders a live preview with a sixel wallpaper thumbnail for the highlighted theme.
+
 ## Critical upstream facts
 
 - **Nura is postmarketOS renamed** (rebrand 2026). Old names `postmarketOS`, `pmOS`, `pmaports`,

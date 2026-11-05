@@ -556,7 +556,7 @@ The colours of this session come from **one file**, not from a dozen edited
 configs: `theme.toml` holds the 16 terminal colours and the roles a surface asks
 for (background, text, accent, danger…), and every other file is *generated*
 from it — foot, waybar, mako, rofi, btop, lazygit, nvim, fzf, the lock screen,
-the prompt (starship) and the wallpaper and window frame sway uses.
+the prompt (starship), the greeter, the window frame sway uses, and the wallpaper.
 
 ```
 lazyos theme list           # every theme, the active one marked *
@@ -569,6 +569,16 @@ lazyos theme diff           # is every file still what the theme says?
 
 Solarized Dark is the default and the brand; the others are Catppuccin Mocha,
 Tokyo Night, Rose Pine, Nord, Gruvbox, Everforest Dark and Kanagawa.
+
+**Every theme carries its own wallpaper.** The wallpaper is a gradient
+composition generated from the theme's palette with the LazyOS wordmark
+centered, cached at `~/.cache/lazyos/wallpapers/`. The first wallpaper is what
+`theme set` installs as the desktop background and the lock screen image.
+
+**The greeter and lock screen are themed.** The greeter (tuigreet) receives its
+colours from the active theme via generated flags. The lock screen (swaylock)
+uses the theme's colours for its indicator ring and the theme's wallpaper as
+its background image.
 
 **A generated file says so on its first line.** If you edit one of them, the
 next switch will *report* the difference and leave your edit alone instead of
