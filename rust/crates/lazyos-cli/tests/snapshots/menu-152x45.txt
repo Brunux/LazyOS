@@ -1,4 +1,4 @@
-LazyOS · Menu                                                                                                                                   46 rows
+LazyOS · Menu                                                                                                                                   49 rows
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ╭ Menu ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │  type to filter: a name, a word of it, or `system`                                                                                                  │
@@ -13,6 +13,9 @@ LazyOS · Menu                                                                  
 │       Settings  Wi-Fi, Bluetooth, night light, tablet mode, rotation                                                                         open   │
 │       Learn  the manual, with search                                                                                                         open   │
 │   kbd  Keybindings  every binding, from the configuration                                                                                     open   │
+│       Applications  desktop entries, icons, frecency                                                                                         open   │
+│       Window switcher  focus or close any window                                                                                             open   │
+│       Run command  PATH completion, Shift+Enter in foot                                                                                      open   │
 │   =    Calculator  type it, Enter copies the result                                                                                           open   │
 │       Emoji  type a name, insert the glyph                                                                                                   open   │
 │       Clipboard  what was copied, back in one pick                                                                                           open   │
@@ -38,8 +41,5 @@ LazyOS · Menu                                                                  
 │       Install LazyOS  copy this system to the internal disk - asks twice                                                                   system   │
 │       End a process  the heaviest twenty                                                                                                   system   │
 │       Packages  search, then install one                                                                                                   system   │
-│       Developer  profile export and restore, diagnostics                                                                                   system   │
-│       Capture  screenshot, annotate, OCR, QR, record                                                                                       system   │
-│   qr   QR code  Wi-Fi network or any text                                                                                                   system   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close

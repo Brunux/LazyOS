@@ -57,31 +57,67 @@
 //! - **One shape for the window.** The card, the note line, the rows with a
 //!   glyph, and the confirm whose first answer is Cancel — the same layout
 //!   the system pickers (spec 010) use, so a new picker cannot drift.
+//!
+//! The launcher and reference surfaces (spec 012): nine rofi modes and
+//! standalone scripts, now as `lazyos menu` subcommands.
+//!
+//! ```text
+//! lazyos menu apps        .desktop entries, icons   (rofi -show drun)
+//! lazyos menu window      window switcher           (rofi -show window)
+//! lazyos menu run         PATH commands, Shift+Enter→foot (rofi -show run)
+//! lazyos menu keys        parsed sway config        (rofi-keys)
+//! lazyos menu learn       manual + apropos          (rofi-learn)
+//! lazyos menu about       fastfetch facts + logs    (rofi-about)
+//! lazyos menu colour      pixel picker + palette    (rofi-color)
+//! lazyos menu pkg         apt search + install      (rofi-pkg)
+//! lazyos menu dev         profile export/restore    (rofi-dev)
+//! ```
+//!
+//! The rules that keep the port honest:
+//! - **The `.desktop` parser is pure and tested.** Fixtures from real
+//!   `/usr/share/applications` files drive the parser; a broken entry is a
+//!   failing test, not a crashed launcher.
+//! - **The window switcher uses `swaymsg -t get_tree`** — recorded JSON is the
+//!   fixture, so the parser works without a live compositor.
+//! - **The keys parser mirrors the awk script** — same files, same comment-to-
+//!   binding association, same section icons. The awk is deleted when counts match.
+//! - **The markdown renderer handles the manual's subset** — headings, lists,
+//!   code fences, bold, tables — with the theme's code role. No `glow` subprocess.
+//! - **The revision in About equals `/etc/debian-aarch64-revision`** — the mark
+//!   is sixel, cards fit at 80x24.
 
+pub mod about;
+pub mod apps;
 pub mod audio;
 pub mod bluetooth;
 pub mod calc;
 pub mod capture;
 pub mod clip;
 pub mod colour;
+pub mod dev;
 pub mod disk;
 pub mod display;
 pub mod dns;
 pub mod emoji;
 pub mod format;
 pub mod fstab;
+pub mod keys;
+pub mod learn;
 pub mod media;
 pub mod notify;
 pub mod pick;
+pub mod pkg;
 pub mod power;
 pub mod qr;
 pub mod remind;
+pub mod run;
 pub mod settings;
 pub mod ssh;
 pub mod step;
 pub mod swap;
 pub mod tz;
 pub mod vnc;
+pub mod window;
 
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -179,6 +215,27 @@ pub fn print(line: &str) {
 /// Used by format and swap.
 pub fn wait_for(node: &str) -> bool {
     crate::system::format::wait_for(node)
+}
+
+/// Start a busy card with the bar spinner.
+pub fn busy(tag: &str, title: &str, message: &str, icon: &str) {
+    let _ = std::process::Command::new("lazyos")
+        .args(["notify", "busy", tag, title, message, icon])
+        .status();
+}
+
+/// End a busy card with success.
+pub fn busy_end(tag: &str, title: &str, message: &str) {
+    let _ = std::process::Command::new("lazyos")
+        .args(["notify", "busy-end", tag, title, message])
+        .status();
+}
+
+/// End a busy card with failure.
+pub fn busy_fail(tag: &str, title: &str, message: &str, urgency: &str) {
+    let _ = std::process::Command::new("lazyos")
+        .args(["notify", "busy-fail", tag, title, message, urgency])
+        .status();
 }
 
 #[cfg(test)]

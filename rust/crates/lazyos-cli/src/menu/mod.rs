@@ -498,7 +498,7 @@ mod tests {
     fn rows_say_what_they_run_in_the_words_the_check_matches() {
         let rows = entries(Surface::Palette, &Context::default());
         let runs_of = |key: &str| runs(rows.iter().find(|e| e.key == key).unwrap().action);
-        assert_eq!(runs_of("dev"), "rofi-dev");
+        assert_eq!(runs_of("dev"), "lazyos menu dev");
         assert_eq!(runs_of("agent"), "rofi-agents --default");
         assert_eq!(runs_of("files-window"), "favnyr ~");
         assert_eq!(runs_of("ssh"), "lazyos menu ssh");

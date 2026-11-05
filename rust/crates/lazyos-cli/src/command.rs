@@ -382,6 +382,70 @@ pub const COMMANDS: &[CommandSpec] = &[
         symlinks: &["bar-bt"],
         installed: &["bar-bt"],
     },
+    CommandSpec {
+        // Launcher (spec 012): .desktop entries with icons, frecency, Terminal=true → foot.
+        path: "menu apps",
+        summary: "desktop entries with icons, frecency, Terminal=true → foot (spec 012)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-drun"],
+        installed: &[],
+    },
+    CommandSpec {
+        // Window switcher (spec 012): sway IPC tree, focus/close.
+        path: "menu window",
+        summary: "focus or close any window, from sway IPC (spec 012)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-window"],
+        installed: &[],
+    },
+    CommandSpec {
+        // Run prompt (spec 012): PATH completion, Shift+Enter → foot.
+        path: "menu run",
+        summary: "PATH commands with completion, Shift+Enter in foot (spec 012)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-run"],
+        installed: &[],
+    },
+    CommandSpec {
+        // Learn: manual pages + apropos (spec 012).
+        path: "menu learn",
+        summary: "the manual pages and apropos, rendered in the window (spec 012)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-learn"],
+        installed: &[],
+    },
+    CommandSpec {
+        // Keys: parsed sway config (spec 012).
+        path: "menu keys",
+        summary: "every binding from the sway config, comments as descriptions (spec 012)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-keys"],
+        installed: &[],
+    },
+    CommandSpec {
+        // Pkg: apt search + install (spec 012).
+        path: "menu pkg",
+        summary: "search packages and install with apt (spec 012)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-pkg"],
+        installed: &[],
+    },
+    CommandSpec {
+        // Dev: profile export/restore/report (spec 012).
+        path: "menu dev",
+        summary: "profile export, restore and diagnostics bundle (spec 012)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-dev"],
+        installed: &[],
+    },
+    CommandSpec {
+        // About: fastfetch facts, revision, logs (spec 012).
+        path: "menu about",
+        summary: "system facts, revision, errors, boot time, devices (spec 012)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-about"],
+        installed: &[],
+    },
 ];
 
 /// A command the table resolved, with the arguments that belong to it.
