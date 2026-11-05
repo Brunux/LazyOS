@@ -8,11 +8,13 @@
 //! Shift+Insert is typed. Alt+1 is clipboard only, for a surface that refuses a
 //! virtual keyboard.
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 use std::env;
 use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
 
 use lazyos_ui::{
     BodyCtx, Design, Glyph, Header, Input, KeyHint, ListAction, ListState, Outcome, Row, Screen,

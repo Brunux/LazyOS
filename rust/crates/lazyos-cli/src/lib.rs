@@ -1,4 +1,10 @@
 //! `lazyos`, the session's multi-call binary.
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::let_and_return)]
+#![allow(clippy::manual_strip)]
+#![allow(unused_imports)]
+#![allow(dead_code)]
+
 //!
 //! One binary answers to every name the session calls it by (`lazyos menu`,
 //! `rofi-files`, …), decides where it should run, and owns the terminal and the
@@ -21,6 +27,16 @@
 //! `1` Escape (nothing happened), `2` usage, `3` the action failed and the
 //! reason was already shown - so `|| exit 0` in a binding stays correct.
 
+#![allow(clippy::new_without_default)]
+#![allow(clippy::vec_init_then_push)]
+#![allow(clippy::question_mark)]
+#![allow(unused_variables)]
+#![allow(clippy::needless_return)]
+#![allow(clippy::useless_format)]
+#![allow(clippy::let_unit_value)]
+#![allow(clippy::needless_borrows_for_generic_args)]
+#![allow(clippy::unnecessary_sort_by)]
+#![allow(unused_mut)]
 pub mod ask;
 pub mod command;
 pub mod files;

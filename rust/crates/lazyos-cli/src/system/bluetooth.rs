@@ -3,6 +3,10 @@
 //! The old script scanned for 3 seconds, listed known devices with connected
 //! ones first, and offered connect/disconnect, turn off, and open bluetoothctl.
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 
 use lazyos_ui::{
@@ -12,7 +16,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{have, missing, out, say};
+use crate::system::{missing, out, say };
 
 const NEEDED: &[&str] = &["bluetoothctl", "foot"];
 

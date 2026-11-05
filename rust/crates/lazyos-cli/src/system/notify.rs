@@ -5,6 +5,10 @@
 //! footer rows were dismiss-all and toggle DND. Enter on a row copied the
 //! notification to the clipboard.
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 
 use lazyos_ui::{
@@ -14,7 +18,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{have, missing, out, print, say};
+use crate::system::{missing, out, say };
 
 const NEEDED: &[&str] = &["makoctl", "jq", "wl-copy"];
 

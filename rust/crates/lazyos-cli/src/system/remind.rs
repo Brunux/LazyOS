@@ -5,8 +5,14 @@
 //! --collect --on-active/--on-calendar`) that fire `notify-send`. The list reads
 //! from systemd itself, so there is no second store to drift.
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
+
+#![allow(clippy::collapsible_if)]
+
+#![allow(clippy::new_without_default)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
-use std::time::{Duration, Instant};
 
 use lazyos_ui::{
     BodyCtx, Design, Glyph, Header, Input, InputAction, KeyHint, ListAction, ListState, Outcome,

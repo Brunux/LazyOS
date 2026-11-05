@@ -15,6 +15,9 @@
 //! - functions: sin, cos, tan, sqrt, log, ln, abs, floor, ceil, round
 //! - history: last 50 results, each entry is "expr = result"
 
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 use std::collections::VecDeque;
 

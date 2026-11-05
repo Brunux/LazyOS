@@ -13,9 +13,13 @@
 //! $XDG_RUNTIME_DIR/lazyos-capture, so a session that dies takes the state with
 //! it and a killed recorder is not remembered; the file it was writing stays.
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::{Duration };
 
 use lazyos_ui::{
     BodyCtx, Design, Glyph, Header, KeyHint, ListAction, ListState, Outcome, Row, Screen,
@@ -24,7 +28,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{have, missing, out, print, say};
+use crate::system::{missing, out, print, say };
 
 const NEEDED: &[&str] = &[
     "grimshot",

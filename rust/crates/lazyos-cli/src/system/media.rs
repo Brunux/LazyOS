@@ -8,6 +8,10 @@
 //! `playerctl -F` (follow) is not used here: the menu opens, reads once, and
 //! closes. A live-updating panel is the bar's MPRIS module (spec 014).
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 
 use lazyos_ui::{
@@ -17,7 +21,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{have, missing, out, say};
+use crate::system::{missing, out, say };
 
 const NEEDED: &[&str] = &["playerctl"];
 

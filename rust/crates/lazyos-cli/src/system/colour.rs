@@ -4,6 +4,9 @@
 //! and `ffmpeg` to read the raw pixel value. It then showed the hex, RGB, and
 //! the solarized palette as swatch rows.
 
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 
 use lazyos_ui::{

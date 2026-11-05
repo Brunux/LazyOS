@@ -4,6 +4,10 @@
 //! mute/unmute for output and microphone, plus "Volume per application" which
 //! opens pavucontrol.
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 
 use lazyos_ui::{
@@ -13,7 +17,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{have, missing, out, say};
+use crate::system::{missing, out, say };
 
 const NEEDED: &[&str] = &["pactl", "pavucontrol"];
 

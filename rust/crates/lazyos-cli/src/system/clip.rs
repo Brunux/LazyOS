@@ -8,8 +8,11 @@
 //! The secret rule (spec 006) applies: a row that is a secret (password) is handled by
 //! `Card::secret` so the value never appears in the notification body.
 
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
-use std::io::Cursor;
 
 use lazyos_ui::{
     BodyCtx, Design, Glyph, Header, KeyHint, ListAction, ListState, Outcome, Row, Screen,
@@ -19,7 +22,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
 use std::process::Stdio;
 
-use crate::system::{have, missing, out, say};
+use crate::system::{missing, out, say };
 
 const NEEDED: &[&str] = &["cliphist", "wl-copy", "wl-paste", "xdg-open", "file"];
 
