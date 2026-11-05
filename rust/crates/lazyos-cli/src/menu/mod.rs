@@ -389,7 +389,22 @@ mod tests {
             .collect();
         assert_eq!(
             added,
-            vec!["ask", "format", "display", "media", "notify", "clip", "emoji", "capture", "qr", "remind", "calc", "colour", "audio", "bluetooth"],
+            vec![
+                "ask",
+                "format",
+                "display",
+                "media",
+                "notify",
+                "clip",
+                "emoji",
+                "capture",
+                "qr",
+                "remind",
+                "calc",
+                "colour",
+                "audio",
+                "bluetooth"
+            ],
             "the rows spec 010 and spec 011 add"
         );
     }
