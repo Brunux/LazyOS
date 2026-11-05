@@ -41,8 +41,5 @@ LazyOS · Menu                                                                  
 │       Developer  profile export and restore, diagnostics                                                                                   system   │
 │       Capture  screenshot, annotate, OCR, QR, record                                                                                       system   │
 │   qr   QR code  Wi-Fi network or any text                                                                                                   system   │
-│       Colour  pick a pixel, see the palette                                                                                                system   │
-│       About  kernel, uptime, memory, battery                                                                                               system   │
-│       Reminders  write it now, be told later                                                                                               session   │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close

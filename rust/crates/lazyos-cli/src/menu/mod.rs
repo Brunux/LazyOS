@@ -389,23 +389,8 @@ mod tests {
             .collect();
         assert_eq!(
             added,
-            vec![
-                "ask",
-                "format",
-                "display",
-                "media",
-                "notify",
-                "clip",
-                "emoji",
-                "capture",
-                "qr",
-                "remind",
-                "calc",
-                "colour",
-                "audio",
-                "bluetooth"
-            ],
-            "the rows spec 010 and spec 011 add"
+            vec!["ask", "format", "display"],
+            "the rows spec 007 and spec 010 add to ROOT (spec 011 entries are in BAR_MENU_KEYS)"
         );
     }
 
