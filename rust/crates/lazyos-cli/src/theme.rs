@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 
 use lazyos_theme::store::{self, Outcome, Paths};
-use lazyos_theme::{SURFACES, Theme, builtin};
+use lazyos_theme::{SURFACES, Theme, builtin, wallpaper};
 
 use crate::command::Resolved;
 
@@ -268,6 +268,15 @@ fn set(paths: &Paths, args: &[&str]) -> i32 {
             return EXIT_USAGE;
         }
     };
+
+    // Generate the wallpaper and thumbnail for the theme (spec 013).
+    let _ = wallpaper::get_or_generate(
+        &theme,
+        slug,
+        lazyos_theme::wallpaper::DEFAULT_WIDTH,
+        lazyos_theme::wallpaper::DEFAULT_HEIGHT,
+    );
+    let _ = wallpaper::generate_thumbnail(&theme, slug);
 
     let mut written = 0;
     let mut unchanged = 0;

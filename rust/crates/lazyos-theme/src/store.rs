@@ -30,7 +30,7 @@ pub struct Surface {
 
 /// The session's surfaces. A new one is one line here and one template file -
 /// and a golden test, because the test renders whatever is in this table.
-pub const SURFACES: [Surface; 11] = [
+pub const SURFACES: [Surface; 12] = [
     Surface {
         name: "foot",
         template: include_str!("../templates/foot.ini.tpl"),
@@ -85,6 +85,11 @@ pub const SURFACES: [Surface; 11] = [
         name: "sway",
         template: include_str!("../templates/sway-theme.conf.tpl"),
         target: ".config/sway/config.d/35-theme.conf",
+    },
+    Surface {
+        name: "greeter",
+        template: include_str!("../templates/greeter.tpl"),
+        target: ".config/lazyos/greeter",
     },
 ];
 
