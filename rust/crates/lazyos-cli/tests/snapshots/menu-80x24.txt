@@ -1,4 +1,4 @@
-LazyOS · Menu                                                           46 rows
+LazyOS · Menu                                                           49 rows
 ────────────────────────────────────────────────────────────────────────────────
 ╭ Menu ────────────────────────────────────────────────────────────────────────╮
 │  type to filter: a name, a word of it, or `system`                          │
@@ -13,12 +13,12 @@ LazyOS · Menu                                                           46 rows
 │       Settings  Wi-Fi, Bluetooth, night light, tablet mode, rotation open   │
 │       Learn  the manual, with search                                 open   │
 │   kbd  Keybindings  every binding, from the configuration             open   │
+│       Applications  desktop entries, icons, frecency                 open   │
+│       Window switcher  focus or close any window                     open   │
+│       Run command  PATH completion, Shift+Enter in foot              open   │
 │   =    Calculator  type it, Enter copies the result                   open   │
 │       Emoji  type a name, insert the glyph                           open   │
 │       Clipboard  what was copied, back in one pick                   open   │
 │       Password  32 random characters, into the clipboard             open   │
-│       SSH  remote login status                                       open   │
-│       Agent session  ● opencode, in ~/Work                             ai   │
-│       Ask  one question, the answer here                               ai   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close

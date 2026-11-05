@@ -247,7 +247,10 @@ pub const ROOT: &[MenuItem] = &[
         "the manual, with search",
         Glyph::Book,
         Open,
-        session("rofi-learn"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("learn")],
+        },
     ),
     item(
         "keys",
@@ -255,7 +258,43 @@ pub const ROOT: &[MenuItem] = &[
         "every binding, from the configuration",
         Glyph::Keyboard,
         Open,
-        session("rofi-keys"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("keys")],
+        },
+    ),
+    item(
+        "apps",
+        "Applications",
+        "desktop entries, icons, frecency",
+        Glyph::Desktop,
+        Open,
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("apps")],
+        },
+    ),
+    item(
+        "window",
+        "Window switcher",
+        "focus or close any window",
+        Glyph::Window,
+        Open,
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("window")],
+        },
+    ),
+    item(
+        "run",
+        "Run command",
+        "PATH completion, Shift+Enter in foot",
+        Glyph::Terminal,
+        Open,
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("run")],
+        },
     ),
     item(
         "calc",
@@ -491,7 +530,10 @@ pub const ROOT: &[MenuItem] = &[
         "search, then install one",
         Glyph::Box,
         System,
-        session("rofi-pkg"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("pkg")],
+        },
     ),
     item(
         "dev",
@@ -499,7 +541,10 @@ pub const ROOT: &[MenuItem] = &[
         "profile export and restore, diagnostics",
         Glyph::Database,
         System,
-        session("rofi-dev"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("dev")],
+        },
     ),
     item(
         "capture",
@@ -540,7 +585,10 @@ pub const ROOT: &[MenuItem] = &[
         "kernel, uptime, memory, battery",
         Glyph::Info,
         System,
-        session("rofi-about"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("about")],
+        },
     ),
     item(
         "remind",
@@ -697,6 +745,9 @@ pub const BAR_MENU_KEYS: &[&str] = &[
     "settings",
     "learn",
     "keys",
+    "apps",
+    "window",
+    "run",
     "calc",
     "emoji",
     "clip",
