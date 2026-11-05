@@ -19,7 +19,7 @@
 #![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
 use std::path::Path;
-use std::time::{Duration };
+use std::time::Duration;
 
 use lazyos_ui::{
     BodyCtx, Design, Glyph, Header, KeyHint, ListAction, ListState, Outcome, Row, Screen,
@@ -28,7 +28,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{missing, out, print, say };
+use crate::system::{missing, out, print, say};
 
 const NEEDED: &[&str] = &[
     "grimshot",

@@ -16,7 +16,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{missing, out, say };
+use crate::system::{missing, out, say};
 
 const NEEDED: &[&str] = &["bluetoothctl", "foot"];
 

@@ -7,9 +7,7 @@
 
 #![allow(unused_imports)]
 #![allow(dead_code)]
-
 #![allow(clippy::collapsible_if)]
-
 #![allow(clippy::new_without_default)]
 #![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;

@@ -22,7 +22,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
 use std::process::Stdio;
 
-use crate::system::{missing, out, say };
+use crate::system::{missing, out, say};
 
 const NEEDED: &[&str] = &["cliphist", "wl-copy", "wl-paste", "xdg-open", "file"];
 

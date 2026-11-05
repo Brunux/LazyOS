@@ -21,7 +21,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{missing, out, say, sudo };
+use crate::system::{missing, out, say, sudo};
 
 const NEEDED: &[&str] = &["qrencode", "nmcli", "sudo", "foot"];
 
