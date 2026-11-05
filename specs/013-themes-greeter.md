@@ -1,6 +1,6 @@
 # Spec 013 — The seven themes, wallpapers and the greeter
 
-- **Status**: draft
+- **Status**: in progress (code merged in PR #30, shipped in v0.4.2; hardware report pending)
 - **Phase**: 5
 - **Depends on**: 004, 006
 - **Model**: `claude-sonnet-5-5` (effort `high`) — palette data across seven themes, greeter

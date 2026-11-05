@@ -1,6 +1,6 @@
 # Spec 012 — Launcher, window switcher, run and the reference surfaces
 
-- **Status**: draft
+- **Status**: in progress (code merged in PR #29; hardware report pending)
 - **Phase**: 4
 - **Depends on**: 001-007, 009
 - **Model**: `claude-sonnet-5-5` (effort `high`) — `.desktop` parsing, sway IPC, generated keys

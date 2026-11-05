@@ -1,6 +1,9 @@
 # Spec 015 — The browser bar
 
 - **Status**: draft
+- **Note**: PR #10 was merged from a branch named `spec/015-browser-bar`, but its commits are
+  spec 004's (`theme.toml`, the eight built-ins, the 004 report). The browser bar itself is
+  unbuilt: no `lazyos browser` command exists, so nothing here has landed by accident.
 - **Optional**: **yes** — not on the critical path. The session works with Firefox's own
   toolbar; this spec exists because the maintainer asked for the idea to be written down and
   validated, and the decision to build it is theirs. Nothing depends on it.

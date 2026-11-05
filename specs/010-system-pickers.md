@@ -1,6 +1,6 @@
 # Spec 010 — System pickers
 
-- **Status**: draft
+- **Status**: in progress (code merged in PR #27; hardware report pending)
 - **Phase**: 3
 - **Depends on**: 002, 003, 004, 005, 006
 - **Model**: `claude-sonnet-5-5` (effort `high`) — many dialogs sharing one shape, each with a

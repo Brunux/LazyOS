@@ -1,6 +1,6 @@
 # Spec 011 — Media and utility pickers
 
-- **Status**: draft
+- **Status**: in progress (code merged in PR #28; hardware report pending)
 - **Phase**: 3
 - **Depends on**: 002, 003, 005, 006
 - **Model**: `claude-haiku-5-5` — a fixed shape repeated over ten surfaces, with fixtures and a
