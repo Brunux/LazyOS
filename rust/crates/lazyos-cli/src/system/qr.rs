@@ -58,10 +58,16 @@ impl QrScreen {
     }
 
     fn get_wifi_status() -> (String, lazyos_ui::ColorRole) {
-        let dev = out(&["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"]).unwrap_or_default();
-        let dev = dev.lines().find(|l| l.split(':').nth(1) == Some("wifi")).and_then(|l| l.split(':').next()).map(|s| s.to_string());
+        let dev =
+            out(&["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"]).unwrap_or_default();
+        let dev = dev
+            .lines()
+            .find(|l| l.split(':').nth(1) == Some("wifi"))
+            .and_then(|l| l.split(':').next())
+            .map(|s| s.to_string());
         if let Some(dev) = dev {
-            let con = out(&["nmcli", "-g", "GENERAL.CONNECTION", "device", "show", &dev]).unwrap_or_default();
+            let con = out(&["nmcli", "-g", "GENERAL.CONNECTION", "device", "show", &dev])
+                .unwrap_or_default();
             let con = con.lines().next().unwrap_or("").trim();
             if !con.is_empty() && con != "--" {
                 return (con.to_string(), lazyos_ui::ColorRole::Ok);
@@ -72,15 +78,18 @@ impl QrScreen {
 
     fn build_rows(&mut self) {
         let mut rows = Vec::new();
-        rows.push(Row::new("Wi-Fi network")
-            .glyph(Glyph::Wifi)
-            .detail(self.wifi_detail.clone())
-            .value("wifi")
-            );
-        rows.push(Row::new("Any text")
-            .glyph(Glyph::Qr)
-            .detail("type it, and it becomes a code")
-            .value("text"));
+        rows.push(
+            Row::new("Wi-Fi network")
+                .glyph(Glyph::Wifi)
+                .detail(self.wifi_detail.clone())
+                .value("wifi"),
+        );
+        rows.push(
+            Row::new("Any text")
+                .glyph(Glyph::Qr)
+                .detail("type it, and it becomes a code")
+                .value("text"),
+        );
         self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
@@ -108,19 +117,49 @@ impl QrScreen {
     }
 
     fn wifi_qr(&self) {
-        let dev = out(&["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"]).unwrap_or_default();
-        let dev = dev.lines().find(|l| l.split(':').nth(1) == Some("wifi")).and_then(|l| l.split(':').next());
+        let dev =
+            out(&["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"]).unwrap_or_default();
+        let dev = dev
+            .lines()
+            .find(|l| l.split(':').nth(1) == Some("wifi"))
+            .and_then(|l| l.split(':').next());
         if let Some(dev) = dev {
-            let con = out(&["nmcli", "-g", "GENERAL.CONNECTION", "device", "show", dev]).unwrap_or_default();
+            let con = out(&["nmcli", "-g", "GENERAL.CONNECTION", "device", "show", dev])
+                .unwrap_or_default();
             let con = con.lines().next().unwrap_or("").trim();
             if !con.is_empty() && con != "--" {
-                let ssid = out(&["nmcli", "-g", "802-11-wireless.ssid", "connection", "show", con]).unwrap_or_default().trim().to_string();
+                let ssid = out(&[
+                    "nmcli",
+                    "-g",
+                    "802-11-wireless.ssid",
+                    "connection",
+                    "show",
+                    con,
+                ])
+                .unwrap_or_default()
+                .trim()
+                .to_string();
                 if !ssid.is_empty() {
-                    let psk = sudo(&["nmcli", "-s", "-g", "802-11-wireless-security.psk", "connection", "show", con]).unwrap_or_default().trim().to_string();
+                    let psk = sudo(&[
+                        "nmcli",
+                        "-s",
+                        "-g",
+                        "802-11-wireless-security.psk",
+                        "connection",
+                        "show",
+                        con,
+                    ])
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string();
                     let payload = if psk.is_empty() {
                         format!("WIFI:T:nopass;S:{};;", Self::qr_escape(&ssid))
                     } else {
-                        format!("WIFI:T:WPA;S:{};P:{};;", Self::qr_escape(&ssid), Self::qr_escape(&psk))
+                        format!(
+                            "WIFI:T:WPA;S:{};P:{};;",
+                            Self::qr_escape(&ssid),
+                            Self::qr_escape(&psk)
+                        )
                     };
                     Self::show_qr(&payload, &format!("Wi-Fi · {}", con));
                 }
@@ -131,7 +170,12 @@ impl QrScreen {
     fn text_qr(&self) {
         // For now, we can't easily prompt for text in this context
         // The old script used bar-pick -free; we'll just say it's not available
-        say("QR code", "Text input not available from this menu; use the command line", lazyos_ui::Urgency::Normal, Glyph::Qr);
+        say(
+            "QR code",
+            "Text input not available from this menu; use the command line",
+            lazyos_ui::Urgency::Normal,
+            Glyph::Qr,
+        );
     }
 }
 
@@ -139,7 +183,12 @@ impl Screen for QrScreen {
     fn draw(&mut self, ctx: &mut BodyCtx) {
         draw_card(ctx.buf, ctx.area, ctx.design, Some("QR code"), true);
         let (filter, rows) = super::pick::list_layout(ctx.area);
-        ctx.buf.set_string(filter.x, filter.y, "Enter shows the code · Escape closes", ctx.design.style(TextStyle::Dim));
+        ctx.buf.set_string(
+            filter.x,
+            filter.y,
+            "Enter shows the code · Escape closes",
+            ctx.design.style(TextStyle::Dim),
+        );
         self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
     }
@@ -179,7 +228,6 @@ impl Screen for QrScreen {
 }
 
 impl QrScreen {
-
     fn activate(&mut self, index: usize) -> Outcome {
         let rows = self.list.rows();
         if index >= rows.len() {
@@ -196,7 +244,6 @@ impl QrScreen {
         }
         Outcome::Continue
     }
-
 }
 
 /// `lazyos menu qr` (`rofi-qr`): the window.

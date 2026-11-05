@@ -15,9 +15,16 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
 
-use crate::system::{have, missing, out, say, print};
+use crate::system::{have, missing, out, print, say};
 
-const NEEDED: &[&str] = &["systemd-run", "systemctl", "systemd-analyze", "date", "wl-copy", "jq"];
+const NEEDED: &[&str] = &[
+    "systemd-run",
+    "systemctl",
+    "systemd-analyze",
+    "date",
+    "wl-copy",
+    "jq",
+];
 const PREFIX: &str = "lazyos-reminder-";
 const TAB: &str = "\t";
 
@@ -64,32 +71,58 @@ impl RemindScreen {
 
     fn get_reminders() -> Vec<Reminder> {
         let output = out(&[
-            "systemctl", "--user", "list-timers", "--all", "--output=json",
+            "systemctl",
+            "--user",
+            "list-timers",
+            "--all",
+            "--output=json",
             &format!("{}*", PREFIX),
-        ]).unwrap_or_default();
+        ])
+        .unwrap_or_default();
         let mut reminders = Vec::new();
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output) {
             if let Some(arr) = json.as_array() {
                 for item in arr {
-                    let unit = item.get("unit").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let unit = item
+                        .get("unit")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
                     let next = item.get("next").and_then(|v| v.as_u64()).unwrap_or(0) / 1_000_000;
                     if next == 0 || next <= now {
                         continue;
                     }
                     let props = out(&[
-                        "systemctl", "--user", "show", "-p", "Description", "-p", "TimersCalendar", &unit
-                    ]).unwrap_or_default();
+                        "systemctl",
+                        "--user",
+                        "show",
+                        "-p",
+                        "Description",
+                        "-p",
+                        "TimersCalendar",
+                        &unit,
+                    ])
+                    .unwrap_or_default();
                     let mut desc = String::new();
                     let mut cal = String::new();
                     for line in props.lines() {
                         if line.starts_with("Description=") {
                             desc = line["Description=".len()..].to_string();
                         } else if line.starts_with("TimersCalendar=") {
-                            cal = line["TimersCalendar={ OnCalendar=".len()..].trim_end_matches('}').to_string();
+                            cal = line["TimersCalendar={ OnCalendar=".len()..]
+                                .trim_end_matches('}')
+                                .to_string();
                         }
                     }
-                    let title = desc.split(TAB).next().unwrap_or("(untitled reminder)").to_string();
+                    let title = desc
+                        .split(TAB)
+                        .next()
+                        .unwrap_or("(untitled reminder)")
+                        .to_string();
                     let note = desc.split(TAB).nth(1).unwrap_or("").to_string();
                     reminders.push(Reminder {
                         unit,
@@ -152,7 +185,10 @@ impl RemindScreen {
             }
             d if d.contains('-') && d.chars().next().unwrap().is_ascii_digit() => {
                 // One-shot date
-                let _ = chrono::NaiveDateTime::parse_from_str(&format!("{} {}", d, hm), "%Y-%m-%d %H:%M");
+                let _ = chrono::NaiveDateTime::parse_from_str(
+                    &format!("{} {}", d, hm),
+                    "%Y-%m-%d %H:%M",
+                );
                 None
             }
             _ => Some("repeating".to_string()),
@@ -170,25 +206,48 @@ impl RemindScreen {
 
     fn build_rows(&mut self) {
         let mut rows = Vec::new();
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         if self.reminders.is_empty() {
-            rows.push(Row::new("No reminders waiting").glyph(Glyph::Clock).detail("The row below starts one"));
+            rows.push(
+                Row::new("No reminders waiting")
+                    .glyph(Glyph::Clock)
+                    .detail("The row below starts one"),
+            );
         } else {
             for r in &self.reminders {
-                let words = r.calendar.as_ref().and_then(|c| Self::repeat_words(c)).unwrap_or_else(|| Self::left(r.when.saturating_sub(now)));
-                let mut detail = format!("{} · {}", words, chrono::DateTime::from_timestamp(r.when as i64, 0).map(|d| d.format("%a %d %b %H:%M").to_string()).unwrap_or_default());
+                let words = r
+                    .calendar
+                    .as_ref()
+                    .and_then(|c| Self::repeat_words(c))
+                    .unwrap_or_else(|| Self::left(r.when.saturating_sub(now)));
+                let mut detail = format!(
+                    "{} · {}",
+                    words,
+                    chrono::DateTime::from_timestamp(r.when as i64, 0)
+                        .map(|d| d.format("%a %d %b %H:%M").to_string())
+                        .unwrap_or_default()
+                );
                 detail.push_str(" · Enter cancels");
                 if !r.note.is_empty() {
                     detail = format!("{} · {}", Self::trim(&r.note, 40), detail);
                 }
-                rows.push(Row::new(Self::trim(&r.title, 72))
-                    .glyph(Glyph::Clock)
-                    .detail(detail)
-                    .value(format!("cancel:{}", r.unit))
-                    );
+                rows.push(
+                    Row::new(Self::trim(&r.title, 72))
+                        .glyph(Glyph::Clock)
+                        .detail(detail)
+                        .value(format!("cancel:{}", r.unit)),
+                );
             }
         }
-        rows.push(Row::new("New reminder").glyph(Glyph::Bell).detail("say what, when, and whether it repeats").value("new"));
+        rows.push(
+            Row::new("New reminder")
+                .glyph(Glyph::Bell)
+                .detail("say what, when, and whether it repeats")
+                .value("new"),
+        );
         self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
@@ -203,7 +262,12 @@ impl Screen for RemindScreen {
         } else {
             "{} waiting · Enter cancels one · Escape closes"
         };
-        ctx.buf.set_string(filter.x, filter.y, &msg.replace("{}", &self.reminders.len().to_string()), ctx.design.style(TextStyle::Dim));
+        ctx.buf.set_string(
+            filter.x,
+            filter.y,
+            &msg.replace("{}", &self.reminders.len().to_string()),
+            ctx.design.style(TextStyle::Dim),
+        );
         self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
     }
@@ -227,7 +291,6 @@ impl Screen for RemindScreen {
             _ => Outcome::Continue,
         }
     }
-
 
     fn click(&mut self, row: Option<usize>) -> Outcome {
         if let Some(row) = row {
@@ -254,7 +317,6 @@ impl Screen for RemindScreen {
 }
 
 impl RemindScreen {
-
     fn activate(&mut self, index: usize) -> Outcome {
         let rows = self.list.rows();
         if index >= rows.len() {
@@ -272,7 +334,11 @@ impl RemindScreen {
         } else if key.starts_with("cancel:") {
             let unit = &key[7..];
             if let Some(r) = self.reminders.iter().find(|r| r.unit == unit) {
-                let name = if r.title.is_empty() { "The reminder" } else { &r.title };
+                let name = if r.title.is_empty() {
+                    "The reminder"
+                } else {
+                    &r.title
+                };
                 let said = format!("“{}”", name);
                 let output = std::process::Command::new("systemctl")
                     .args(["--user", "stop", unit])
@@ -282,11 +348,18 @@ impl RemindScreen {
                     .status();
                 if output.map(|s| s.success()).unwrap_or(false) {
                     let mut msg = said;
-                    msg.push_str("
-It will not fire.");
+                    msg.push_str(
+                        "
+It will not fire.",
+                    );
                     say("Cancelled", msg, lazyos_ui::Urgency::Normal, Glyph::Clock);
                 } else {
-                    say("Already gone", format!("{} was already gone.", said), lazyos_ui::Urgency::Critical, Glyph::Clock);
+                    say(
+                        "Already gone",
+                        format!("{} was already gone.", said),
+                        lazyos_ui::Urgency::Critical,
+                        Glyph::Clock,
+                    );
                 }
                 self.reload();
             }
@@ -299,7 +372,12 @@ It will not fire.");
     fn run_new_reminder_flow(&mut self) {
         // This is a simplified version - in reality this would be a multi-step flow
         // similar to the old script. For now, we'll just say it's not fully implemented.
-        say("Reminders", "New reminder flow not yet fully ported; use the command line", lazyos_ui::Urgency::Normal, Glyph::Clock);
+        say(
+            "Reminders",
+            "New reminder flow not yet fully ported; use the command line",
+            lazyos_ui::Urgency::Normal,
+            Glyph::Clock,
+        );
     }
 
     fn list_layout(area: Rect) -> (Rect, Rect) {

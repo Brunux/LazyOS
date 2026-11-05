@@ -96,7 +96,11 @@ impl ClipScreen {
         let mut rows = Vec::new();
         let mut keys = Vec::new();
         if self.entries.is_empty() {
-            rows.push(Row::new("Nothing has been copied yet").glyph(Glyph::Clipboard).detail("The history fills as you copy things"));
+            rows.push(
+                Row::new("Nothing has been copied yet")
+                    .glyph(Glyph::Clipboard)
+                    .detail("The history fills as you copy things"),
+            );
             keys.push("".to_string());
         } else {
             for e in &self.entries {
@@ -110,13 +114,28 @@ impl ClipScreen {
                 } else {
                     e.preview.clone()
                 };
-                rows.push(Row::new(shown).glyph(glyph).detail(kind_str).value(e.id.clone()));
+                rows.push(
+                    Row::new(shown)
+                        .glyph(glyph)
+                        .detail(kind_str)
+                        .value(e.id.clone()),
+                );
                 keys.push(e.id.clone());
             }
         }
-        rows.push(Row::new("Save the newest image").glyph(Glyph::Image).detail("to ~/Pictures/clipboard and open it").value("save"));
+        rows.push(
+            Row::new("Save the newest image")
+                .glyph(Glyph::Image)
+                .detail("to ~/Pictures/clipboard and open it")
+                .value("save"),
+        );
         keys.push("save".to_string());
-        rows.push(Row::new("Clear the history").glyph(Glyph::Trash).detail(format!("{} entries", self.entries.len())).value("wipe"));
+        rows.push(
+            Row::new("Clear the history")
+                .glyph(Glyph::Trash)
+                .detail(format!("{} entries", self.entries.len()))
+                .value("wipe"),
+        );
         keys.push("wipe".to_string());
         self.keys = keys;
         self.list.set_rows(rows);
@@ -132,7 +151,8 @@ impl Screen for ClipScreen {
         } else {
             "Enter copies back · Alt+1 deletes that entry · Escape closes"
         };
-        ctx.buf.set_string(filter.x, filter.y, msg, ctx.design.style(TextStyle::Dim));
+        ctx.buf
+            .set_string(filter.x, filter.y, msg, ctx.design.style(TextStyle::Dim));
         self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
     }
@@ -148,7 +168,10 @@ impl Screen for ClipScreen {
                 if index < self.entries.len() {
                     let deleted = std::process::Command::new("sh")
                         .arg("-c")
-                        .arg(format!("echo '{}' | cliphist delete", self.entries[index].id))
+                        .arg(format!(
+                            "echo '{}' | cliphist delete",
+                            self.entries[index].id
+                        ))
                         .stdin(Stdio::null())
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
@@ -156,10 +179,20 @@ impl Screen for ClipScreen {
                         .map(|s| s.success())
                         .unwrap_or(false);
                     if deleted {
-                        say("Clipboard", "Entry deleted from the history", lazyos_ui::Urgency::Normal, Glyph::Trash);
+                        say(
+                            "Clipboard",
+                            "Entry deleted from the history",
+                            lazyos_ui::Urgency::Normal,
+                            Glyph::Trash,
+                        );
                         self.reload();
                     } else {
-                        say("Clipboard", "Could not delete that entry", lazyos_ui::Urgency::Critical, Glyph::Trash);
+                        say(
+                            "Clipboard",
+                            "Could not delete that entry",
+                            lazyos_ui::Urgency::Critical,
+                            Glyph::Trash,
+                        );
                     }
                 }
                 return Outcome::Continue;
@@ -171,7 +204,8 @@ impl Screen for ClipScreen {
                 if let Some(index) = self.list.selected_index() {
                     if index < self.entries.len() {
                         let entry = &self.entries[index];
-                        let decode_output = out(&["cliphist", "decode", &entry.id]).unwrap_or_default();
+                        let decode_output =
+                            out(&["cliphist", "decode", &entry.id]).unwrap_or_default();
                         if !decode_output.is_empty() {
                             let copied = std::process::Command::new("wl-copy")
                                 .stdin(Stdio::piped())
@@ -182,16 +216,29 @@ impl Screen for ClipScreen {
                                 .unwrap_or(false);
                             if copied {
                                 let msg = match self.entries[index].kind {
-                                    ClipKind::Image => "Image copied back to the clipboard".to_string(),
+                                    ClipKind::Image => {
+                                        "Image copied back to the clipboard".to_string()
+                                    }
                                     _ => {
                                         let preview = &self.entries[index].preview;
-                                        let shown = preview.trim().replace("\n", " ").replace("\t", " ");
+                                        let shown =
+                                            preview.trim().replace("\n", " ").replace("\t", " ");
                                         format!("Copied: {}", shown)
                                     }
                                 };
-                                say("Clipboard", msg, lazyos_ui::Urgency::Normal, Glyph::Clipboard);
+                                say(
+                                    "Clipboard",
+                                    msg,
+                                    lazyos_ui::Urgency::Normal,
+                                    Glyph::Clipboard,
+                                );
                             } else {
-                                say("Clipboard", "Could not copy that entry back", lazyos_ui::Urgency::Critical, Glyph::Clipboard);
+                                say(
+                                    "Clipboard",
+                                    "Could not copy that entry back",
+                                    lazyos_ui::Urgency::Critical,
+                                    Glyph::Clipboard,
+                                );
                             }
                         }
                     }
@@ -220,23 +267,36 @@ impl Screen for ClipScreen {
                                 ClipKind::Image => "Image copied back to the clipboard".to_string(),
                                 _ => {
                                     let preview = &self.entries[index].preview;
-                                    let shown = preview.trim().replace("
-", " ").replace("	", " ");
+                                    let shown = preview
+                                        .trim()
+                                        .replace(
+                                            "
+", " ",
+                                        )
+                                        .replace("	", " ");
                                     format!("Copied: {}", shown)
                                 }
                             };
-                            say("Clipboard", msg, lazyos_ui::Urgency::Normal, Glyph::Clipboard);
+                            say(
+                                "Clipboard",
+                                msg,
+                                lazyos_ui::Urgency::Normal,
+                                Glyph::Clipboard,
+                            );
                         } else {
-                            say("Clipboard", "Could not copy that entry back", lazyos_ui::Urgency::Critical, Glyph::Clipboard);
+                            say(
+                                "Clipboard",
+                                "Could not copy that entry back",
+                                lazyos_ui::Urgency::Critical,
+                                Glyph::Clipboard,
+                            );
                         }
                     }
                     return Outcome::Continue;
                 }
                 return Outcome::Continue;
             }
-            ListAction::Ignored | ListAction::Moved => {
-                Outcome::Continue
-            }
+            ListAction::Ignored | ListAction::Moved => Outcome::Continue,
         }
     }
 
@@ -281,7 +341,12 @@ impl ClipScreen {
         let entry = &self.entries[index];
         let decode_output = out(&["cliphist", "decode", &entry.id]).unwrap_or_default();
         if decode_output.is_empty() {
-            say("Clipboard", "Could not copy that entry back", lazyos_ui::Urgency::Critical, Glyph::Clipboard);
+            say(
+                "Clipboard",
+                "Could not copy that entry back",
+                lazyos_ui::Urgency::Critical,
+                Glyph::Clipboard,
+            );
             return Outcome::Continue;
         }
         let copied = std::process::Command::new("wl-copy")
@@ -300,9 +365,19 @@ impl ClipScreen {
                     format!("Copied: {}", shown)
                 }
             };
-            say("Clipboard", msg, lazyos_ui::Urgency::Normal, Glyph::Clipboard);
+            say(
+                "Clipboard",
+                msg,
+                lazyos_ui::Urgency::Normal,
+                Glyph::Clipboard,
+            );
         } else {
-            say("Clipboard", "Could not copy that entry back", lazyos_ui::Urgency::Critical, Glyph::Clipboard);
+            say(
+                "Clipboard",
+                "Could not copy that entry back",
+                lazyos_ui::Urgency::Critical,
+                Glyph::Clipboard,
+            );
         }
         Outcome::Continue
     }
@@ -335,15 +410,29 @@ mod tests {
     fn clip_entry_classification() {
         assert_eq!(
             ClipKind::Image,
-            if "[[ binary data 1234 png 640x480 ]]".starts_with("[[ binary data") { ClipKind::Image } else { ClipKind::Text }
+            if "[[ binary data 1234 png 640x480 ]]".starts_with("[[ binary data") {
+                ClipKind::Image
+            } else {
+                ClipKind::Text
+            }
         );
         assert_eq!(
             ClipKind::Link,
-            if "http://example.com".starts_with("http://") { ClipKind::Link } else { ClipKind::Text }
+            if "http://example.com".starts_with("http://") {
+                ClipKind::Link
+            } else {
+                ClipKind::Text
+            }
         );
         assert_eq!(
             ClipKind::Text,
-            if "plain text".starts_with("[[ binary data") { ClipKind::Image } else if "plain text".starts_with("http") { ClipKind::Link } else { ClipKind::Text }
+            if "plain text".starts_with("[[ binary data") {
+                ClipKind::Image
+            } else if "plain text".starts_with("http") {
+                ClipKind::Link
+            } else {
+                ClipKind::Text
+            }
         );
     }
 }

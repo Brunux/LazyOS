@@ -19,14 +19,14 @@ use std::cell::Cell;
 use std::collections::VecDeque;
 
 use lazyos_ui::{
-    BodyCtx, Design, Glyph, Header, Input, KeyHint, ListAction, ListState, Outcome,
-    Row, Screen, TextStyle, draw_card,
+    BodyCtx, Design, Glyph, Header, Input, KeyHint, ListAction, ListState, Outcome, Row, Screen,
+    TextStyle, draw_card,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
 
 use crate::paths::Paths;
-use crate::system::{have, missing, say, print};
+use crate::system::{have, missing, print, say};
 
 const MAX_HISTORY: usize = 50;
 
@@ -91,7 +91,11 @@ impl CalcScreen {
             let path = paths.state.join("calc-history");
             let _ = std::fs::write(
                 path,
-                self.history.iter().rev().map(|h| format!("{h}\n")).collect::<String>(),
+                self.history
+                    .iter()
+                    .rev()
+                    .map(|h| format!("{h}\n"))
+                    .collect::<String>(),
             );
         }
     }
@@ -102,7 +106,10 @@ impl CalcScreen {
         // Format with up to 9 decimal places, removing trailing zeros
         let formatted = format!("{value:.9}");
         if formatted.contains('.') {
-            Ok(formatted.trim_end_matches('0').trim_end_matches('.').to_string())
+            Ok(formatted
+                .trim_end_matches('0')
+                .trim_end_matches('.')
+                .to_string())
         } else {
             Ok(formatted)
         }
@@ -128,15 +135,13 @@ impl Screen for CalcScreen {
     fn draw(&mut self, ctx: &mut BodyCtx) {
         draw_card(ctx.buf, ctx.area, ctx.design, Some("Calculator"), true);
         let (filter, rows) = super::pick::list_layout(ctx.area);
-        let x = ctx
-            .buf
-            .set_string(
-                filter.x,
-                filter.y,
-                &format!("{} ", Glyph::Calculator.cell()),
-                ctx.design.style(TextStyle::Title),
-            );
-let x = filter.x + 1 + Glyph::Calculator.cell().len() as u16;
+        let x = ctx.buf.set_string(
+            filter.x,
+            filter.y,
+            &format!("{} ", Glyph::Calculator.cell()),
+            ctx.design.style(TextStyle::Title),
+        );
+        let x = filter.x + 1 + Glyph::Calculator.cell().len() as u16;
         let room = filter.right().saturating_sub(x);
         if self.list.filter().is_empty() {
             ctx.buf.set_string(
@@ -146,7 +151,12 @@ let x = filter.x + 1 + Glyph::Calculator.cell().len() as u16;
                 ctx.design.style(TextStyle::Dim),
             );
         } else {
-            ctx.buf.set_string(x, filter.y, self.list.filter(), ctx.design.style(TextStyle::Body));
+            ctx.buf.set_string(
+                x,
+                filter.y,
+                self.list.filter(),
+                ctx.design.style(TextStyle::Body),
+            );
         }
         self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
@@ -187,7 +197,12 @@ let x = filter.x + 1 + Glyph::Calculator.cell().len() as u16;
                             );
                         }
                         Err(e) => {
-                            say("Calculator", e, lazyos_ui::Urgency::Critical, Glyph::Calculator);
+                            say(
+                                "Calculator",
+                                e,
+                                lazyos_ui::Urgency::Critical,
+                                Glyph::Calculator,
+                            );
                         }
                     }
                     self.input = Input::new();
@@ -294,7 +309,11 @@ impl Parser {
                 break;
             }
             self.advance();
-            let next_min_prec = if matches!(assoc, Assoc::Right) { prec } else { prec + 1 };
+            let next_min_prec = if matches!(assoc, Assoc::Right) {
+                prec
+            } else {
+                prec + 1
+            };
             let rhs = self.parse_expression(next_min_prec)?;
             lhs = op.apply(lhs, rhs)?;
             self.skip_whitespace();

@@ -14,7 +14,7 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{have, missing, out, say, print};
+use crate::system::{have, missing, out, print, say};
 
 const NEEDED: &[&str] = &["makoctl", "jq", "wl-copy"];
 
@@ -45,10 +45,7 @@ impl NotifyScreen {
             dnd: false,
             list: ListState::new(),
             header: Header::new("LazyOS").subtitle("Notifications"),
-            keybar: vec![
-                KeyHint::new("Enter", "copy"),
-                KeyHint::new("Esc", "close"),
-            ],
+            keybar: vec![KeyHint::new("Enter", "copy"), KeyHint::new("Esc", "close")],
             rows_height: Cell::new(20),
         };
         screen.reload();
@@ -68,12 +65,33 @@ impl NotifyScreen {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output) {
             if let Some(arr) = json.as_array() {
                 for item in arr {
-                    let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let app = item.get("app_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let summary = item.get("summary").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let body = item.get("body").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let id = item
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let app = item
+                        .get("app_name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let summary = item
+                        .get("summary")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let body = item
+                        .get("body")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
                     if !id.is_empty() {
-                        notifications.push(Notification { id, app, summary, body });
+                        notifications.push(Notification {
+                            id,
+                            app,
+                            summary,
+                            body,
+                        });
                     }
                 }
             }
@@ -82,13 +100,19 @@ impl NotifyScreen {
     }
 
     fn get_dnd() -> bool {
-        out(&["makoctl", "mode"]).map(|m| m.contains("do-not-disturb")).unwrap_or(false)
+        out(&["makoctl", "mode"])
+            .map(|m| m.contains("do-not-disturb"))
+            .unwrap_or(false)
     }
 
     fn build_rows(&mut self) {
         let mut rows = Vec::new();
         if self.notifications.is_empty() {
-            rows.push(Row::new("Nothing in the history yet").glyph(Glyph::Bell).detail("Notifications land here after they expire"));
+            rows.push(
+                Row::new("Nothing in the history yet")
+                    .glyph(Glyph::Bell)
+                    .detail("Notifications land here after they expire"),
+            );
         } else {
             for n in &self.notifications {
                 let body_short = if n.body.len() > 64 {
@@ -97,16 +121,48 @@ impl NotifyScreen {
                     n.body.clone()
                 };
                 let detail = format!("{} · {}", n.app, body_short);
-                rows.push(Row::new(n.summary.clone()).glyph(Glyph::Bell).detail(detail).value(format!("id:{}", n.id)));
+                rows.push(
+                    Row::new(n.summary.clone())
+                        .glyph(Glyph::Bell)
+                        .detail(detail)
+                        .value(format!("id:{}", n.id)),
+                );
             }
         }
-        let dnd_label = if self.dnd { "Do not disturb · on" } else { "Do not disturb · off" };
-        let dnd_glyph = if self.dnd { Glyph::BellOff } else { Glyph::Bell };
-        let dnd_color = if self.dnd { lazyos_ui::ColorRole::Warn } else { lazyos_ui::ColorRole::Dim };
-        rows.push(Row::new(dnd_label).glyph(dnd_glyph).detail("toggle do-not-disturb").value("dnd"));
-        rows.push(Row::new("Restore the last one").glyph(Glyph::Undo).detail("back on screen").value("restore"));
+        let dnd_label = if self.dnd {
+            "Do not disturb · on"
+        } else {
+            "Do not disturb · off"
+        };
+        let dnd_glyph = if self.dnd {
+            Glyph::BellOff
+        } else {
+            Glyph::Bell
+        };
+        let dnd_color = if self.dnd {
+            lazyos_ui::ColorRole::Warn
+        } else {
+            lazyos_ui::ColorRole::Dim
+        };
+        rows.push(
+            Row::new(dnd_label)
+                .glyph(dnd_glyph)
+                .detail("toggle do-not-disturb")
+                .value("dnd"),
+        );
+        rows.push(
+            Row::new("Restore the last one")
+                .glyph(Glyph::Undo)
+                .detail("back on screen")
+                .value("restore"),
+        );
         let count = self.notifications.len();
-        rows.push(Row::new("Dismiss everything").glyph(Glyph::Trash).detail(format!("{} in the history", count)).value("dismiss"));
+        rows.push(
+            Row::new("Dismiss everything")
+                .glyph(Glyph::Trash)
+                .detail(format!("{} in the history", count))
+                .value("dismiss"),
+        );
         self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
@@ -121,7 +177,8 @@ impl Screen for NotifyScreen {
         } else {
             "Enter copies the notification · Escape closes"
         };
-        ctx.buf.set_string(filter.x, filter.y, msg, ctx.design.style(TextStyle::Dim));
+        ctx.buf
+            .set_string(filter.x, filter.y, msg, ctx.design.style(TextStyle::Dim));
         self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
     }
@@ -145,7 +202,6 @@ impl Screen for NotifyScreen {
             _ => Outcome::Continue,
         }
     }
-
 
     fn click(&mut self, row: Option<usize>) -> Outcome {
         if let Some(row) = row {
@@ -172,7 +228,6 @@ impl Screen for NotifyScreen {
 }
 
 impl NotifyScreen {
-
     fn activate(&mut self, index: usize) -> Outcome {
         let rows = self.list.rows();
         if index >= rows.len() {
@@ -188,8 +243,11 @@ impl NotifyScreen {
                 let text = if n.body.is_empty() {
                     n.summary.clone()
                 } else {
-                    format!("{}
-{}", n.summary, n.body)
+                    format!(
+                        "{}
+{}",
+                        n.summary, n.body
+                    )
                 };
                 let _ = std::process::Command::new("wl-copy")
                     .arg(&text)
@@ -222,7 +280,12 @@ impl NotifyScreen {
                         .stdout(std::process::Stdio::null())
                         .stderr(std::process::Stdio::null())
                         .status();
-                    say("Notifications", "Last notification restored", lazyos_ui::Urgency::Normal, Glyph::Bell);
+                    say(
+                        "Notifications",
+                        "Last notification restored",
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Bell,
+                    );
                 }
                 "dismiss" => {
                     let _ = std::process::Command::new("makoctl")
@@ -231,7 +294,12 @@ impl NotifyScreen {
                         .stdout(std::process::Stdio::null())
                         .stderr(std::process::Stdio::null())
                         .status();
-                    say("Notifications", "Everything dismissed", lazyos_ui::Urgency::Normal, Glyph::Trash);
+                    say(
+                        "Notifications",
+                        "Everything dismissed",
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Trash,
+                    );
                     self.reload();
                 }
                 _ => {}

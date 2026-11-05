@@ -24,9 +24,17 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{have, missing, out, say, print};
+use crate::system::{have, missing, out, print, say};
 
-const NEEDED: &[&str] = &["grimshot", "swappy", "tesseract", "zbarimg", "wf-recorder", "slurp", "grim"];
+const NEEDED: &[&str] = &[
+    "grimshot",
+    "swappy",
+    "tesseract",
+    "zbarimg",
+    "wf-recorder",
+    "slurp",
+    "grim",
+];
 
 /// The capture screen.
 pub struct CaptureScreen {
@@ -47,10 +55,7 @@ impl CaptureScreen {
             rec_file: String::new(),
             list: ListState::new(),
             header: Header::new("LazyOS").subtitle("Capture"),
-            keybar: vec![
-                KeyHint::new("Enter", "run"),
-                KeyHint::new("Esc", "close"),
-            ],
+            keybar: vec![KeyHint::new("Enter", "run"), KeyHint::new("Esc", "close")],
             rows_height: Cell::new(20),
         };
         screen.check_recording();
@@ -77,7 +82,10 @@ impl CaptureScreen {
                         .unwrap_or(false)
                     {
                         self.recording = true;
-                        self.rec_file = std::fs::read_to_string(&file_file).unwrap_or_default().trim().to_string();
+                        self.rec_file = std::fs::read_to_string(&file_file)
+                            .unwrap_or_default()
+                            .trim()
+                            .to_string();
                         return;
                     }
                 }
@@ -91,67 +99,94 @@ impl CaptureScreen {
     fn build_rows(&mut self) {
         let mut rows = Vec::new();
         if self.recording {
-            rows.push(Row::new("Stop recording")
-                .glyph(Glyph::Stop)
-                .detail(format!("{}", Path::new(&self.rec_file).file_name().unwrap_or_default().to_string_lossy()))
-                .value("stop")
-                );
+            rows.push(
+                Row::new("Stop recording")
+                    .glyph(Glyph::Stop)
+                    .detail(format!(
+                        "{}",
+                        Path::new(&self.rec_file)
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                    ))
+                    .value("stop"),
+            );
         } else {
             let shotdir = dirs::picture_dir()
                 .map(|p| p.join("Screenshots"))
                 .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Pictures"));
             let day = chrono::Local::now().format("%Y-%m-%d").to_string();
-            rows.push(Row::new("Screenshot · the whole screen")
-                .glyph(Glyph::Camera)
-                .detail(format!("saved to {}/{}", shotdir.display(), day))
-                .value("shot:save:screen"));
-            rows.push(Row::new("Screenshot · an area")
-                .glyph(Glyph::Crop)
-                .detail(format!("saved to {}/{}", shotdir.display(), day))
-                .value("shot:save:area"));
-            rows.push(Row::new("Screenshot · an area, to the clipboard")
-                .glyph(Glyph::Crop)
-                .detail("paste it anywhere")
-                .value("shot:copy:area"));
-            rows.push(Row::new("Screenshot · a window")
-                .glyph(Glyph::Image)
-                .detail("pick one with the pointer")
-                .value("shot:save:window"));
-            rows.push(Row::new("Annotate an area")
-                .glyph(Glyph::Camera)
-                .detail("arrows, text, crop (swappy)")
-                .value("annotate"));
-            rows.push(Row::new("Record · the whole screen")
-                .glyph(Glyph::Video)
-                .detail("until you stop it")
-                .value("rec:none"));
-            rows.push(Row::new("Record · an area")
-                .glyph(Glyph::Video)
-                .detail("pick it with the pointer")
-                .value("rec:area"));
+            rows.push(
+                Row::new("Screenshot · the whole screen")
+                    .glyph(Glyph::Camera)
+                    .detail(format!("saved to {}/{}", shotdir.display(), day))
+                    .value("shot:save:screen"),
+            );
+            rows.push(
+                Row::new("Screenshot · an area")
+                    .glyph(Glyph::Crop)
+                    .detail(format!("saved to {}/{}", shotdir.display(), day))
+                    .value("shot:save:area"),
+            );
+            rows.push(
+                Row::new("Screenshot · an area, to the clipboard")
+                    .glyph(Glyph::Crop)
+                    .detail("paste it anywhere")
+                    .value("shot:copy:area"),
+            );
+            rows.push(
+                Row::new("Screenshot · a window")
+                    .glyph(Glyph::Image)
+                    .detail("pick one with the pointer")
+                    .value("shot:save:window"),
+            );
+            rows.push(
+                Row::new("Annotate an area")
+                    .glyph(Glyph::Camera)
+                    .detail("arrows, text, crop (swappy)")
+                    .value("annotate"),
+            );
+            rows.push(
+                Row::new("Record · the whole screen")
+                    .glyph(Glyph::Video)
+                    .detail("until you stop it")
+                    .value("rec:none"),
+            );
+            rows.push(
+                Row::new("Record · an area")
+                    .glyph(Glyph::Video)
+                    .detail("pick it with the pointer")
+                    .value("rec:area"),
+            );
         }
         rows.push(Row::new("").glyph(Glyph::Camera)); // separator
-        rows.push(Row::new("Text from an area")
-            .glyph(Glyph::File)
-            .detail("OCR (tesseract) → clipboard")
-            .value("ocr"));
-        rows.push(Row::new("QR code from an area")
-            .glyph(Glyph::Qr)
-            .detail("zbarimg → clipboard")
-            .value("qr"));
-        rows.push(Row::new("Make a QR code")
-            .glyph(Glyph::Qr)
-            .detail("the Wi-Fi password, or any text")
-            .value("make-qr")
-            );
+        rows.push(
+            Row::new("Text from an area")
+                .glyph(Glyph::File)
+                .detail("OCR (tesseract) → clipboard")
+                .value("ocr"),
+        );
+        rows.push(
+            Row::new("QR code from an area")
+                .glyph(Glyph::Qr)
+                .detail("zbarimg → clipboard")
+                .value("qr"),
+        );
+        rows.push(
+            Row::new("Make a QR code")
+                .glyph(Glyph::Qr)
+                .detail("the Wi-Fi password, or any text")
+                .value("make-qr"),
+        );
         let shotdir = dirs::picture_dir()
             .map(|p| p.join("Screenshots"))
             .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Pictures"));
-        rows.push(Row::new("Open the pictures folder")
-            .glyph(Glyph::File)
-            .detail(shotdir.display().to_string())
-            .value("folder")
-            );
+        rows.push(
+            Row::new("Open the pictures folder")
+                .glyph(Glyph::File)
+                .detail(shotdir.display().to_string())
+                .value("folder"),
+        );
         self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
@@ -161,7 +196,12 @@ impl Screen for CaptureScreen {
     fn draw(&mut self, ctx: &mut BodyCtx) {
         draw_card(ctx.buf, ctx.area, ctx.design, Some("Capture"), true);
         let (filter, rows) = super::pick::list_layout(ctx.area);
-        ctx.buf.set_string(filter.x, filter.y, "Enter runs · Escape closes", ctx.design.style(TextStyle::Dim));
+        ctx.buf.set_string(
+            filter.x,
+            filter.y,
+            "Enter runs · Escape closes",
+            ctx.design.style(TextStyle::Dim),
+        );
         self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
     }
@@ -312,9 +352,20 @@ impl CaptureScreen {
                 .to_string();
             let _ = std::fs::remove_file(&tmp);
             if !text.is_empty() {
-                let preview = text.lines().next().unwrap_or("").chars().take(60).collect::<String>();
+                let preview = text
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+                    .chars()
+                    .take(60)
+                    .collect::<String>();
                 print(&format!("{}", text));
-                say("Text from the screen", format!("Text copied · {}", preview), lazyos_ui::Urgency::Normal, Glyph::File);
+                say(
+                    "Text from the screen",
+                    format!("Text copied · {}", preview),
+                    lazyos_ui::Urgency::Normal,
+                    Glyph::File,
+                );
                 let _ = std::process::Command::new("wl-copy")
                     .arg(&text)
                     .stdin(std::process::Stdio::null())
@@ -322,7 +373,12 @@ impl CaptureScreen {
                     .stderr(std::process::Stdio::null())
                     .status();
             } else {
-                say("Text from the screen", "No text was found in that region", lazyos_ui::Urgency::Normal, Glyph::File);
+                say(
+                    "Text from the screen",
+                    "No text was found in that region",
+                    lazyos_ui::Urgency::Normal,
+                    Glyph::File,
+                );
             }
         }
     }
@@ -330,11 +386,19 @@ impl CaptureScreen {
     fn scan_qr() {
         let tmp = std::env::temp_dir().join(format!("capture-{}.png", std::process::id()));
         if Self::region_image(&tmp) {
-            let code = out(&["zbarimg", "-q", "--raw", &tmp.to_string_lossy()]).unwrap_or_default().trim().to_string();
+            let code = out(&["zbarimg", "-q", "--raw", &tmp.to_string_lossy()])
+                .unwrap_or_default()
+                .trim()
+                .to_string();
             let _ = std::fs::remove_file(&tmp);
             if !code.is_empty() {
                 let preview = code.chars().take(60).collect::<String>();
-                say("QR code from the screen", format!("Copied · {}", preview), lazyos_ui::Urgency::Normal, Glyph::Qr);
+                say(
+                    "QR code from the screen",
+                    format!("Copied · {}", preview),
+                    lazyos_ui::Urgency::Normal,
+                    Glyph::Qr,
+                );
                 let _ = std::process::Command::new("wl-copy")
                     .arg(&code)
                     .stdin(std::process::Stdio::null())
@@ -342,7 +406,12 @@ impl CaptureScreen {
                     .stderr(std::process::Stdio::null())
                     .status();
             } else {
-                say("QR code from the screen", "No code was found in that region", lazyos_ui::Urgency::Normal, Glyph::Qr);
+                say(
+                    "QR code from the screen",
+                    "No code was found in that region",
+                    lazyos_ui::Urgency::Normal,
+                    Glyph::Qr,
+                );
             }
         }
     }
@@ -373,17 +442,33 @@ impl CaptureScreen {
         let _ = std::fs::create_dir_all(&state);
         let pid_file = state.join("recording.pid");
         let file_file = state.join("recording.file");
-        let videos = dirs::video_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Videos"));
-        let file = videos.join(format!("lazyos-{}.mp4", chrono::Local::now().format("%Y%m%d-%H%M%S")));
+        let videos = dirs::video_dir()
+            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Videos"));
+        let file = videos.join(format!(
+            "lazyos-{}.mp4",
+            chrono::Local::now().format("%Y%m%d-%H%M%S")
+        ));
         let mut cmd = std::process::Command::new("wf-recorder");
-        cmd.args(["-c", "libx264", "-p", "preset=veryfast", "-p", "crf=28", "-r", "30", "-f", &file.to_string_lossy()]);
+        cmd.args([
+            "-c",
+            "libx264",
+            "-p",
+            "preset=veryfast",
+            "-p",
+            "crf=28",
+            "-r",
+            "30",
+            "-f",
+            &file.to_string_lossy(),
+        ]);
         if let Some(g) = geom {
             cmd.args(["-g", &g]);
         }
         cmd.stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::from(
-                std::fs::File::create(state.join("recorder.log")).unwrap_or_else(|_| std::fs::File::create("/dev/null").unwrap())
+                std::fs::File::create(state.join("recorder.log"))
+                    .unwrap_or_else(|_| std::fs::File::create("/dev/null").unwrap()),
             ));
         if let Ok(mut child) = cmd.spawn() {
             let pid = child.id();
@@ -450,9 +535,25 @@ impl CaptureScreen {
                     let path = Path::new(&file);
                     if path.exists() && path.metadata().map(|m| m.len()).unwrap_or(0) > 0 {
                         print(&format!("Recording saved: {}", path.display()));
-                        say("Capture", format!("Recording saved · {}", path.file_name().unwrap_or_default().to_string_lossy()), lazyos_ui::Urgency::Normal, Glyph::Video);
+                        say(
+                            "Capture",
+                            format!(
+                                "Recording saved · {}",
+                                path.file_name().unwrap_or_default().to_string_lossy()
+                            ),
+                            lazyos_ui::Urgency::Normal,
+                            Glyph::Video,
+                        );
                     } else {
-                        say("Capture", format!("Recording failed · {} is empty", path.file_name().unwrap_or_default().to_string_lossy()), lazyos_ui::Urgency::Critical, Glyph::Video);
+                        say(
+                            "Capture",
+                            format!(
+                                "Recording failed · {} is empty",
+                                path.file_name().unwrap_or_default().to_string_lossy()
+                            ),
+                            lazyos_ui::Urgency::Critical,
+                            Glyph::Video,
+                        );
                     }
                 }
             }
@@ -483,8 +584,7 @@ impl CaptureScreen {
     }
 }
 
-impl CaptureScreen {
-}
+impl CaptureScreen {}
 
 /// `lazyos menu capture` (`rofi-capture`): the window.
 pub fn menu(

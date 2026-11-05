@@ -7,8 +7,7 @@
 use std::cell::Cell;
 
 use lazyos_ui::{
-    Input,
-    BodyCtx, Design, Glyph, Header, KeyHint, ListAction, ListState, Outcome, Row, Screen,
+    BodyCtx, Design, Glyph, Header, Input, KeyHint, ListAction, ListState, Outcome, Row, Screen,
     TextStyle, draw_card,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
@@ -55,7 +54,10 @@ impl AudioScreen {
     }
 
     fn reload(&mut self) {
-        self.default_sink = out(&["pactl", "get-default-sink"]).unwrap_or_default().trim().to_string();
+        self.default_sink = out(&["pactl", "get-default-sink"])
+            .unwrap_or_default()
+            .trim()
+            .to_string();
         self.sinks = Self::get_sinks(&self.default_sink);
         self.build_rows();
     }
@@ -98,30 +100,38 @@ impl AudioScreen {
                 };
                 let key = format!("sink:{}", s.name);
                 keys.push(key.clone());
-                rows.push(Row::new(label)
-                    .glyph(Glyph::Volume)
-                    .detail(s.name.clone())
-                    .value(key));
+                rows.push(
+                    Row::new(label)
+                        .glyph(Glyph::Volume)
+                        .detail(s.name.clone())
+                        .value(key),
+                );
             }
         }
         let key1 = "pavucontrol".to_string();
         keys.push(key1.clone());
-        rows.push(Row::new("Volume per application")
-            .glyph(Glyph::Sliders)
-            .detail("pavucontrol: per-stream volume, ports, profiles")
-            .value(key1));
+        rows.push(
+            Row::new("Volume per application")
+                .glyph(Glyph::Sliders)
+                .detail("pavucontrol: per-stream volume, ports, profiles")
+                .value(key1),
+        );
         let key2 = "mute-sink".to_string();
         keys.push(key2.clone());
-        rows.push(Row::new("Mute / unmute output")
-            .glyph(Glyph::Volume)
-            .detail("toggle the default sink mute")
-            .value(key2));
+        rows.push(
+            Row::new("Mute / unmute output")
+                .glyph(Glyph::Volume)
+                .detail("toggle the default sink mute")
+                .value(key2),
+        );
         let key3 = "mute-source".to_string();
         keys.push(key3.clone());
-        rows.push(Row::new("Mute / unmute microphone")
-            .glyph(Glyph::Mic)
-            .detail("toggle the default source mute")
-            .value(key3));
+        rows.push(
+            Row::new("Mute / unmute microphone")
+                .glyph(Glyph::Mic)
+                .detail("toggle the default source mute")
+                .value(key3),
+        );
         self.keys = keys;
         self.list.set_rows(rows);
     }
@@ -131,7 +141,12 @@ impl Screen for AudioScreen {
     fn draw(&mut self, ctx: &mut BodyCtx) {
         draw_card(ctx.buf, ctx.area, ctx.design, Some("Audio output"), true);
         let (filter, rows) = super::pick::list_layout(ctx.area);
-        ctx.buf.set_string(filter.x, filter.y, "Enter switches the default sink · footer rows for mute and pavucontrol", ctx.design.style(TextStyle::Dim));
+        ctx.buf.set_string(
+            filter.x,
+            filter.y,
+            "Enter switches the default sink · footer rows for mute and pavucontrol",
+            ctx.design.style(TextStyle::Dim),
+        );
         self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
     }
@@ -219,7 +234,12 @@ impl AudioScreen {
                 }
             }
             self.reload();
-            say("Audio output", format!("Default sink: {}", name), lazyos_ui::Urgency::Normal, Glyph::Volume);
+            say(
+                "Audio output",
+                format!("Default sink: {}", name),
+                lazyos_ui::Urgency::Normal,
+                Glyph::Volume,
+            );
         } else {
             match key.as_str() {
                 "pavucontrol" => {
@@ -237,7 +257,12 @@ impl AudioScreen {
                         .stdout(std::process::Stdio::null())
                         .stderr(std::process::Stdio::null())
                         .status();
-                    say("Audio output", "Sink mute toggled", lazyos_ui::Urgency::Normal, Glyph::Volume);
+                    say(
+                        "Audio output",
+                        "Sink mute toggled",
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Volume,
+                    );
                 }
                 "mute-source" => {
                     let _ = std::process::Command::new("pactl")
@@ -246,7 +271,12 @@ impl AudioScreen {
                         .stdout(std::process::Stdio::null())
                         .stderr(std::process::Stdio::null())
                         .status();
-                    say("Audio output", "Microphone mute toggled", lazyos_ui::Urgency::Normal, Glyph::Mic);
+                    say(
+                        "Audio output",
+                        "Microphone mute toggled",
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Mic,
+                    );
                 }
                 _ => {}
             }

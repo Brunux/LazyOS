@@ -9,13 +9,13 @@
 //! virtual keyboard.
 
 use std::cell::Cell;
-use std::env; use std::path::PathBuf;
+use std::env;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use lazyos_ui::{
-    Input,
-    BodyCtx, Design, Glyph, Header, KeyHint, ListAction, ListState, Outcome, Row, Screen,
+    BodyCtx, Design, Glyph, Header, Input, KeyHint, ListAction, ListState, Outcome, Row, Screen,
     TextStyle, draw_card,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -62,7 +62,11 @@ impl EmojiScreen {
     }
 
     fn load_emojis(&mut self) {
-        let path = env::home_dir().map(|h| h.join(".config/emojis.tsv")).unwrap_or_default().to_string_lossy().to_string();
+        let path = env::home_dir()
+            .map(|h| h.join(".config/emojis.tsv"))
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         let content = fs::read_to_string(&path).unwrap_or_default();
         self.emojis = content
             .lines()
@@ -108,7 +112,8 @@ impl EmojiScreen {
                         let sha_output = String::from_utf8_lossy(&output2.stdout);
                         let sha = sha_output.split_whitespace().next().unwrap_or("");
                         // The pinned SHA from make-emojis.sh
-                        const PINNED_SHA: &str = "9536496476507f7621d05fb6f42dc53cd6e736267329c7b30e2772bab4281740";
+                        const PINNED_SHA: &str =
+                            "9536496476507f7621d05fb6f42dc53cd6e736267329c7b30e2772bab4281740";
                         return sha == PINNED_SHA;
                     }
                 }
@@ -120,12 +125,25 @@ impl EmojiScreen {
     fn build_rows(&mut self) {
         let mut rows = Vec::new();
         if !self.font_ok {
-            rows.push(Row::new("Emoji font not found or pin mismatch").glyph(Glyph::Warning).detail("Run scripts/make-emojis.sh on the build host"));
+            rows.push(
+                Row::new("Emoji font not found or pin mismatch")
+                    .glyph(Glyph::Warning)
+                    .detail("Run scripts/make-emojis.sh on the build host"),
+            );
         } else if self.emojis.is_empty() {
-            rows.push(Row::new("No emojis loaded").glyph(Glyph::Warning).detail("The emoji table is missing or empty"));
+            rows.push(
+                Row::new("No emojis loaded")
+                    .glyph(Glyph::Warning)
+                    .detail("The emoji table is missing or empty"),
+            );
         } else {
             for e in &self.emojis {
-                rows.push(Row::new(format!("{}  {}", e.glyph, e.name)).glyph(Glyph::Smile).detail(e.block.clone()).value(e.glyph.clone()));
+                rows.push(
+                    Row::new(format!("{}  {}", e.glyph, e.name))
+                        .glyph(Glyph::Smile)
+                        .detail(e.block.clone())
+                        .value(e.glyph.clone()),
+                );
             }
         }
         self.list.set_rows(rows);
@@ -141,7 +159,8 @@ impl Screen for EmojiScreen {
         } else {
             "Enter inserts at cursor · Alt+1 copies only · Escape closes"
         };
-        ctx.buf.set_string(filter.x, filter.y, msg, ctx.design.style(TextStyle::Dim));
+        ctx.buf
+            .set_string(filter.x, filter.y, msg, ctx.design.style(TextStyle::Dim));
         self.rows_height.set(rows.height);
         self.list.render(rows, ctx.buf, ctx.design, true);
     }
@@ -187,7 +206,6 @@ impl Screen for EmojiScreen {
 }
 
 impl EmojiScreen {
-
     fn insert_emoji(&mut self, index: usize, copy_only: bool) -> Outcome {
         if index >= self.emojis.len() || !self.font_ok {
             return Outcome::Continue;
@@ -202,11 +220,21 @@ impl EmojiScreen {
             .map(|s| s.success())
             .unwrap_or(false);
         if !copied {
-            say("Emoji", "wl-copy is not available", lazyos_ui::Urgency::Critical, Glyph::Smile);
+            say(
+                "Emoji",
+                "wl-copy is not available",
+                lazyos_ui::Urgency::Critical,
+                Glyph::Smile,
+            );
             return Outcome::Continue;
         }
         if copy_only {
-            say("Emoji", format!("{} copied to the clipboard", glyph), lazyos_ui::Urgency::Normal, Glyph::Smile);
+            say(
+                "Emoji",
+                format!("{} copied to the clipboard", glyph),
+                lazyos_ui::Urgency::Normal,
+                Glyph::Smile,
+            );
         } else if have("wtype") {
             let wtype_ok = std::process::Command::new("wtype")
                 .args(["-M", "shift", "-k", "Insert", "-m", "shift"])
@@ -221,7 +249,10 @@ impl EmojiScreen {
             } else {
                 say(
                     "Emoji",
-                    format!("{} copied · this window takes no virtual keyboard, paste it yourself", glyph),
+                    format!(
+                        "{} copied · this window takes no virtual keyboard, paste it yourself",
+                        glyph
+                    ),
                     lazyos_ui::Urgency::Normal,
                     Glyph::Smile,
                 );

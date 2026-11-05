@@ -47,10 +47,7 @@ impl MediaScreen {
             players: Vec::new(),
             list: ListState::new(),
             header: Header::new("LazyOS").subtitle("Media"),
-            keybar: vec![
-                KeyHint::new("Enter", "act"),
-                KeyHint::new("Esc", "close"),
-            ],
+            keybar: vec![KeyHint::new("Enter", "act"), KeyHint::new("Esc", "close")],
             rows_height: Cell::new(20),
         };
         screen.reload();
@@ -88,7 +85,11 @@ impl MediaScreen {
     fn build_rows(&mut self) {
         let mut rows = Vec::new();
         if self.players.is_empty() {
-            rows.push(Row::new("Nothing is playing").glyph(Glyph::Music).detail("no MPRIS player is running"));
+            rows.push(
+                Row::new("Nothing is playing")
+                    .glyph(Glyph::Music)
+                    .detail("no MPRIS player is running"),
+            );
         } else {
             for p in &self.players {
                 let mut label = String::new();
@@ -103,18 +104,53 @@ impl MediaScreen {
                     label.push_str(&format!(" · {}", p.album));
                 }
                 let detail = format!("{} · {}", p.name, p.status);
-                rows.push(Row::new(label).glyph(Glyph::Music).detail(detail).value(format!("player:{}", p.name)));
+                rows.push(
+                    Row::new(label)
+                        .glyph(Glyph::Music)
+                        .detail(detail)
+                        .value(format!("player:{}", p.name)),
+                );
             }
             rows.push(Row::new("").glyph(Glyph::Music)); // separator
             if self.players.iter().any(|p| p.status == "Playing") {
-                rows.push(Row::new("Pause").glyph(Glyph::Pause).detail("pause playback").value("pause"));
+                rows.push(
+                    Row::new("Pause")
+                        .glyph(Glyph::Pause)
+                        .detail("pause playback")
+                        .value("pause"),
+                );
             } else {
-                rows.push(Row::new("Play").glyph(Glyph::Play).detail("resume playback").value("play"));
+                rows.push(
+                    Row::new("Play")
+                        .glyph(Glyph::Play)
+                        .detail("resume playback")
+                        .value("play"),
+                );
             }
-            rows.push(Row::new("Next track").glyph(Glyph::Next).detail("skip to next").value("next"));
-            rows.push(Row::new("Previous track").glyph(Glyph::Prev).detail("skip to previous").value("previous"));
-            rows.push(Row::new("Stop").glyph(Glyph::Stop).detail("stop playback").value("stop"));
-            rows.push(Row::new("Copy track").glyph(Glyph::Clipboard).detail("artist — title to clipboard").value("copy"));
+            rows.push(
+                Row::new("Next track")
+                    .glyph(Glyph::Next)
+                    .detail("skip to next")
+                    .value("next"),
+            );
+            rows.push(
+                Row::new("Previous track")
+                    .glyph(Glyph::Prev)
+                    .detail("skip to previous")
+                    .value("previous"),
+            );
+            rows.push(
+                Row::new("Stop")
+                    .glyph(Glyph::Stop)
+                    .detail("stop playback")
+                    .value("stop"),
+            );
+            rows.push(
+                Row::new("Copy track")
+                    .glyph(Glyph::Clipboard)
+                    .detail("artist — title to clipboard")
+                    .value("copy"),
+            );
         }
         self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
@@ -179,7 +215,6 @@ impl Screen for MediaScreen {
 }
 
 impl MediaScreen {
-
     fn activate(&mut self, index: usize) -> Outcome {
         if self.players.is_empty() {
             return Outcome::Continue;
@@ -194,7 +229,12 @@ impl MediaScreen {
         }
         if key.starts_with("player:") {
             let name = &key[7..];
-            let status = self.players.iter().find(|p| p.name == name).map(|p| p.status.clone()).unwrap_or_default();
+            let status = self
+                .players
+                .iter()
+                .find(|p| p.name == name)
+                .map(|p| p.status.clone())
+                .unwrap_or_default();
             if status == "Playing" {
                 let _ = std::process::Command::new("playerctl")
                     .args(["pause", "-p", name])
@@ -271,7 +311,12 @@ impl MediaScreen {
                             .stdout(std::process::Stdio::null())
                             .stderr(std::process::Stdio::null())
                             .status();
-                        say("Media", format!("Copied: {track}"), lazyos_ui::Urgency::Normal, Glyph::Clipboard);
+                        say(
+                            "Media",
+                            format!("Copied: {track}"),
+                            lazyos_ui::Urgency::Normal,
+                            Glyph::Clipboard,
+                        );
                     }
                 }
                 _ => {}

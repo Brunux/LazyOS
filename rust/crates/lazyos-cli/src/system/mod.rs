@@ -193,12 +193,8 @@ mod tests {
 
     #[test]
     fn checked_keeps_the_reason_a_tool_gave() {
-        let error = checked(&[
-            "sh",
-            "-c",
-            "printf 'second line\nlast line\n' >&2; exit 3",
-        ])
-        .unwrap_err();
+        let error =
+            checked(&["sh", "-c", "printf 'second line\nlast line\n' >&2; exit 3"]).unwrap_err();
         assert_eq!(error, "last line");
     }
 

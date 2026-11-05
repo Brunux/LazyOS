@@ -96,9 +96,11 @@ impl ColourScreen {
     fn build_rows(&mut self) {
         let mut rows = Vec::new();
         if let Some(c) = &self.picked {
-            rows.push(Row::new(format!("Picked: {}", c.hex))
-                .glyph(Glyph::Brush)
-                .detail(format!("RGB({}, {}, {})", c.rgb.0, c.rgb.1, c.rgb.2)));
+            rows.push(
+                Row::new(format!("Picked: {}", c.hex))
+                    .glyph(Glyph::Brush)
+                    .detail(format!("RGB({}, {}, {})", c.rgb.0, c.rgb.1, c.rgb.2)),
+            );
         }
         // Solarized palette swatches
         const SOLARIZED: &[(&str, &str, &str)] = &[
@@ -120,9 +122,11 @@ impl ColourScreen {
             ("green", "#859900", "success"),
         ];
         for (name, hex, role) in SOLARIZED.iter().copied() {
-            rows.push(Row::new(format!("{}  {}", name, hex.to_uppercase()))
-                .glyph(Glyph::Brush)
-                .detail(role));
+            rows.push(
+                Row::new(format!("{}  {}", name, hex.to_uppercase()))
+                    .glyph(Glyph::Brush)
+                    .detail(role),
+            );
         }
         self.list.set_rows(rows);
     }
@@ -154,7 +158,10 @@ impl Screen for ColourScreen {
                     self.build_rows();
                     say(
                         "Colour",
-                        format!("{} · RGB({}, {}, {})", colour.hex, colour.rgb.0, colour.rgb.1, colour.rgb.2),
+                        format!(
+                            "{} · RGB({}, {}, {})",
+                            colour.hex, colour.rgb.0, colour.rgb.1, colour.rgb.2
+                        ),
                         lazyos_ui::Urgency::Normal,
                         Glyph::Brush,
                     );
@@ -191,8 +198,7 @@ impl Screen for ColourScreen {
     }
 }
 
-impl ColourScreen {
-}
+impl ColourScreen {}
 
 /// `lazyos menu colour` (`rofi-color`): the window.
 pub fn menu(
