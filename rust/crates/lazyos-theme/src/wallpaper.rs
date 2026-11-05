@@ -8,7 +8,7 @@
 //! The wordmark uses the theme's accent colour for the 'z' and the orange
 //! accent for the cursor (following the brand rules).
 
-use crate::{Rgb};
+use crate::Rgb;
 use image::{ImageBuffer, Rgba, RgbaImage};
 use std::fs;
 
