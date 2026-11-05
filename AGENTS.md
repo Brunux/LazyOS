@@ -353,6 +353,8 @@ yet present in `scripts/` as not implemented.
 
 - **The system pickers share one safety module** (`disk::is_system_disk`, `disk::candidates`, `power::Hibernate`): the nine `rofi-*` scripts each re-implemented their own disk rules and confirmations, and the shell got these right only after hardware reports (the eMMC's boot partitions, the SPI flash, the microSD that installed the eMMC were all offered at one point). The port consolidates the rules in `crates/lazyos-cli/src/system/` as pure functions with fixtures from real `lsblk`/`findmnt`/`swapon` output, so a changed tool output is a failing test instead of a wrong answer. Every destructive action (`format`, `swap`, `power`) is a `Confirm` whose first answer is Cancel, and the `Picker` queue lets Escape step back one question — a stray Enter costs a step, never a disk.
 
+- **The media and utility pickers share one shape** (`List`/`Task`/`Card`/`Picker`): the ten `rofi-*` scripts each repeated the same rofi plumbing and the same three bugs. The port consolidates the UI into `lazyos menu` subcommands using `List`/`Task`/`Card` from `lazyos-ui`, so a changed tool output is a failing test instead of a wrong answer. The recorder (`wf-recorder`) is the only long-lived child; its pid and file live in `$XDG_RUNTIME_DIR/lazyos-capture`, and start/stop share the same menu.
+
 ## Critical upstream facts
 
 - **Nura is postmarketOS renamed** (rebrand 2026). Old names `postmarketOS`, `pmOS`, `pmaports`,

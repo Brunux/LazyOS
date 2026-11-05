@@ -28,14 +28,54 @@
 //!
 //! The menus themselves share [`pick`]: one window, one filter line, one set
 //! of keys, and a destructive row that cannot be reached without the confirm.
+//!
+//! The media and utility pickers (spec 011): ten dialogs that used to be
+//! shell scripts, with one shared shape for the window.
+//!
+//! ```text
+//! lazyos menu media       what is playing           (rofi-media)
+//! lazyos menu notify      history and DND           (rofi-notify)
+//! lazyos menu clip        clipboard by kind         (rofi-clip)
+//! lazyos menu emoji       the emoji table           (rofi-emoji)
+//! lazyos menu capture     screenshot, OCR, record   (rofi-capture)
+//! lazyos menu qr          Wi-Fi QR or any text      (rofi-qr)
+//! lazyos menu remind      write now, be told later  (rofi-remind)
+//! lazyos menu calc        expression parser         (rofi-calc)
+//! lazyos menu colour      pixel and palette         (rofi-color)
+//! lazyos menu audio       sink list and mute        (bar-audio)
+//! lazyos menu bluetooth   scan, connect, disconnect (bar-bt)
+//! ```
+//!
+//! The rules that keep the port honest:
+//! - **The rules are data and have tests.** Each picker parses the output of
+//!   a system tool (`playerctl`, `cliphist`, `makoctl`, etc.) and the fixture
+//!   from a real machine is the unit test. A changed tool output is a failing
+//!   test instead of a wrong answer.
+//! - **Nothing is handed to a shell.** Every call is an argv array built here,
+//!   so a resolver list or a device name read from a person is one argument
+//!   and never a word a shell would split.
+//! - **One shape for the window.** The card, the note line, the rows with a
+//!   glyph, and the confirm whose first answer is Cancel — the same layout
+//!   the system pickers (spec 010) use, so a new picker cannot drift.
 
+pub mod audio;
+pub mod bluetooth;
+pub mod calc;
+pub mod capture;
+pub mod clip;
+pub mod colour;
 pub mod disk;
 pub mod display;
 pub mod dns;
+pub mod emoji;
 pub mod format;
 pub mod fstab;
+pub mod media;
+pub mod notify;
 pub mod pick;
 pub mod power;
+pub mod qr;
+pub mod remind;
 pub mod settings;
 pub mod ssh;
 pub mod step;
@@ -153,12 +193,8 @@ mod tests {
 
     #[test]
     fn checked_keeps_the_reason_a_tool_gave() {
-        let error = checked(&[
-            "sh",
-            "-c",
-            "printf 'second line\\nlast line\\n' >&2; exit 3",
-        ])
-        .unwrap_err();
+        let error =
+            checked(&["sh", "-c", "printf 'second line\nlast line\n' >&2; exit 3"]).unwrap_err();
         assert_eq!(error, "last line");
     }
 

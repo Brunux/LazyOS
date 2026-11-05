@@ -390,7 +390,7 @@ mod tests {
         assert_eq!(
             added,
             vec!["ask", "format", "display"],
-            "the rows spec 010 adds"
+            "the rows spec 007 and spec 010 add to ROOT (spec 011 entries are in BAR_MENU_KEYS)"
         );
     }
 
@@ -501,7 +501,7 @@ mod tests {
         assert_eq!(runs_of("dev"), "rofi-dev");
         assert_eq!(runs_of("agent"), "rofi-agents --default");
         assert_eq!(runs_of("files-window"), "favnyr ~");
-        assert_eq!(runs_of("ssh"), "rofi-ssh");
+        assert_eq!(runs_of("ssh"), "lazyos menu ssh");
         assert_eq!(runs_of("theme-next"), "lazyos theme next");
         assert_eq!(runs_of("theme-nord"), "lazyos theme set nord");
         assert_eq!(runs_of("ask"), "menu:ask");

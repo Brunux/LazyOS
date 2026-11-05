@@ -294,6 +294,94 @@ pub const COMMANDS: &[CommandSpec] = &[
         symlinks: &["lazyos-task"],
         installed: &["lazyos-task"],
     },
+    CommandSpec {
+        // Media: player state and transport (spec 011).
+        path: "menu media",
+        summary: "what is playing, and the transport keys (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-media"],
+        installed: &["rofi-media"],
+    },
+    CommandSpec {
+        // Notify history: mako's history with dismiss/clear (spec 011).
+        path: "menu notify",
+        summary: "the notification history and do-not-disturb (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-notify"],
+        installed: &["rofi-notify"],
+    },
+    CommandSpec {
+        // Clipboard: cliphist rows, copy back, save image, clear (spec 011).
+        path: "menu clip",
+        summary: "clipboard history by kind, copy back, save image, clear (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-clip"],
+        installed: &["rofi-clip"],
+    },
+    CommandSpec {
+        // Emoji: the emojis.tsv table, insert through wtype (spec 011).
+        path: "menu emoji",
+        summary: "the emoji table, fuzzy filter, insert at cursor (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-emoji"],
+        installed: &["rofi-emoji"],
+    },
+    CommandSpec {
+        // Capture: screenshots, OCR, QR, recording (spec 011).
+        path: "menu capture",
+        summary: "screenshot, annotate, OCR, QR, record (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-capture"],
+        installed: &["rofi-capture"],
+    },
+    CommandSpec {
+        // QR: Wi-Fi payload or any text (spec 011).
+        path: "menu qr",
+        summary: "the Wi-Fi QR or any text, rendered in-window (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-qr"],
+        installed: &["rofi-qr"],
+    },
+    CommandSpec {
+        // Remind: title → note → when flow (spec 011).
+        path: "menu remind",
+        summary: "write it now, be told later, cancel from the list (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-remind"],
+        installed: &["rofi-remind"],
+    },
+    CommandSpec {
+        // Calc: expression parser, history, copy (spec 011).
+        path: "menu calc",
+        summary: "an expression parser, not a rofi prompt (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-calc"],
+        installed: &["rofi-calc"],
+    },
+    CommandSpec {
+        // Colour: the hex of a pixel and the palette (spec 011).
+        path: "menu colour",
+        summary: "pick a pixel and show the palette (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-color"],
+        installed: &["rofi-color"],
+    },
+    CommandSpec {
+        // Audio output picker (spec 011): the bar's sink list.
+        path: "menu audio",
+        summary: "switch the default sink, mute, pavucontrol (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["bar-audio"],
+        installed: &["bar-audio"],
+    },
+    CommandSpec {
+        // Bluetooth picker (spec 011): the bar's device list.
+        path: "menu bluetooth",
+        summary: "scan, connect, disconnect, bluetoothctl (spec 011)",
+        shape: Shape::Pick,
+        symlinks: &["bar-bt"],
+        installed: &["bar-bt"],
+    },
 ];
 
 /// A command the table resolved, with the arguments that belong to it.

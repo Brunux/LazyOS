@@ -218,14 +218,6 @@ pub const ROOT: &[MenuItem] = &[
         session("rofi-places"),
     ),
     item(
-        "capture",
-        "Capture",
-        "screenshot, OCR, QR, recording",
-        Glyph::Capture,
-        Open,
-        session("rofi-capture"),
-    ),
-    item(
         "camera",
         "Camera",
         "look through the webcam, take a photo",
@@ -271,7 +263,10 @@ pub const ROOT: &[MenuItem] = &[
         "type it, Enter copies the result",
         Glyph::Calculator,
         Open,
-        session("rofi-calc"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("calc")],
+        },
     ),
     item(
         "emoji",
@@ -279,7 +274,10 @@ pub const ROOT: &[MenuItem] = &[
         "type a name, insert the glyph",
         Glyph::Smile,
         Open,
-        session("rofi-emoji"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("emoji")],
+        },
     ),
     item(
         "clip",
@@ -287,7 +285,10 @@ pub const ROOT: &[MenuItem] = &[
         "what was copied, back in one pick",
         Glyph::Clipboard,
         Open,
-        session("rofi-clip"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("clip")],
+        },
     ),
     item(
         "password",
@@ -300,10 +301,13 @@ pub const ROOT: &[MenuItem] = &[
     item(
         "ssh",
         "SSH",
-        "hosts from ~/.ssh/config",
+        "remote login status",
         Glyph::Server,
         Open,
-        session("rofi-ssh"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("ssh")],
+        },
     ),
     // The AI group opens with the two actions an agent is for: a session, and
     // one question. Both follow the default the Agents menu marks with `●`.
@@ -361,44 +365,48 @@ pub const ROOT: &[MenuItem] = &[
         session("bar-net"),
     ),
     item(
-        "qr",
-        "QR code",
-        "this network, or any text",
-        Glyph::Qr,
-        System,
-        session("rofi-qr"),
-    ),
-    item(
         "dns",
         "DNS",
         "the resolver this connection uses",
         Glyph::Cloud,
         System,
-        session("rofi-dns"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("dns")],
+        },
     ),
     item(
         "bt",
         "Bluetooth",
-        "pick a device",
+        "scan, connect, disconnect",
         Glyph::Bluetooth,
         System,
-        session("bar-bt"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("bluetooth")],
+        },
     ),
     item(
         "audio",
         "Audio output",
-        "sinks and volume",
+        "switch sink, mute, pavucontrol",
         Glyph::Volume,
         System,
-        session("bar-audio"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("audio")],
+        },
     ),
     item(
         "media",
         "Media",
-        "play, pause, next",
+        "play, pause, next, copy track",
         Glyph::Music,
         System,
-        session("rofi-media"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("media")],
+        },
     ),
     item(
         "notify",
@@ -406,7 +414,10 @@ pub const ROOT: &[MenuItem] = &[
         "history and do-not-disturb",
         Glyph::Bell,
         System,
-        session("rofi-notify"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("notify")],
+        },
     ),
     item(
         "vnc",
@@ -491,12 +502,37 @@ pub const ROOT: &[MenuItem] = &[
         session("rofi-dev"),
     ),
     item(
+        "capture",
+        "Capture",
+        "screenshot, annotate, OCR, QR, record",
+        Glyph::Capture,
+        System,
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("capture")],
+        },
+    ),
+    item(
+        "qr",
+        "QR code",
+        "Wi-Fi network or any text",
+        Glyph::Qr,
+        System,
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("qr")],
+        },
+    ),
+    item(
         "colour",
         "Colour",
-        "the hex of a pixel, and the palette",
+        "pick a pixel, see the palette",
         Glyph::Brush,
         System,
-        session("rofi-color"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("colour")],
+        },
     ),
     item(
         "about",
@@ -509,10 +545,13 @@ pub const ROOT: &[MenuItem] = &[
     item(
         "remind",
         "Reminders",
-        "be told about it later",
-        Glyph::Calendar,
+        "write it now, be told later",
+        Glyph::Clock,
         Session,
-        session("rofi-remind"),
+        Action::Run {
+            program: Program::System("lazyos"),
+            args: &[Arg::Lit("menu"), Arg::Lit("remind")],
+        },
     ),
     item(
         "lock",
@@ -653,7 +692,6 @@ pub const BAR_MENU_KEYS: &[&str] = &[
     "files-window",
     "grep",
     "places",
-    "capture",
     "camera",
     "download",
     "settings",
@@ -669,7 +707,6 @@ pub const BAR_MENU_KEYS: &[&str] = &[
     "dictate",
     "model",
     "wifi",
-    "qr",
     "dns",
     "bt",
     "audio",
@@ -683,6 +720,8 @@ pub const BAR_MENU_KEYS: &[&str] = &[
     "kill",
     "pkg",
     "dev",
+    "capture",
+    "qr",
     "colour",
     "about",
     "remind",
