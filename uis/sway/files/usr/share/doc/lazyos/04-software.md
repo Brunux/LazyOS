@@ -162,122 +162,42 @@ pins the SHA256 and the family of the font the filter used, which is how
 table. Nothing of this runs on the machine: the picker is one rofi window and the
 table is a file.
 
-## Working in the terminal all day
 
-* `tmux` (alias `t`) keeps a session across terminal windows; `Ctrl+B` is its
-  prefix.
-* `ssh` keys: generate your own with `ssh-keygen -t ed25519`; the machine also
-  runs `sshd`, so you can log in from another computer.
-* `journalctl -b -p err` shows this boot's errors; `dmesg` the kernel's.
-* `/usr/share/doc/<package>/` and `man` are local; `tldr` is the shortcut.
-* The network's three questions are `ip -br addr`, `ping` and `ss -tunlp` (the
-  first two packages are `iproute2` and `iputils-ping`, in the base list because
-  no "is it up" answer starts without them).
-* `zip` is the writing half of `unzip`, `strace` is the debugger when a program
-  fails without a message, and `ncdu` is the disk walk to reach for when this
-  58 GB eMMC fills (`du` prints the same numbers as a wall of text).
+## Capture
 
-## The browser
+The **Capture** menu (Alt+Ctrl+C, and the root menu) offers screenshots
+(screen, area, window), annotation (swappy), OCR (tesseract), QR code reading
+(zbarimg), and recording (wf-recorder). Each action ends with a card showing
+the path or result. Recordings start/stop from the same menu and write to
+`~/Videos/`.
 
-**firefox-esr** is the one application outside the session that this image
-installs on purpose (280 MB on disk, none of it resident while it is closed). It
-is the browser, and it is also the last resort for a file: a downloaded page, an
-EPUB, a `.deb`, or anything whose own viewer is missing.
 
-* **Files** (Alt+Ctrl+F) hands it an **EPUB** or a `.deb`, the formats nothing
-  else here opens. A PDF, a DjVu page or a comic goes to **papers** (the reader),
-  a picture to **imv**, a video to **mpv** and an HTML page to `bat`, because an
-  HTML page *is* text - each of those is cheaper than a browser window (see
-  below). A **URL** is the browser's job, which is what `xdg-open` below is
-  about.
-* `xdg-open` exists (`/usr/local/bin/xdg-open`, two dozen lines): a URL goes to
-  Firefox, and a path goes to the same rule table a double click in favnyr uses
-  (`lazyos open`, linked as `lazyos-view`), so a file opened from a script lands where it would land from
-  the desktop. That is what foot's ctrl+click and the command-line tools that
-  print a URL call - there is no desktop portal in this image.
-* It is a normal Wayland client here (no Xwayland needed), and its icon is its
-  own: the launcher shows Firefox's icon, not a substitute.
-* **Alt+Shift+Return** opens it from anywhere - the one program that earns a key
-  of its own (Omarchy has none; its launcher is the way there).
 
-## Playing a video
 
-**mpv** is the video player, and the only program the file browser needs for
-`video`: **Files** (Alt+Ctrl+F) starts it on the file you chose and leaves it
-running after the list closes. It seeks, shows subtitles, follows the screen's
-refresh rate and takes the keyboard while its window has the focus - `q` quits,
-`space` pauses, the arrow keys seek, `f` goes fullscreen.
+## QR Codes
 
-It is deliberately plain: the file list starts it with `--no-config`, so nothing
-in `~/.config/mpv` (a shader, a GUI driver, a profile copied from another
-machine) changes what a click does - write that file if you want to, but the
-session's behaviour does not depend on it. A still picture does not start mpv:
-**imv** draws it on the GPU (zoom, pan, rotate, and a slideshow of the folder),
-and `chafa`'s sixels in a foot window are the answer when imv cannot get an EGL
-context - both cost a fraction of a player, and a picture looks like a picture
-rather than like a video that has not started.
+The **QR** menu (Alt+Ctrl+Q, and the root menu) generates Wi-Fi QR codes
+or encodes arbitrary text. The Wi-Fi payload includes the SSID and password
+(escaped for ZXing), rendered in-window via `qrencode -t ANSIUTF8`.
 
-**The first picture comes with its keys.** imv has no on-screen help, so the
-first picture of a session raises one notification with the bindings its
-`/etc/imv_config` defines: `i` and `o` zoom, `h` `j` `k` `l` pan, **Ctrl+R**
-rotates, **Left** and **Right** walk the folder, `f` is fullscreen and `q` quits.
-It is one card per session (the state file is
-`$XDG_RUNTIME_DIR/lazyos-imv-hint`), it appears only when a picture actually
-opens in imv - not for text, a document or a video - and it is queued in the
-background, so it never delays the picture.
 
-**A film keeps the screen awake.** mpv asks the compositor for an idle inhibitor
-while its window is visible, so the idle screen and the lock do not arrive in the
-middle of one. Firefox and the document reader ask the same thing through their
-own interface and get it from the compositor (see the next section); the bar's
-coffee cup is the manual switch for everything else - a long download, a recipe,
-a page you are reading from across the room.
 
-## The camera
+## Reminders
 
-**The camera works because the kernel drives it, not because something was
-installed for it.** It is a USB device on the internal hub (`lsusb`:
-`0408:30d5 Quanta USB2.0 HD UVC WebCam`, at `1-1.4`), and `uvcvideo` - a module
-of this kernel - turns it into `/dev/video0`. `/dev/video2` and `/dev/video3`
-are the SoC's hardware video encoder and decoder, not cameras. This device tree
-carries no MIPI sensor, so there is no second (rear) camera to open: a machine
-with one would need a kernel and an image pipeline, not a package.
+The **Reminders** menu (Alt+Ctrl+R, and the root menu) creates transient
+systemd user timers. The flow is: title → optional note → when (delays, date,
+repeats). Every expression is validated by `systemd-analyze calendar`. The list
+shows active reminders with cancel actions.
 
-**To open it: Camera, in the root menu (Alt+Space) and the launcher.** It runs
-`~/.config/bin/lazyos-camera`, which finds the node bound to `uvcvideo` - by
-driver, because the numbering is what a replug reorders - sends a notification
-when there is no camera at all, and starts **guvcview**: the preview, the
-camera's own controls, and two capture buttons. **Alt+Q** closes the window
-(sway's kill; guvcview's own quit is the **Quit** button). The device opens
-exclusively, so pressing **Camera** again while it is open brings that window
-back instead of starting a second one.
 
-**The controls are half of what it is for.** The preview and **Image Controls**
-are two windows: exposure, gain, brightness, contrast, white balance and
-sharpness come from the camera itself through UVC, and a camera that looks black
-in a dim room is usually exposure, not a broken driver. Auto exposure takes a
-moment to settle, so the first frame after the window appears is darker than the
-second one - that is the sensor ramping, not a fault. **Cap. Image (I)** writes
-`~/Pictures/Camera/photo-N.jpg`, **Cap. Video (V)** writes
-`~/Videos/camera-N.mkv`; guvcview continues that numbering across runs, so
-nothing is overwritten, and a clip carries the internal microphone.
 
-**Without the window**, from a terminal:
-`ffmpeg -f v4l2 -i /dev/video0 -frames:v 1 /tmp/cam.png` captures one frame, and
-`ffmpeg -f v4l2 -list_formats all -i /dev/video0` lists what this camera offers
-(MJPEG and YUYV, from 1280x720 down to 160x120). That is the test that separates
-"the camera is broken" from "the window is broken", and it is the same device
-`check-system.sh` reports on.
+## Calculator
 
-**A browser reads the camera directly.** A video call in Firefox needs none of
-the above: Firefox asks the kernel for the device and prompts for permission in
-its own window. **The camera *portal* is what this image does not have** -
-`org.freedesktop.portal.Camera` needs a portal backend that implements it, the
-only backend here is the wlr one (Screenshot and ScreenCast), and
-`xdg-desktop-portal` therefore logs *The camera portal requires an access impl*
-once per session. Native programs are unaffected; a Flatpak application, which
-may only reach a camera through that portal, sees none at all. That is a stated
-limit rather than a reason to run one more daemon.
+The **Calculator** menu (Alt+Ctrl+=, and the root menu) evaluates arithmetic
+expressions with a Pratt parser (operators + - * / % ^, parentheses, constants
+pi/e/tau, functions sin/cos/tan/sqrt/log/ln/abs/floor/ceil/round). History is
+kept and can be copied.
+
 
 ## An external monitor
 
