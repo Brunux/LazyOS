@@ -265,7 +265,7 @@ impl Screen for RemindScreen {
         ctx.buf.set_string(
             filter.x,
             filter.y,
-            &msg.replace("{}", &self.reminders.len().to_string()),
+            msg.replace("{}", &self.reminders.len().to_string()),
             ctx.design.style(TextStyle::Dim),
         );
         self.rows_height.set(rows.height);
@@ -332,7 +332,7 @@ impl RemindScreen {
             self.reload();
             Outcome::Continue
         } else if key.starts_with("cancel:") {
-            let unit = &key[7..];
+            let unit = key.strip_prefix("cancel:").unwrap_or("");
             if let Some(r) = self.reminders.iter().find(|r| r.unit == unit) {
                 let name = if r.title.is_empty() {
                     "The reminder"
