@@ -389,8 +389,8 @@ mod tests {
             .collect();
         assert_eq!(
             added,
-            vec!["ask", "format", "display"],
-            "the rows spec 010 adds"
+            vec!["ask", "format", "display", "media", "notify", "clip", "emoji", "capture", "qr", "remind", "calc", "colour", "audio", "bluetooth"],
+            "the rows spec 010 and spec 011 add"
         );
     }
 
@@ -501,7 +501,7 @@ mod tests {
         assert_eq!(runs_of("dev"), "rofi-dev");
         assert_eq!(runs_of("agent"), "rofi-agents --default");
         assert_eq!(runs_of("files-window"), "favnyr ~");
-        assert_eq!(runs_of("ssh"), "rofi-ssh");
+        assert_eq!(runs_of("ssh"), "lazyos menu ssh");
         assert_eq!(runs_of("theme-next"), "lazyos theme next");
         assert_eq!(runs_of("theme-nord"), "lazyos theme set nord");
         assert_eq!(runs_of("ask"), "menu:ask");

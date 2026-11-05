@@ -8,7 +8,6 @@ LazyOS · Menu                                                           46 rows
 │       Files (window)  favnyr: folders, drag and drop, trash          open   │
 │       Search inside files  the text in them, with ripgrep            open   │
 │       Places  home, disks, the configuration                         open   │
-│       Capture  screenshot, OCR, QR, recording                        open   │
 │       Camera  look through the webcam, take a photo                  open   │
 │       Download  a link, into ~/Downloads                             open   │
 │       Settings  Wi-Fi, Bluetooth, night light, tablet mode, rotation open   │
@@ -18,7 +17,8 @@ LazyOS · Menu                                                           46 rows
 │       Emoji  type a name, insert the glyph                           open   │
 │       Clipboard  what was copied, back in one pick                   open   │
 │       Password  32 random characters, into the clipboard             open   │
-│       SSH  hosts from ~/.ssh/config                                  open   │
+│       SSH  remote login status                                       open   │
 │       Agent session  ● opencode, in ~/Work                             ai   │
+│       Ask  one question, the answer here                               ai   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  [Enter]  open   [type]  filter   [↑↓]  move   [Esc]  close
