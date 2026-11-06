@@ -15,7 +15,7 @@ set -euo pipefail
 BLOCK="${1:-/dev/mmcblk1}"
 
 if [ "$(id -u)" -ne 0 ]; then
-	exec sudo -n DEVICE="$DEVICE" "$(readlink -f "$0")" "${1:-}"
+	exec sudo -n DEVICE="$DEVICE" KERNEL_CMDLINE_OVERRIDE="${KERNEL_CMDLINE_OVERRIDE:-}" "$(readlink -f "$0")" "${1:-}"
 fi
 
 [ -b "$BLOCK" ] || die "not a block device: $BLOCK"
