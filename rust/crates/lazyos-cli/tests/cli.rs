@@ -392,7 +392,10 @@ fn a_menu_writes_nothing_to_disk() {
 #[test]
 fn browser_distribution_policies_are_valid_and_configure_vertical_tabs() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../");
-    let policy_path = repo_root.join("uis/sway/files/usr/lib/firefox-esr/distribution/policies.json");
+    let mut policy_path = repo_root.join("uis/sway/files/usr/share/firefox-esr/distribution/policies.json");
+    if !policy_path.exists() {
+        policy_path = repo_root.join("uis/sway/files/usr/lib/firefox-esr/distribution/policies.json");
+    }
     let content = std::fs::read_to_string(&policy_path)
         .unwrap_or_else(|e| panic!("failed to read {}: {e}", policy_path.display()));
     let v: serde_json::Value = serde_json::from_str(&content)

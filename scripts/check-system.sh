@@ -2844,6 +2844,8 @@ fi
 # Spec 015: Browser optimization (vertical tabs, compact density, zero Marionette daemons)
 if have firefox-esr; then
 	_ff_pol=/usr/lib/firefox-esr/distribution/policies.json
+	[ -n "$REPO" ] && [ -f "$REPO/uis/sway/files/usr/share/firefox-esr/distribution/policies.json" ] &&
+		_ff_pol="$REPO/uis/sway/files/usr/share/firefox-esr/distribution/policies.json"
 	[ -n "$REPO" ] && [ -f "$REPO/uis/sway/files/usr/lib/firefox-esr/distribution/policies.json" ] &&
 		_ff_pol="$REPO/uis/sway/files/usr/lib/firefox-esr/distribution/policies.json"
 	if [ -f "$_ff_pol" ]; then
