@@ -6,11 +6,11 @@
 - **Model**: `claude-sonnet-5-5` (effort `high`) — multi-surface interactive port covering NetworkManager IPC/nmcli, process signals, safety confirmations, disk reclamation, and agent model switching. Fallback `claude-opus-5-5`.
 - **Branch**: `spec/017-remaining-surfaces`
 - **Plan**: [`docs/plan-ui.md`](../docs/plan-ui.md) §16 phase 4 (the final rofi replacement surfaces before closure)
-- **Old paths**: `bar-net`, `rofi-agents`, `rofi-places`, `rofi-clean`, `rofi-kill`, `rofi-download`, `rofi-layout`, `rofi-file-actions`, `rofi-install`, `translate`, `dictate`
+- **Old paths**: `bar-net`, `rofi-agents`, `rofi-places`, `rofi-clean`, `rofi-kill`, `rofi-download`, `rofi-layout`, `rofi-file-actions`, `translate`, `dictate`
 
 ## Problem
 
-While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 10 user-facing scripts still call `rofi -dmenu` and source [`lib-rofi.sh`](../uis/sway/files/home/.config/bin/lib-rofi.sh). Because of these remaining scripts, the `rofi` package cannot yet be removed from `uis/sway/packages.list`, keeping rofi's styling files, layer-effects configuration, and Pango glyph dependencies in the shipping OS. These remaining scripts also lack the unified theme, case-folded filtering, Nerd Font single-advance glyphs, and responsive TaskView progress reporting of the new framework.
+While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 9 user-facing scripts still call `rofi -dmenu` and source [`lib-rofi.sh`](../uis/sway/files/home/.config/bin/lib-rofi.sh). Because of these remaining scripts, the `rofi` package cannot yet be removed from `uis/sway/packages.list`, keeping rofi's styling files, layer-effects configuration, and Pango glyph dependencies in the shipping OS. These remaining scripts also lack the unified theme, case-folded filtering, Nerd Font single-advance glyphs, and responsive TaskView progress reporting of the new framework.
 
 ## Scope
 
@@ -50,19 +50,16 @@ While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 10 user-facin
 - **`lazyos menu file-actions` (Contextual File Actions)**:
   - Replaces `rofi-file-actions`.
   - Accepts a path argument and presents secondary actions: copy absolute path, rename, trash, open with terminal, or reveal in file manager.
-- **`lazyos menu install` (eMMC Installer Wizard)**:
-  - Replaces `rofi-install`.
-  - Detects current root disk; refuses if running from eMMC (`/dev/mmcblk0`).
-  - Presents gated confirmation requiring typing target confirmation before executing `scripts/install-emmc.sh`.
 - **`lazyos menu translate` & `lazyos menu dictate`**:
   - Replaces `translate` and `dictate`.
   - Interactive language selector and prompt input for translation; recording and model trigger for dictation.
 - **Symlinks & Legacy Path Support**:
-  - All 10 legacy script names under `~/.config/bin/` become symlinks to `/usr/bin/lazyos`.
+  - All 9 legacy script names under `~/.config/bin/` become symlinks to `/usr/bin/lazyos`.
   - Commands added to `command.rs` dispatch table and `lazyos --symlinks`.
 
 **Out:**
 
+- **The eMMC installation wizard**: moved to dedicated Spec 018 (`018-tui-installer.md`), which builds a full TUI installer with user setup, password, location/timezone, and TaskView progress bars.
 - Removal of `rofi` package from `packages.list` and deletion of `lib-rofi.sh` (this is the scope of spec 014, which enforces closure and ledger verification).
 - Web browser toolbar Marionette integration (spec 015).
 
@@ -82,9 +79,6 @@ While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 10 user-facin
 - **Process Killer (`menu kill`)**:
   - Reads `/proc/[0-9]*/stat` and status for user processes.
   - Formats rows with PID, process name, memory footprint, and CPU activity.
-- **Installation Wizard (`menu install`)**:
-  - Implements the strict disk safety invariant: checks `findmnt /` and refuses execution if root filesystem is already `/dev/mmcblk0*`.
-  - Confirms with a two-step gate: Cancel default, followed by typing the target device name.
 
 ## Acceptance criteria
 
@@ -96,12 +90,11 @@ While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 10 user-facin
 - [ ] `lazyos menu kill` lists running processes; typing filters by process name, and selecting a process terminates it with `SIGTERM`.
 - [ ] `lazyos menu download` prompts for URL (auto-fills from clipboard), prompts format, and spawns download task in `~/Downloads`.
 - [ ] `lazyos menu layout` lists keyboard layouts and switches the active Sway keyboard mapping on selection.
-- [ ] `lazyos menu install` detects running root device, refuses if running from eMMC, and provides gated two-step confirmation before invoking installer.
-- [ ] compatibility: all 10 legacy paths (`bar-net`, `rofi-agents`, `rofi-places`, `rofi-clean`, `rofi-kill`, `rofi-download`, `rofi-layout`, `rofi-file-actions`, `rofi-install`, `translate`, `dictate`) exist as symlinks to `lazyos` and dispatch to their corresponding commands.
+- [ ] compatibility: all 9 legacy paths (`bar-net`, `rofi-agents`, `rofi-places`, `rofi-clean`, `rofi-kill`, `rofi-download`, `rofi-layout`, `rofi-file-actions`, `translate`, `dictate`) exist as symlinks to `lazyos` and dispatch to their corresponding commands.
 - [ ] witness: `scripts/check-system.sh` verifies every ported surface exists in `lazyos --symlinks` and `lazyos --help`, and passes behavioral tests for `menu net --status`, `menu clean --dry-run`, and `menu places --rows`.
 - [ ] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/02-rofi.md` documents the migrated interactive surfaces under their `lazyos menu <subcommand>` paths.
 - [ ] witness: an `AGENTS.md` bullet documents the completion of the interactive surface migration and the retirement of `rofi -dmenu` workflows.
-- [ ] unit tests: network output parser, process table parser, cleaner target calculation, places drive detection, and install safety checks are covered by `cargo test`.
+- [ ] unit tests: network output parser, process table parser, cleaner target calculation, and places drive detection are covered by `cargo test`.
 
 ## Tests
 
@@ -109,7 +102,6 @@ While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 10 user-facin
   - `parse_nmcli_wifi`: parses tabular nmcli output into structured SSID records with signal and security.
   - `parse_proc_stat`: parses `/proc` stat files into process entries with memory calculations.
   - `cleaner_reclaim_calc`: validates size calculations for mock directory trees.
-  - `install_disk_safety`: asserts that `/dev/mmcblk0*` running root is rejected.
 - **Snapshot**:
   - `lazyos-ui` golden snapshot tests for `menu-net`, `menu-places`, `menu-clean`, and `menu-kill` at 80x24 and 152x45 terminals.
 - **Integration**:
@@ -124,4 +116,3 @@ While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 10 user-facin
 
 - **Password exposure in terminal logs** — Wi-Fi WPA keys and passphrases must be handled strictly in memory via masked `Input` fields and never logged or serialized to disk.
 - **Accidental process termination** — `menu kill` must require explicit Enter with confirmation for non-user system processes.
-- **Premature disk format in installer** — `menu install` must enforce the same safety checks as `scripts/install-emmc.sh`, preventing overwriting running media.
