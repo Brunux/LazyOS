@@ -34,7 +34,7 @@ set -euo pipefail
 . "$(dirname "$0")/lib-dist.sh"
 
 OUTDIR="${1:-$WORK_DIR/release-$DEVICE}"
-IMAGE_SIZE_MIB="${IMAGE_SIZE_MIB:-4096}"
+IMAGE_SIZE_MIB="${IMAGE_SIZE_MIB:-6144}"
 export IMAGE_SIZE_MIB
 
 # build-rootfs.sh documents the same pitfall: sudo drops the environment, so

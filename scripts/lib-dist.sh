@@ -53,6 +53,8 @@ DIST_EXCLUDES='
 /home/*/.cache/opencode/
 /home/*/.config/opencode/
 /var/log/bootstrap.log
+/var/cache/apt/archives/*.deb
+/var/cache/apt/archives/partial/
 /tmp/repo/
 '
 
