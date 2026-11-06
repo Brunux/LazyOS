@@ -61,7 +61,7 @@ While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 9 user-facing
 
 - **The eMMC installation wizard**: moved to dedicated Spec 018 (`018-tui-installer.md`), which builds a full TUI installer with user setup, password, location/timezone, and TaskView progress bars.
 - Removal of `rofi` package from `packages.list` and deletion of `lib-rofi.sh` (this is the scope of spec 014, which enforces closure and ledger verification).
-- Web browser toolbar Marionette integration (spec 015).
+- Browser chrome optimization (spec 015).
 
 ## Design
 
