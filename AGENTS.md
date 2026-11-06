@@ -65,9 +65,11 @@ yet present in `scripts/` as not implemented.
   surfaces); the **palette files are generated** from `theme.toml` (a hand edit is caught by the
   idempotent-regeneration check, never silently overwritten); and **the AI proposes, the person
   confirms** - `lazyos mcp` never exposes an apply-level destructive tool (install, format, swap,
-  power), so the MCP manifest is the witness. The framework itself does not exist yet (the
-  sixel spike in `rust/crates/spike-sixel` is the one validated piece); `docs/plan-ui.md` §16 is
-  the order, and each tier lands with its three witnesses like everything else.
+  power), so the MCP manifest is the witness. The framework is built and shipping at
+  `v0.4.2`: 35 surfaces have migrated into `lazyos`, 8 themes are driven by `lazyos-theme`,
+  `lazyos mcp` serves tools to OpenCode, and `specs/017-remaining-surfaces.md` scopes the
+  final 10 interactive surfaces leading to rofi closure; `docs/plan-ui.md` §16 is the order,
+  and each tier lands with its three witnesses like everything else.
 - **Ratatui is not the expensive part, and that is measured rather than assumed**
   ([`docs/optimization.md`](docs/optimization.md) §13). Against a crossterm-only app doing the same
   job it adds 23.6 s to a clean build, 89 MB of `target/`, 328 KB of stripped binary, **no**

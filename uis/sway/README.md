@@ -28,18 +28,18 @@ and on `Alt+D`, waybar and the foot terminal.
 | `home/.config/waybar/{config.jsonc,style.css}` | Solarized waybar theme and the bar itself (see **The bar** below). |
 | `home/.config/bin/osd` | The volume and brightness overlay: the key's `pactl`/`brightnessctl` step plus one mako card with its progress bar and the matching icon (no process, no daemon). |
 | `home/.config/gtk-4.0/{settings.ini,gtk.css}` | The GTK4/libadwaita half of the palette (`papers` and anything else GTK4): the dark preference the missing Settings portal would otherwise answer, and the solarized named colours. The GTK3 pair next door does not reach it. |
-| `home/.config/bin/rofi-learn` | **Learn**: the manual, one page at a time. |
-| `home/.config/bin/rofi-keys` | **Keybindings**: every binding, parsed from the configuration, a picture on every row (its tool, its action, or its section). |
+| `home/.config/bin/rofi-learn` | **Learn**: symlink to `lazyos menu learn` (the manual in a foot TUI). |
+| `home/.config/bin/rofi-keys` | **Keybindings**: symlink to `lazyos menu keys` (every binding parsed from configuration, searchable). |
 | `home/.config/bin/dictate`, `dictate-model` | Dictation with whisper.cpp; the model is fetched (pinned SHA256) on first use. |
 | `home/.config/bin/translate` | **Alt+Ctrl+T**: the text selected with the mouse (or the clipboard) into the language Settings sets - English until it is - with Google's JSON endpoint and MyMemory as the fallback; the answer goes to the clipboard and, when long, to a read window. |
 | `home/.config/bin/sway-hibernate` | Hibernate, gated on a disk swap and `resume=`. |
 | `home/.config/bin/rofi-agents` | **Agents**: launch a coding agent, install one, keep accounts per agent; `--default` is the root menu's one-click `Agent session` row. |
-| `home/.config/bin/rofi-capture`, `rofi-qr`, `screenshot` | **Capture** (screenshot, annotate, OCR, QR, record), the Wi-Fi QR code, and the one place a screenshot's folder is decided (`~/Pictures/Screenshots/<today>/`). |
-| `home/.config/bin/rofi-dev`, `lazyos-profile` | **Developer** (`Alt+Ctrl+D`): the account into one encrypted archive on a disk (keys, dotfiles, package list), the restore that backs the current profile up first, and a diagnostics bundle for a bug report. `lazyos-profile` is the engine and also runs from a terminal. |
+| `home/.config/bin/rofi-capture`, `rofi-qr`, `screenshot` | **Capture**: symlinks to `lazyos menu capture` and `lazyos menu qr` (screenshot, annotate, OCR, QR), and `screenshot` script deciding output path (`~/Pictures/Screenshots/<today>/`). |
+| `home/.config/bin/rofi-dev`, `lazyos-profile` | **Developer** (`Alt+Ctrl+D`): symlink to `lazyos menu dev` (account backup to encrypted archive, dotfiles, package list). `lazyos-profile` is the CLI engine. |
 | `usr/local/sbin/lazyos-automount`, `etc/udev/rules.d/90-lazyos-automount.rules`, `etc/systemd/system/lazyos-automount@.service`, `etc/polkit-1/rules.d/49-lazyos-automount.rules` | **A plugged USB drive mounts itself**: the udev rule wants one oneshot unit per partition, the helper mounts it through `udisksctl` as the session user (`setpriv`, because a root mount is `uid=0` on vfat) after refusing anything that is not a removable USB disk or that this system came from, and the polkit rule authorizes that session-less caller through `plugdev`. One process per plug, nothing resident. |
-| `home/.config/bin/rofi-files`, `lazyos-thumbnail`, `lazyos-view` | The file browser, the thumbnail generator it calls, and the "open with LazyOS" rule (text/bat, document/papers, image/imv, video/mpv, the rest/Firefox). |
-| `home/.config/bin/lazyos-find` | **Search+Shift**: `fd` streamed into `fzf` over the whole home, with a preview pane (see **Files in a terminal**). |
-| `home/.config/bin/rofi-power` | **Power** menu: lock, suspend, hibernate, log out, reboot, shut down (the last three ask first). |
+| `home/.config/bin/rofi-files`, `lazyos-thumbnail`, `lazyos-view` | The file browser: `rofi-files` is a symlink to `lazyos menu files`, `lazyos-view` is a symlink to `lazyos open`, with thumbnails generated via `lazyos-thumbnail`. |
+| `home/.config/bin/lazyos-find` | **Search+Shift**: symlink to `lazyos menu find` (async file finder over home with preview pane). |
+| `home/.config/bin/rofi-power` | **Power** menu: symlink to `lazyos menu power` (lock, suspend, hibernate, log out, reboot, shut down with Cancel confirmation). |
 | `usr/share/doc/lazyos/*.md` | The seven manual pages the Learn menu opens. |
 | `home/.config/rofi/config.rasi` | Launcher settings: the three modes, `terminal = foot`, matching. |
 | `home/.config/rofi/solarized.rasi` | The solarized look, shared by the launcher, the window switcher and the bar's dmenu. |

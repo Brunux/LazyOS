@@ -15,12 +15,13 @@ First target: the **Google Hayato** Chromebook (MediaTek MT8192, `google-asurada
   booted image comes back clean (kept in [`reports/`](reports/)). The eMMC install works and is
   validated on hardware, and the running installation can be backed up and restored
   (`scripts/backup-system.sh`, `scripts/restore-system.sh`).
-- **Release:** [`v0.3.1`](docs/releases/v0.3.1.md) — the precompiled image, with the **LazyOS**
+- **Release:** [`v0.4.2`](docs/releases/v0.4.2.md) — the precompiled image, with the **LazyOS**
   brand (the mark and the distribution's own identity) and the session this repository documents:
-  **swayfx** with blur, **rofi** for the launcher, the window switcher and
-  the bar's menus, the file browser and its viewers, the manual, **capture**, **download**,
-  **dictation**, **agents**, tablet mode, and the **LazyOS** idle screen and lock (see
-  [Using the system](#using-the-system)).
+  **swayfx** with blur, **lazyos** (Rust/Ratatui multi-call binary) powering the launcher,
+  window switcher, runner, root menu, settings, search, reference, media, and tools across 35 ported
+  surfaces, the pure-data **theme engine** (eight built-in themes, generated wallpapers, themed
+  greeter and lock screen), **TaskView**, the **OpenCode MCP server**, and the **LazyOS** idle
+  screen and lock (see [Using the system](#using-the-system)).
 - **Using it:** [Using the system](#using-the-system) below, and the manual that ships in the image
   (`/usr/share/doc/lazyos/`, or **Learn** in the launcher) - its sources are
   [`uis/sway/files/usr/share/doc/lazyos/`](uis/sway/files/usr/share/doc/lazyos/).
@@ -104,12 +105,13 @@ User `brunux` (or the one the image was built with), password `debian`, password
 | Piece | What it is |
 |---|---|
 | compositor | **swayfx** (a sway fork) with rounded corners, shadows and a blurred backdrop under the translucent terminal, launcher and bar |
-| bar | **waybar**: menu, workspaces, clock, updates, tray, keyboard layout, Bluetooth, network, volume, brightness, battery - each click opens a short-lived **rofi** list |
-| terminal | **foot** (solarized) |
-| launcher | **rofi**: applications (`-show drun`, with the icons of a small theme rendered from the icon fonts), windows (`-show window`), commands (`-show run`), and the bar's own menus (`-dmenu`) |
+| bar | **waybar**: menu, workspaces, clock, updates, tray, keyboard layout, Bluetooth, network, volume, brightness, battery - clicks open native **lazyos** screens or transient bar menus |
+| terminal | **foot** (solarized default, dynamically themed by `lazyos-theme`) |
+| launcher | **lazyos**: applications (`lazyos menu apps`), windows (`lazyos menu window`), commands (`lazyos menu run`), and the 35 ported session menus rendered in native Ratatui TUI inside floating foot windows |
+| theme engine | **lazyos-theme**: 8 built-in themes, atomic generation of 11 surface palettes from `theme.toml`, generated wallpapers, themed greeter and swaylock |
 | notifications | **mako**, under the bar |
 | idle | the screensaver at 150 s, the lock at 300 s |
-| manual | **Learn**, seven pages rendered with **glow** in foot |
+| manual | **Learn**, seven pages rendered with **glow** in foot (`lazyos menu learn`) |
 | browser | **firefox-esr**, the image's one viewer: the file browser hands it anything that is not text |
 
 ### The keys worth knowing on day one
@@ -242,6 +244,12 @@ uis/<ui>/                  one directory per graphical shell (sway, ...)
                            home/ merged into the user's home)
   README.md                what the shell ships and how it differs upstream
 packages/                  device-agnostic package lists (base.list, tools.list)
+rust/                      the native LazyOS Rust workspace
+  crates/lazyos-cli        the `lazyos` multi-call binary (menu, host, dispatch, system pickers)
+  crates/lazyos-ui         Ratatui TUI design system, widgets, snapshots, card vocabulary
+  crates/lazyos-theme      theme engine (theme.toml parser, 8 built-ins, template generators)
+  crates/lazyos-mcp        OpenCode MCP server (18 tools across 4 safety tiers)
+specs/                     one spec per mergeable change (scope, acceptance, witnesses, model)
 scripts/
   lib.sh                   resolves device + kernel + UI, shared config
   lib-cgpt.sh              the ChromeOS GPT layout (kernel + boot + root)
@@ -249,9 +257,13 @@ scripts/
   00-deps.sh               host build dependencies (apk)
   build-kernel.sh          download + patch + build + stage the kernel
   build-swayfx.sh          build scenefx + swayfx and package them as .debs
+  build-workstyle.sh       fetch, patch, build and package workstyle as .deb
+  build-lazyos.sh          build and stage the `lazyos` release binary
   build-rootfs.sh          debootstrap the Debian rootfs
   install-kernel.sh        copy the staged kernel into the rootfs, build the initramfs
   install-swayfx.sh        install the compositor .debs (rootfs, or `/` on a running system)
+  install-workstyle.sh     install the workstyle .deb into rootfs
+  install-lazyos.sh        install `/usr/bin/lazyos` and all command symlinks
   make-kpart.sh            build the signed depthcharge FIT kpart
   write-sd.sh              partition + populate a microSD/USB
   make-image.sh            build a distributable disk image (no card needed)

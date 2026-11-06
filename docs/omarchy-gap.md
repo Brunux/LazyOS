@@ -117,7 +117,7 @@ has that are still missing:
 | **Package search/install** | **done**: `rofi-pkg` searches with `apt-cache`, marks what is installed, installs with `apt-get -y` behind the busy card, and its last row runs `apt-get update` | — |
 | **DNS switcher** | **done**: `rofi-dns` sets `ipv4.dns`/`ipv4.ignore-auto-dns` on the connection that is up and brings it back, with common resolvers, typed servers or DHCP | — |
 | **Reminders** | **done**: `rofi-remind` starts transient `systemd-run --user` timers that fire `notify-send` once, listed back from systemd and cancelled by choosing one | — |
-| **Theme switcher, appearance, animations, monitor layout** | fixed solarized theme | A real project: the palette lives in waybar CSS, foot.ini, rofi's rasi, mako, sway `client.*` and swaybg. Not a menu. |
+| **Theme switcher, appearance, animations, monitor layout** | **done**: `lazyos-theme` (Alt+Shift+T / Alt+Shift+W) parses `theme.toml` with 8 built-ins (Solarized, Catppuccin, Tokyo Night, Rose Pine, Nord, Gruvbox, Everforest, Kanagawa), generates wallpapers and atomic templates across 11 surfaces | — |
 | **OSD (volume/brightness overlay)** | **done**: `~/.config/bin/osd` (Alt+volume/brightness) draws a mako card with the `value` hint as a progress bar and the matching Font Awesome icon; no process, no package. `swayosd` **is** packaged in forky (`0.3.0-4`, 7.7 MB), and the reason it is not used is the daemon: a resident GTK4 server for the same picture. | — |
 
 Not portable from Omarchy at all: its **Install/Remove trees** (pacman/AUR/mise for Arch packages -

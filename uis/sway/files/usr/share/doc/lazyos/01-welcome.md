@@ -26,7 +26,7 @@ everything above the kernel.
 | the bar (top) | waybar: menu, workspaces, clock, updates, tray, keyboard layout, Bluetooth, network, volume, brightness, battery. Left/right click and scroll do different things on each |
 | compositor | **swayfx**, a fork of sway that draws rounded corners, shadows and a blurred backdrop under the translucent terminal, launcher and bar |
 | the terminal | **foot**: solarized palette, no GPU renderer, about half the memory of an Alacritty window |
-| the launcher | **rofi**: applications, windows, commands, and the bar's own menus |
+| the launcher | **lazyos**: applications (`lazyos menu apps`), windows (`lazyos menu window`), commands (`lazyos menu run`), and the 35 ported session menus rendered in native Ratatui TUI inside floating foot windows |
 | notifications | **mako**, bottom of the top-right corner, under the bar |
 | the session | greetd starts sway at boot; swayidle runs the idle screen at 150 s and the lock at 300 s |
 
