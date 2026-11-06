@@ -143,6 +143,7 @@ boundary (008).
 | 016 local model | measured flags + a wrapper + a pin | `claude-sonnet-5-5` (high) | `claude-haiku-5-5` |
 | 017 remaining surfaces | nmcli IPC + process manager + cleaner + places | `claude-sonnet-5-5` (high) | `claude-opus-5-5` |
 | 018 TUI installer | full TUI wizard: user, password, timezone, disk safety, progress | `claude-opus-5-5` (high) | `claude-sonnet-5-5` |
+| 019 notification daemon | layer-shell + D-Bus server + tiny-skia 2D card rendering + actions | `claude-opus-5-5` (high) | `claude-sonnet-5-5` |
 
 The assignment is still a **starting hypothesis**: each PR records the model, the effort, the
 harness and whether the criteria and tests passed on the first review, and the table is revised
@@ -212,6 +213,7 @@ specs.
 | 016 | [`016-local-models.md`](016-local-models.md) — a local model, measured and pinned | - | merged |
 | 017 | [`017-remaining-surfaces.md`](017-remaining-surfaces.md) — remaining interactive surfaces: network, places, clean, agents, and utilities | 4 | draft |
 | 018 | [`018-tui-installer.md`](018-tui-installer.md) — full TUI installer: user setup, timezone, disk safety, progress | 4-5 | draft |
+| 019 | [`019-notification-daemon.md`](019-notification-daemon.md) — eye-candy layer-shell notification daemon, actions, progress | 5 | draft |
 
 The status column is the word that opens each file's `**Status**` line, and CI fails when the two
 disagree (`The index status is the spec's status`, `.github/workflows/specs.yml`). `merged` means
