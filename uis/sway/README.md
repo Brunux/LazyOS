@@ -98,17 +98,19 @@ The drop-in is swayfx-only, so `sway -C` failing means Debian's plain sway is in
 
 ## The launcher
 
-Three jobs, one binary: **rofi** 2.0, themed by `~/.config/rofi/config.rasi` (settings) and
-`~/.config/rofi/solarized.rasi` (the look).
+The launcher, window switcher, and command palette are `lazyos menu apps|window|run` (`rofi-drun`,
+`rofi-window`, `rofi-run`, spec 012) running in a floating `foot` window; **rofi** 2.0
+(`~/.config/rofi/config.rasi` and `~/.config/rofi/solarized.rasi`) stays for the remaining
+`bar-pick` helpers until spec 014 retires them.
 
 | Binding | Command | What it lists |
 |---|---|---|
-| `$mod+d` | `rofi -show drun` | the `.desktop` entries, including the port's own session actions in `usr/share/applications/org.lazyos.*` |
-| Search key | `rofi -show drun` | the applications, the same menu as `$mod+d` |
+| `$mod+d` | `lazyos menu apps` (`rofi-drun`) | the `.desktop` entries, including the port's own session actions in `usr/share/applications/org.lazyos.*` |
+| Search key | `lazyos menu apps` (`rofi-drun`) | the applications, the same menu as `$mod+d` |
 | `Alt+Search` | `rofi-files --search` | every file under `$HOME`, newest first, narrowed by typing (one bounded `fd` run; see "The file browser") |
-| `$mod+Tab` | `rofi -show window` | the open windows, through wlroots' `zwlr_foreign_toplevel_manager_v1` - sway has no switcher of its own |
-| `$mod+Shift+d` | `rofi -show run` | every executable in `$PATH`; **Enter** runs it, **Shift+Enter** runs it in foot, which is how the TUIs from `packages/tools.list` are started |
-| any bar panel | `bar-pick` → `rofi -dmenu` | the fixed list the bar hands it |
+| `$mod+Tab` | `lazyos menu window` (`rofi-window`) | the open windows, from `swaymsg -t get_tree` |
+| `$mod+Shift+d` | `lazyos menu run` (`rofi-run`) | every executable in `$PATH`; **Enter** runs it, **Shift+Enter** runs it in foot, which is how the TUIs from `packages/tools.list` are started |
+| remaining bar helpers | `bar-pick` → `rofi -dmenu` | the fixed list the helper hands it |
 
 The Search key opens the launcher, as it did before the file search borrowed it:
 the magnifier is the key people press for the applications, and `$mod+d` stays as
@@ -168,9 +170,9 @@ The theme holds **three tables**, because three different things ask it for a na
 
 | Table | Who asks | Example |
 |---|---|---|
-| `.desktop` names | the launcher (`rofi -show drun`) | `org.lazyos.files` |
-| binary names | the command palette (`rofi -show run`) | `foot.png`, `htop.png` |
-| freedesktop names | `rofi-files` rows and mako notifications | `folder`, `text-x-generic`, `application-pdf`, `dialog-error` |
+| `.desktop` names | launcher entries (`usr/share/applications`) | `org.lazyos.files` |
+| binary names | command palette / rofi helpers | `foot.png`, `htop.png` |
+| freedesktop names | mako notifications and icon lookups | `folder`, `text-x-generic`, `application-pdf`, `dialog-error` |
 
 The command palette needed its own table for a reason that is not obvious: rofi's **run** mode
 asks the icon theme for an icon *named after the binary* it would run

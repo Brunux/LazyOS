@@ -39,6 +39,19 @@ pub const NEEDED: &[&str] = &["wayvnc", "ss"];
 const PORT: u16 = 5900;
 const STATE_DIR: &str = "lazyos-vnc";
 
+/// Exact argv `start()` uses to spawn `wayvnc`.
+pub const COMMAND_LINE: [&str; 5] = ["nohup", "wayvnc", "--disable-input", "127.0.0.1", "5900"];
+
+/// The command line `start()` runs, exposed for `lazyos menu vnc --command`.
+pub fn command_line() -> Vec<String> {
+    COMMAND_LINE.iter().map(|s| (*s).to_string()).collect()
+}
+
+/// The SSH tunnel command a viewer runs on the other machine.
+pub fn tunnel_command() -> String {
+    tunnel_cmd()
+}
+
 fn state_dir() -> std::path::PathBuf {
     std::env::var("XDG_RUNTIME_DIR")
         .map(std::path::PathBuf::from)
@@ -122,7 +135,7 @@ pub fn status_bar() -> String {
 }
 
 /// Start the wayvnc server.
-fn start() -> Result<(), String> {
+pub fn start() -> Result<(), String> {
     if running().is_some() {
         return Err("Already sharing".to_string());
     }
@@ -137,11 +150,8 @@ fn start() -> Result<(), String> {
     // while the server runs on unowned. nohup execs in place and ignores
     // SIGHUP, so the pid is right in both cases and a closed terminal cannot
     // take the server with it. At logout the session's cgroup takes it.
-    let mut cmd = std::process::Command::new("nohup");
-    cmd.arg("wayvnc")
-        .arg("--disable-input")
-        .arg("127.0.0.1")
-        .arg(PORT.to_string());
+    let mut cmd = std::process::Command::new(COMMAND_LINE[0]);
+    cmd.args(&COMMAND_LINE[1..]);
     cmd.stdout(std::process::Stdio::from(
         std::fs::File::create(log_file()).map_err(|e| e.to_string())?,
     ));
@@ -173,7 +183,7 @@ fn start() -> Result<(), String> {
 }
 
 /// Stop the wayvnc server.
-fn stop() -> Result<(), String> {
+pub fn stop() -> Result<(), String> {
     let pid = match running() {
         Some(p) => p,
         None => {
@@ -219,28 +229,6 @@ pub fn menu(
         return Ok(3);
     }
 
-    let mut picker = Picker::new(
-        "Share this screen",
-        vec![Question::choose(
-            "Share this screen",
-            "Enter acts · Escape closes",
-            Vec::new(), // built dynamically
-            Vec::new(),
-        )],
-    );
-
-    // We need to dynamically build the rows based on current state.
-    // For now, use a simple approach: run the screen, then handle the action.
-    // The rows are rebuilt on each loop iteration in the shell version.
-    // Here we'll use a simpler approach with a single question and handle the action.
-
-    let code = crate::run_screen(terminal, design, "Share this screen", &mut picker)?;
-    if code != 0 {
-        return Ok(code);
-    }
-
-    // The shell version uses a loop that rebuilds the menu. We'll simulate
-    // by checking the state and acting accordingly.
     if sharing() {
         // Already sharing: offer stop and tunnel
         let mut picker = Picker::new(
@@ -428,5 +416,13 @@ mod tests {
         let cmd = tunnel_cmd();
         assert!(cmd.contains(&PORT.to_string()));
         assert!(cmd.contains("ssh -L"));
+    }
+
+    #[test]
+    fn command_line_is_read_only_loopback() {
+        let cmd = command_line().join(" ");
+        assert!(cmd.contains("--disable-input"));
+        assert!(cmd.contains("127.0.0.1"));
+        assert!(!cmd.contains("0.0.0.0"));
     }
 }

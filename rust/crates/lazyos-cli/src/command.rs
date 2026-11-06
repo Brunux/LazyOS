@@ -107,7 +107,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "lock, sleep, hibernate, log out, reboot or shut down (spec 010)",
         shape: Shape::Pick,
         symlinks: &["rofi-power"],
-        installed: &[],
+        installed: &["rofi-power"],
     },
     CommandSpec {
         // `rofi-format`: only disks with nothing mounted, never a built-in one
@@ -388,7 +388,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "desktop entries with icons, frecency, Terminal=true → foot (spec 012)",
         shape: Shape::Pick,
         symlinks: &["rofi-drun"],
-        installed: &[],
+        installed: &["rofi-drun"],
     },
     CommandSpec {
         // Window switcher (spec 012): sway IPC tree, focus/close.
@@ -396,7 +396,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "focus or close any window, from sway IPC (spec 012)",
         shape: Shape::Pick,
         symlinks: &["rofi-window"],
-        installed: &[],
+        installed: &["rofi-window"],
     },
     CommandSpec {
         // Run prompt (spec 012): PATH completion, Shift+Enter → foot.
@@ -404,7 +404,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "PATH commands with completion, Shift+Enter in foot (spec 012)",
         shape: Shape::Pick,
         symlinks: &["rofi-run"],
-        installed: &[],
+        installed: &["rofi-run"],
     },
     CommandSpec {
         // Learn: manual pages + apropos (spec 012).
@@ -412,7 +412,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "the manual pages and apropos, rendered in the window (spec 012)",
         shape: Shape::Pick,
         symlinks: &["rofi-learn"],
-        installed: &[],
+        installed: &["rofi-learn"],
     },
     CommandSpec {
         // Keys: parsed sway config (spec 012).
@@ -420,7 +420,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "every binding from the sway config, comments as descriptions (spec 012)",
         shape: Shape::Pick,
         symlinks: &["rofi-keys"],
-        installed: &[],
+        installed: &["rofi-keys"],
     },
     CommandSpec {
         // Pkg: apt search + install (spec 012).
@@ -428,7 +428,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "search packages and install with apt (spec 012)",
         shape: Shape::Pick,
         symlinks: &["rofi-pkg"],
-        installed: &[],
+        installed: &["rofi-pkg"],
     },
     CommandSpec {
         // Dev: profile export/restore/report (spec 012).
@@ -436,7 +436,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "profile export, restore and diagnostics bundle (spec 012)",
         shape: Shape::Pick,
         symlinks: &["rofi-dev"],
-        installed: &[],
+        installed: &["rofi-dev"],
     },
     CommandSpec {
         // About: fastfetch facts, revision, logs (spec 012).
@@ -444,7 +444,7 @@ pub const COMMANDS: &[CommandSpec] = &[
         summary: "system facts, revision, errors, boot time, devices (spec 012)",
         shape: Shape::Pick,
         symlinks: &["rofi-about"],
-        installed: &[],
+        installed: &["rofi-about"],
     },
 ];
 

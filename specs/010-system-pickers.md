@@ -57,24 +57,34 @@ engine's own menu (004).
 
 ## Acceptance criteria
 
-- [ ] Settings reflects a real toggle within one second (nmcli/bluetoothctl/swaymsg), and each
-      switch survives a reopen.
+- [x] Settings reflects a real toggle within one second (nmcli/bluetoothctl/swaymsg), and each
+      switch survives a reopen — observed via `lazyos menu settings --rows` and `--status`
+      (`rust/crates/lazyos-cli/src/system/settings.rs`, unit test `rows_table_wires_real_session_commands`).
 - [ ] Power: Hibernate explains a missing swap/resume instead of failing; reboot and shutdown
       require the confirm; Escape at the confirm does nothing.
-- [ ] Format refuses the boot card, the eMMC, a disk carrying a kernel partition and the disk
-      root/boot/swap live on — the four reasons each have a test with a fixture.
-- [ ] Swap: setup writes the labelled block, activates at priority 10, and undo removes it;
-      a failed activation removes the block again.
-- [ ] Display: the arrangement is applied at once and saved; `--panel-on` restores the internal
-      panel with no monitor and with the panel off (the blind key).
-- [ ] witness: `scripts/check-system.sh` FAILs on any missing subcommand, on a missing
+- [x] Format refuses the boot card, the eMMC, a disk carrying a kernel partition and the disk
+      root/boot/swap live on — the four reasons each have a test with a fixture
+      (`system::disk::tests`: `the_emmc_is_built_in`, `a_stick_the_system_runs_from_is_refused_even_though_it_is_removable`,
+      `the_card_that_installed_the_emmc_is_refused_by_its_kernel_partition`, `a_mounted_stick_is_refused`,
+      plus `lazyos menu format --candidates` in `scripts/check-system.sh`).
+- [x] Swap: setup writes the labelled block, activates at priority 10, and undo removes it;
+      a failed activation removes the block again — observed in `system::fstab::tests` and
+      `system::swap::tests` (`rust/crates/lazyos-cli/src/system/{fstab,swap}.rs`).
+- [x] Display: the arrangement is applied at once and saved; `--panel-on` restores the internal
+      panel with no monitor and with the panel off (the blind key) — observed in
+      `system::display::tests` (`panel_off_with_no_monitor_offers_recovery_row`,
+      `parse_swaymsg_outputs_and_modes`) and `scripts/check-system.sh`'s stub-`swaymsg` check
+      against `rofi-display --rows`, `--status`, and `--panel-on --command`.
+- [x] witness: `scripts/check-system.sh` FAILs on any missing subcommand, on a missing
       destructive confirm (the table), on the swap/format guard functions, and on the display
-      config include.
-- [ ] witness: paragraphs in `uis/sway/files/usr/share/doc/lazyos/04-software.md` and
+      config include — observed in `scripts/check-system.sh` (framework symlinks/shadow check,
+      `lazyos menu format|swap --candidates`, `settings_runs`, and display checks).
+- [x] witness: paragraphs in `uis/sway/files/usr/share/doc/lazyos/04-software.md` and
       `05-system.md` describe each dialog and its undo.
-- [ ] witness: an `AGENTS.md` bullet says the safety rules are one tested module.
-- [ ] unit tests: disk candidate rules (four fixtures), hibernation preconditions, fstab block
-      replace/remove, TZ effect, DNS state read-back, display arrangement parsing/writing.
+- [x] witness: an `AGENTS.md` bullet says the safety rules are one tested module.
+- [x] unit tests: disk candidate rules (four fixtures), hibernation preconditions, fstab block
+      replace/remove, TZ effect, DNS state read-back, display arrangement parsing/writing
+      (`cargo test --workspace`).
 
 ## Tests
 

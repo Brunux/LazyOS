@@ -15,7 +15,7 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
 use super::pick::{Picker, Question, row};
-use super::{out, print, say, sudo};
+use super::{checked, out, print, say};
 
 /// What the menu needs before it offers anything.
 pub const NEEDED: &[&str] = &["swaymsg", "jq"];
@@ -40,8 +40,13 @@ fn config_path() -> PathBuf {
 /// The internal panel name (eDP-1 on this hardware).
 const PANEL: &str = "eDP-1";
 
+/// The command `--panel-on` runs to recover from a black screen.
+pub fn panel_on_command() -> &'static str {
+    "swaymsg output eDP-1 enable"
+}
+
 /// An output's live state from `swaymsg -t get_outputs`.
-#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct Output {
     name: String,
     x: i32,
@@ -70,16 +75,48 @@ impl Output {
     }
 }
 
+/// Parse `swaymsg -t get_outputs -r` JSON array into `Output` structs.
+fn parse_outputs(json: &str) -> Vec<Output> {
+    let Ok(serde_json::Value::Array(items)) = serde_json::from_str::<serde_json::Value>(json)
+    else {
+        return Vec::new();
+    };
+    let mut outputs = Vec::new();
+    for v in items {
+        let Some(name) = v["name"].as_str() else {
+            continue;
+        };
+        let active = v["active"].as_bool().unwrap_or(false);
+        let scale = v["scale"].as_f64().unwrap_or(1.0) as f32;
+        let rect = &v["rect"];
+        let x = rect["x"].as_i64().unwrap_or(0) as i32;
+        let y = rect["y"].as_i64().unwrap_or(0) as i32;
+        let width = rect["width"].as_u64().unwrap_or(0) as u32;
+        let height = rect["height"].as_u64().unwrap_or(0) as u32;
+        let cur = &v["current_mode"];
+        let mode_width = cur["width"].as_u64().unwrap_or(0) as u32;
+        let mode_height = cur["height"].as_u64().unwrap_or(0) as u32;
+        let mode_refresh = cur["refresh"].as_u64().unwrap_or(0) as u32;
+        outputs.push(Output {
+            name: name.to_string(),
+            x,
+            y,
+            width,
+            height,
+            scale,
+            mode_width,
+            mode_height,
+            mode_refresh,
+            active,
+        });
+    }
+    outputs
+}
+
 /// Read all outputs from sway.
 fn read_outputs() -> Vec<Output> {
     let output = out(&["swaymsg", "-t", "get_outputs", "-r"]).unwrap_or_default();
-    let mut outputs = Vec::new();
-    for line in output.lines() {
-        if let Ok(o) = serde_json::from_str::<Output>(line) {
-            outputs.push(o);
-        }
-    }
-    outputs
+    parse_outputs(&output)
 }
 
 /// Find the external monitor (DP-*) and the internal panel (eDP-*).
@@ -160,14 +197,15 @@ fn save_config(mon: &Output) -> Result<(), String> {
     Ok(())
 }
 
-/// Get available modes for the monitor.
-fn get_modes(mon_name: &str) -> Vec<String> {
-    let output = out(&["swaymsg", "-t", "get_outputs", "-r"]).unwrap_or_default();
+/// Parse available modes for the monitor from `swaymsg -t get_outputs -r` JSON.
+fn parse_modes(json: &str, mon_name: &str) -> Vec<String> {
+    let Ok(serde_json::Value::Array(items)) = serde_json::from_str::<serde_json::Value>(json)
+    else {
+        return Vec::new();
+    };
     let mut modes = Vec::new();
-    for line in output.lines() {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(line)
-            && v["name"].as_str() == Some(mon_name)
-        {
+    for v in items {
+        if v["name"].as_str() == Some(mon_name) {
             if let Some(modes_arr) = v["modes"].as_array() {
                 for m in modes_arr {
                     let w = m["width"].as_u64().unwrap_or(0);
@@ -180,16 +218,24 @@ fn get_modes(mon_name: &str) -> Vec<String> {
             break;
         }
     }
-    // Deduplicate
     modes.sort();
     modes.dedup();
     modes
 }
 
+/// Get available modes for the monitor.
+fn get_modes(mon_name: &str) -> Vec<String> {
+    let output = out(&["swaymsg", "-t", "get_outputs", "-r"]).unwrap_or_default();
+    parse_modes(&output, mon_name)
+}
+
 /// The `--status` output (also used by the Settings row).
 pub fn status() -> String {
-    let outputs = read_outputs();
-    let (mon, panel) = find_monitor_and_panel(&outputs);
+    status_for(&read_outputs())
+}
+
+fn status_for(outputs: &[Output]) -> String {
+    let (mon, panel) = find_monitor_and_panel(outputs);
 
     match (mon, panel) {
         (None, Some(p)) if !p.active => "internal panel off".to_string(),
@@ -213,11 +259,101 @@ pub fn status() -> String {
 
 /// The `--panel-on` blind key handler.
 pub fn panel_on() -> Result<(), String> {
-    if let Err(e) = sudo(&["swaymsg", "output", PANEL, "enable"]) {
+    if let Err(e) = checked(&["swaymsg", "output", PANEL, "enable"]) {
         return Err(format!("Could not enable panel: {e}"));
     }
     print(&format!("{} is back on", PANEL));
     Ok(())
+}
+
+/// Build the `(key, label, detail)` rows for the current outputs.
+fn rows_for(outputs: &[Output]) -> Vec<(String, String, String)> {
+    let (mon, panel) = find_monitor_and_panel(outputs);
+    let mut list = Vec::new();
+
+    let Some(mon) = mon else {
+        let panel_active = panel.as_ref().map(|p| p.active).unwrap_or(false);
+        if !panel_active {
+            list.push((
+                "enable:panel".to_string(),
+                "Bring the internal panel back".to_string(),
+                format!("{} enable", PANEL),
+            ));
+        }
+        list.push((
+            "wd".to_string(),
+            "Open wdisplays".to_string(),
+            "arrange by dragging".to_string(),
+        ));
+        return list;
+    };
+
+    let panel = panel.unwrap_or_default();
+    let cur_arr = arrangement(&mon, &panel);
+
+    if mon.active && panel.active {
+        for a in ["right", "left", "above", "below", "mirror"] {
+            let (name, hint) = match a {
+                "right" => ("Monitor on the right", "panel | monitor"),
+                "left" => ("Monitor on the left", "monitor | panel"),
+                "above" => ("Monitor above", "monitor over the panel"),
+                "below" => ("Monitor below", "monitor under the panel"),
+                "mirror" => ("Mirrored", "both show the same picture"),
+                _ => continue,
+            };
+            let detail = if a == cur_arr { "current" } else { hint };
+            list.push((format!("pos:{}", a), name.to_string(), detail.to_string()));
+        }
+    }
+
+    if panel.active {
+        list.push((
+            "mono:monitor".to_string(),
+            "Only the monitor".to_string(),
+            "internal panel off · not remembered".to_string(),
+        ));
+    } else {
+        list.push((
+            "enable:panel".to_string(),
+            "Bring the internal panel back".to_string(),
+            format!("{} enable", PANEL),
+        ));
+    }
+    if mon.active {
+        list.push((
+            "mono:panel".to_string(),
+            "Only the internal panel".to_string(),
+            "monitor off · not remembered".to_string(),
+        ));
+    } else {
+        list.push((
+            "enable:monitor".to_string(),
+            "Bring the monitor back".to_string(),
+            format!("{} enable", mon.name),
+        ));
+    }
+
+    list.push((
+        "res".to_string(),
+        "Resolution".to_string(),
+        format!("{} @ {} Hz", mon.mode_str(), hz(mon.mode_refresh)),
+    ));
+    list.push((
+        "scale".to_string(),
+        "Scale".to_string(),
+        format!("{}", mon.scale),
+    ));
+    list.push((
+        "wd".to_string(),
+        "Open wdisplays".to_string(),
+        "arrange by dragging".to_string(),
+    ));
+    list
+}
+
+/// The rows `lazyos menu display --rows` prints for `check-system.sh`.
+pub fn rows() -> Vec<(String, String, String)> {
+    rows_for(&read_outputs())
 }
 
 /// The resolution picker.
@@ -304,7 +440,7 @@ fn apply_and_save(arr: &str, mon: &Output, panel: &Output) -> Result<(), String>
         "mirror" => (panel.x, panel.y),
         _ => return Err("unknown arrangement".to_string()),
     };
-    if let Err(e) = sudo(&[
+    if let Err(e) = checked(&[
         "swaymsg",
         "--",
         "output",
@@ -339,34 +475,71 @@ fn display_menu(
 
     if mon.is_none() {
         // No external monitor
-        let panel_active = panel.as_ref().map(|p| p.active).unwrap_or(false);
-        let rows = if !panel_active {
-            vec![row(
-                "Bring the internal panel back",
-                format!("{} enable", PANEL),
-                Glyph::Desktop,
-            )]
-        } else {
-            vec![]
-        };
+        let entries = rows_for(&outputs);
+        let rows: Vec<lazyos_ui::Row> = entries
+            .iter()
+            .map(|(k, l, d)| {
+                let g = if k == "wd" {
+                    Glyph::Mouse
+                } else {
+                    Glyph::Desktop
+                };
+                row(l.clone(), d.clone(), g)
+            })
+            .collect();
+        let keys: Vec<String> = entries.into_iter().map(|(k, _, _)| k).collect();
         let mut picker = Picker::new(
             "Display",
             vec![Question::choose(
                 "Display",
                 "No external monitor · plug one into a USB-C port",
                 rows,
-                vec!["enable:panel".to_string()],
+                keys,
             )],
         );
         let code = run_picker(terminal, design, "Display", &mut picker)?;
         if code != 0 {
             return Ok(code);
         }
+        let answers = picker.answers();
+        if let Some(key) = answers.first() {
+            match key.as_str() {
+                "enable:panel" => {
+                    if let Err(e) = checked(&["swaymsg", "output", PANEL, "enable"]) {
+                        say(
+                            "Display",
+                            format!("Could not enable panel: {e}"),
+                            Urgency::Critical,
+                            Glyph::Display,
+                        );
+                        return Ok(3);
+                    }
+                }
+                "wd" => {
+                    if !have("wdisplays") {
+                        say(
+                            "Display",
+                            "wdisplays is not installed (apt install wdisplays)".to_string(),
+                            Urgency::Critical,
+                            Glyph::Display,
+                        );
+                        return Ok(3);
+                    }
+                    if out(&["pgrep", "-x", "wdisplays"]).is_some() {
+                        let _ = out(&["swaymsg", "[app_id=\"wdisplays\"]", "focus"]);
+                        return Ok(0);
+                    }
+                    let _ = out(&["swaymsg", "workspace", "number", "11"]);
+                    std::process::Command::new("wdisplays").spawn().ok();
+                }
+                _ => {}
+            }
+        }
         return Ok(0);
     }
 
     let mon = mon.unwrap();
-    let panel = panel.unwrap();
+    let panel = panel.unwrap_or_default();
     let cur_arr = arrangement(&mon, &panel);
 
     let mut rows = Vec::new();
@@ -374,6 +547,7 @@ fn display_menu(
 
     if mon.active && panel.active {
         rows.push(row("Arrangement", "where the monitor sits", Glyph::Display));
+        keys.push("-".to_string());
         for a in ["right", "left", "above", "below", "mirror"] {
             let (name, hint) = match a {
                 "right" => ("Monitor on the right", "panel | monitor"),
@@ -393,6 +567,7 @@ fn display_menu(
     }
 
     rows.push(row("One screen", "", Glyph::Desktop));
+    keys.push("-".to_string());
     if panel.active {
         rows.push(row(
             "Only the monitor",
@@ -425,6 +600,7 @@ fn display_menu(
     }
 
     rows.push(row("The monitor", "", Glyph::Display));
+    keys.push("-".to_string());
     rows.push(row(
         "Resolution",
         format!("{} @ {} Hz", mon.mode_str(), hz(mon.mode_refresh)),
@@ -435,6 +611,7 @@ fn display_menu(
     keys.push("scale".to_string());
 
     rows.push(row("Manual", "", Glyph::Mouse));
+    keys.push("-".to_string());
     rows.push(row("Open wdisplays", "arrange by dragging", Glyph::Mouse));
     keys.push("wd".to_string());
 
@@ -443,6 +620,7 @@ fn display_menu(
         config_path().display().to_string(),
         Glyph::Gear,
     ));
+    keys.push("-".to_string());
 
     let mut picker = Picker::new(
         "Display",
@@ -489,7 +667,7 @@ fn display_menu(
                 return Ok(code);
             }
             if let Some(mode) = picker.answers().first() {
-                if let Err(e) = sudo(&["swaymsg", "output", &mon.name, "resolution", mode]) {
+                if let Err(e) = checked(&["swaymsg", "output", &mon.name, "resolution", mode]) {
                     say(
                         "Display",
                         format!("Could not set resolution: {e}"),
@@ -523,7 +701,7 @@ fn display_menu(
                 return Ok(code);
             }
             if let Some(scale) = picker.answers().first() {
-                if let Err(e) = sudo(&["swaymsg", "output", &mon.name, "scale", scale]) {
+                if let Err(e) = checked(&["swaymsg", "output", &mon.name, "scale", scale]) {
                     say(
                         "Display",
                         format!("Could not set scale: {e}"),
@@ -569,7 +747,7 @@ fn display_menu(
             Ok(0)
         }
         "enable:panel" => {
-            if let Err(e) = sudo(&["swaymsg", "output", PANEL, "enable"]) {
+            if let Err(e) = checked(&["swaymsg", "output", PANEL, "enable"]) {
                 say(
                     "Display",
                     format!("Could not enable panel: {e}"),
@@ -581,7 +759,7 @@ fn display_menu(
         }
         "enable:monitor" => {
             if let Some(m) = read_outputs().iter().find(|o| o.name.starts_with("DP-"))
-                && let Err(e) = sudo(&["swaymsg", "output", &m.name, "enable"])
+                && let Err(e) = checked(&["swaymsg", "output", &m.name, "enable"])
             {
                 say(
                     "Display",
@@ -593,7 +771,7 @@ fn display_menu(
             Ok(0)
         }
         "mono:monitor" => {
-            if let Err(e) = sudo(&["swaymsg", "output", PANEL, "disable"]) {
+            if let Err(e) = checked(&["swaymsg", "output", PANEL, "disable"]) {
                 say(
                     "Display",
                     format!("Could not disable panel: {e}"),
@@ -614,7 +792,7 @@ fn display_menu(
             Ok(0)
         }
         "mono:panel" => {
-            if let Err(e) = sudo(&["swaymsg", "output", &mon.name, "disable"]) {
+            if let Err(e) = checked(&["swaymsg", "output", &mon.name, "disable"]) {
                 say(
                     "Display",
                     format!("Could not disable monitor: {e}"),
@@ -729,5 +907,32 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(arrangement(&mon, &panel), "mirror");
+    }
+
+    #[test]
+    fn panel_off_with_no_monitor_offers_recovery_row() {
+        let json = r#"[{"name":"eDP-1","active":false,"scale":1.0,"rect":{"x":0,"y":0,"width":0,"height":0},"current_mode":null,"modes":[]}]"#;
+        let outputs = parse_outputs(json);
+        assert_eq!(outputs.len(), 1);
+        assert!(!outputs[0].active);
+        assert_eq!(status_for(&outputs), "internal panel off");
+        let rows = rows_for(&outputs);
+        assert!(
+            rows.iter()
+                .any(|(k, l, _)| k == "enable:panel" && l == "Bring the internal panel back")
+        );
+    }
+
+    #[test]
+    fn parse_swaymsg_outputs_and_modes() {
+        let json = r#"[
+          {"name":"eDP-1","active":true,"scale":1.0,"rect":{"x":0,"y":0,"width":1366,"height":768},"current_mode":{"width":1366,"height":768,"refresh":60000},"modes":[]},
+          {"name":"DP-1","active":true,"scale":1.25,"rect":{"x":1366,"y":0,"width":1920,"height":1080},"current_mode":{"width":1920,"height":1080,"refresh":59940},"modes":[{"width":1920,"height":1080,"refresh":60000}]}
+        ]"#;
+        let outputs = parse_outputs(json);
+        assert_eq!(outputs.len(), 2);
+        assert_eq!(status_for(&outputs), "right of the panel");
+        let modes = parse_modes(json, "DP-1");
+        assert_eq!(modes, vec!["1920x1080@60Hz"]);
     }
 }

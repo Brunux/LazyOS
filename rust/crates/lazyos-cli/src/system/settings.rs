@@ -15,10 +15,50 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
 use super::pick::{Picker, Question, row};
-use super::{out, say, sudo};
+use super::{checked, out, say, sudo};
 
 /// What the menu needs before it offers anything.
 pub const NEEDED: &[&str] = &["nmcli", "bluetoothctl", "swaymsg", "makoctl", "iw"];
+
+fn bin_script(name: &str) -> String {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
+    format!("{home}/.config/bin/{name}")
+}
+
+/// The canonical rows of the Settings menu (`key`, `label`, `runs`), exposed
+/// for `lazyos menu settings --rows` so `check-system.sh` never greps an ELF.
+pub fn rows() -> Vec<(&'static str, &'static str, &'static str)> {
+    vec![
+        ("wifi-radio", "Wi-Fi radio", "nmcli radio wifi"),
+        ("wifi", "Wi-Fi networks", "bar-net"),
+        ("bt-radio", "Bluetooth radio", "bluetoothctl power"),
+        ("bt", "Bluetooth devices", "bar-bt"),
+        ("night", "Night light", "night-light start"),
+        ("notify", "Notifications", "rofi-notify"),
+        ("dnd", "Do not disturb", "makoctl mode -t do-not-disturb"),
+        ("vnc", "Share this screen", "rofi-vnc"),
+        (
+            "touchpad",
+            "Touchpad",
+            "swaymsg input type:touchpad events toggle",
+        ),
+        ("rotation", "Rotation", "swaymsg output transform"),
+        ("display", "Display arrangement", "rofi-display"),
+        ("automount", "Auto-mount USB drives", "automount.conf"),
+        ("tablet", "Tablet mode", "tablet-mode toggle"),
+        (
+            "tablet-calibrate",
+            "Calibrate rotation",
+            "tablet-mode calibrate",
+        ),
+        ("layout", "Keyboard layout", "rofi-layout"),
+        ("translate", "Translate", "translate config"),
+        ("audio", "Audio output", "bar-audio"),
+        ("mixer", "Volume per application", "pavucontrol"),
+        ("media", "Media", "rofi-media"),
+        ("power", "Battery", "bar-power"),
+    ]
+}
 
 /// The `--status` output (not used as a separate subcommand, but the Settings
 /// row in the menu shows the same probes).
@@ -118,7 +158,7 @@ fn bt_detail() -> String {
 }
 
 fn night_on() -> bool {
-    out(&["sh", "-c", "lazyos-night-light status 2>/dev/null || true"])
+    out(&[&bin_script("night-light"), "status"])
         .map(|s| s.starts_with("on"))
         .unwrap_or(false)
 }
@@ -146,6 +186,21 @@ fn touchpad_on() -> bool {
         .unwrap_or(true)
 }
 
+fn focused_output() -> String {
+    out(&["swaymsg", "-t", "get_outputs", "-r"])
+        .and_then(|s| {
+            let v: Result<Vec<serde_json::Value>, _> = serde_json::from_str(&s);
+            v.ok().and_then(|outputs| {
+                outputs
+                    .iter()
+                    .find(|o| o["focused"].as_bool().unwrap_or(false))
+                    .and_then(|o| o["name"].as_str())
+                    .map(|s| s.to_string())
+            })
+        })
+        .unwrap_or_else(|| "eDP-1".to_string())
+}
+
 fn rotation_name() -> String {
     out(&["swaymsg", "-t", "get_outputs", "-r"])
         .and_then(|s| {
@@ -162,8 +217,7 @@ fn rotation_name() -> String {
 }
 
 fn tablet_mode_detail() -> String {
-    out(&["sh", "-c", "lazyos-tablet-mode status 2>/dev/null || true"])
-        .unwrap_or_else(|| "off".to_string())
+    out(&[&bin_script("tablet-mode"), "status"]).unwrap_or_else(|| "off".to_string())
 }
 
 fn automount_conf() -> std::path::PathBuf {
@@ -279,8 +333,7 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
     }
 
     // VNC screen sharing
-    let vnc_status = out(&["sh", "-c", "lazyos-vnc status 2>/dev/null || echo off"])
-        .unwrap_or_else(|| "off".to_string());
+    let vnc_status = super::vnc::status();
     rows.push(row("Share this screen", vnc_status, Glyph::Eye));
     keys.push("vnc".to_string());
 
@@ -298,12 +351,7 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
     keys.push("rotation".to_string());
 
     // Display arrangement
-    let display_status = out(&[
-        "sh",
-        "-c",
-        "lazyos-display --status 2>/dev/null || echo unknown",
-    ])
-    .unwrap_or_else(|| "unknown".to_string());
+    let display_status = super::display::status();
     rows.push(row("Display arrangement", display_status, Glyph::Display));
     keys.push("display".to_string());
 
@@ -333,12 +381,8 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
         rows.push(row("Tablet mode", tm, Glyph::Keyboard));
         keys.push("tablet".to_string());
         // Calibrate rotation
-        let calib = out(&[
-            "sh",
-            "-c",
-            "lazyos-tablet-mode calibration 2>/dev/null || echo unknown",
-        ])
-        .unwrap_or_else(|| "unknown".to_string());
+        let calib = out(&[&bin_script("tablet-mode"), "calibration"])
+            .unwrap_or_else(|| "unknown".to_string());
         rows.push(row("Calibrate rotation", calib, Glyph::Rotate));
         keys.push("tablet-calibrate".to_string());
     }
@@ -360,12 +404,8 @@ fn build_rows() -> (Vec<lazyos_ui::Row>, Vec<String>) {
     keys.push("layout".to_string());
 
     // Translate
-    let translate_target = out(&[
-        "sh",
-        "-c",
-        "lazyos-translate --target-name 2>/dev/null || echo English",
-    ])
-    .unwrap_or_else(|| "English".to_string());
+    let translate_target =
+        out(&[&bin_script("translate"), "--target-name"]).unwrap_or_else(|| "English".to_string());
     rows.push(row(
         "Translate",
         format!("into {}", translate_target),
@@ -444,7 +484,9 @@ pub fn menu(
                 "Turning the radio on…"
             };
             say("Wi-Fi", msg.to_string(), Urgency::Normal, Glyph::Wifi);
-            if let Err(_e) = sudo(&["nmcli", "radio", "wifi", action]) {
+            if checked(&["nmcli", "radio", "wifi", action]).is_err()
+                && sudo(&["nmcli", "radio", "wifi", action]).is_err()
+            {
                 say(
                     "Wi-Fi",
                     format!("Could not turn the radio {}", action),
@@ -475,7 +517,9 @@ pub fn menu(
                 Urgency::Normal,
                 Glyph::Bluetooth,
             );
-            if let Err(_e) = sudo(&["bluetoothctl", "power", action]) {
+            if checked(&["bluetoothctl", "power", action]).is_err()
+                && sudo(&["bluetoothctl", "power", action]).is_err()
+            {
                 say(
                     "Bluetooth",
                     format!("Could not power the controller {}", action),
@@ -493,21 +537,16 @@ pub fn menu(
             Ok(0)
         }
         "wifi" => {
-            // Open bar-net (nmcli TUI)
-            let _ = std::process::Command::new("nmtui").spawn();
+            let _ = std::process::Command::new(bin_script("bar-net")).spawn();
             Ok(0)
         }
         "bt" => {
-            // Open bar-bt (bluetoothctl)
-            let _ = std::process::Command::new("bluetoothctl").spawn();
+            let _ = std::process::Command::new(bin_script("bar-bt")).spawn();
             Ok(0)
         }
         "night" => {
-            if night_on() {
-                let _ = out(&["sh", "-c", "lazyos-night-light stop"]);
-            } else {
-                let _ = out(&["sh", "-c", "lazyos-night-light start"]);
-            }
+            let cmd = if night_on() { "stop" } else { "start" };
+            let _ = out(&[&bin_script("night-light"), cmd]);
             Ok(0)
         }
         "dnd" => {
@@ -522,10 +561,7 @@ pub fn menu(
             Ok(0)
         }
         "vnc" => {
-            let _ = std::process::Command::new("lazyos")
-                .arg("menu")
-                .arg("vnc")
-                .spawn();
+            let _ = std::process::Command::new(bin_script("rofi-vnc")).spawn();
             Ok(0)
         }
         "touchpad" => {
@@ -533,17 +569,47 @@ pub fn menu(
             Ok(0)
         }
         "rotation" => {
-            let _ = std::process::Command::new("lazyos")
-                .arg("menu")
-                .arg("--rotation-menu")
-                .spawn();
+            let cur = rotation_name();
+            let choices = [
+                ("normal", "Normal", "landscape (default)"),
+                ("90", "90° clockwise", "portrait"),
+                ("180", "180°", "inverted landscape"),
+                ("270", "270° clockwise", "portrait"),
+            ];
+            let r_rows: Vec<lazyos_ui::Row> = choices
+                .iter()
+                .map(|(k, l, d)| {
+                    let detail = if *k == cur { "current" } else { *d };
+                    row((*l).to_string(), detail.to_string(), Glyph::Rotate)
+                })
+                .collect();
+            let r_keys: Vec<String> = choices.iter().map(|(k, _, _)| (*k).to_string()).collect();
+            let mut r_picker = Picker::new(
+                "Rotation",
+                vec![Question::choose(
+                    "Rotation",
+                    "Enter applies · Escape closes",
+                    r_rows,
+                    r_keys,
+                )],
+            );
+            let r_code = crate::run_screen(terminal, design, "Rotation", &mut r_picker)?;
+            if r_code == 0
+                && let Some(rot) = r_picker.answers().first()
+            {
+                let out_name = focused_output();
+                let _ = out(&["swaymsg", "output", &out_name, "transform", rot]);
+                say(
+                    "Rotation",
+                    format!("{out_name} → {rot}"),
+                    Urgency::Normal,
+                    Glyph::Rotate,
+                );
+            }
             Ok(0)
         }
         "display" => {
-            let _ = std::process::Command::new("lazyos")
-                .arg("menu")
-                .arg("display")
-                .spawn();
+            let _ = std::process::Command::new(bin_script("rofi-display")).spawn();
             Ok(0)
         }
         "automount" => {
@@ -578,29 +644,25 @@ pub fn menu(
             Ok(0)
         }
         "tablet" => {
-            let _ = out(&["sh", "-c", "lazyos-tablet-mode toggle"]);
+            let _ = out(&[&bin_script("tablet-mode"), "toggle"]);
             Ok(0)
         }
         "tablet-calibrate" => {
-            let _ = out(&["sh", "-c", "lazyos-tablet-mode calibrate || true"]);
+            let _ = out(&[&bin_script("tablet-mode"), "calibrate"]);
             Ok(0)
         }
         "layout" => {
-            let _ = std::process::Command::new("lazyos")
-                .arg("menu")
-                .arg("layout")
-                .spawn();
+            let _ = std::process::Command::new(bin_script("rofi-layout")).spawn();
             Ok(0)
         }
         "translate" => {
-            let _ = out(&["sh", "-c", "lazyos-translate config"]);
+            let _ = std::process::Command::new(bin_script("translate"))
+                .arg("config")
+                .spawn();
             Ok(0)
         }
         "audio" => {
-            let _ = std::process::Command::new("lazyos")
-                .arg("menu")
-                .arg("audio")
-                .spawn();
+            let _ = std::process::Command::new(bin_script("bar-audio")).spawn();
             Ok(0)
         }
         "mixer" => {
@@ -608,17 +670,11 @@ pub fn menu(
             Ok(0)
         }
         "media" => {
-            let _ = std::process::Command::new("lazyos")
-                .arg("menu")
-                .arg("media")
-                .spawn();
+            let _ = std::process::Command::new(bin_script("rofi-media")).spawn();
             Ok(0)
         }
         "power" => {
-            let _ = std::process::Command::new("lazyos")
-                .arg("menu")
-                .arg("power")
-                .spawn();
+            let _ = std::process::Command::new(bin_script("bar-power")).spawn();
             Ok(0)
         }
         _ => Ok(0),
@@ -640,8 +696,36 @@ fn have(program: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn status_formats_correctly() {
-        // Would require mocking all the probes
+    fn rows_table_wires_real_session_commands() {
+        let table = rows();
+        assert!(
+            table
+                .iter()
+                .any(|(k, _, r)| *k == "display" && *r == "rofi-display")
+        );
+        assert!(
+            table
+                .iter()
+                .any(|(k, _, r)| *k == "vnc" && *r == "rofi-vnc")
+        );
+        assert!(
+            table
+                .iter()
+                .any(|(k, _, r)| *k == "night" && *r == "night-light start")
+        );
+        assert!(
+            table
+                .iter()
+                .any(|(k, _, r)| *k == "translate" && *r == "translate config")
+        );
+        assert!(
+            table
+                .iter()
+                .any(|(k, l, _)| *k == "automount" && *l == "Auto-mount USB drives")
+        );
+        assert!(!table.iter().any(|(_, _, r)| r.starts_with("lazyos-")));
     }
 }

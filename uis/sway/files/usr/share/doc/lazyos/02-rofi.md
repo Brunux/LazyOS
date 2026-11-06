@@ -1,30 +1,32 @@
-# rofi: the launcher, the window list and every menu
+# The menus: the framework's lists, and the rofi ones still to port
 
-One binary, a handful of jobs. It exists while its window is on screen and
-nothing of it stays afterwards (13-17 MB of memory while open; there is no
-daemon).
+Two programs draw them. **The framework** (`lazyos`) draws the lists in a
+terminal window: one row per item, a Nerd Font glyph, and filtering as you type.
+**rofi** draws the rest - `bar-pick`'s dmenu and the menus whose surface has not
+been ported yet. Neither stays after its window closes (13-17 MB of memory
+while open; there is no daemon).
 
 | You press | What opens | What it lists |
 |---|---|---|
-| **Alt+D** | `rofi -show drun` | the applications: the `.desktop` entries, including this image's own (LazyOS Menu, Settings, Wi-Fi, Bluetooth, audio, media, notifications, power, Files, Camera, Learn, Keys, Dictate, Agents…) |
-| **Alt+Tab** | `rofi -show window` | the open windows (sway has no switcher of its own; this uses wlroots' foreign-toplevel protocol) |
-| **Alt+Shift+D** | `rofi -show run` | every executable in `$PATH`. **Enter** runs it, **Shift+Enter** runs it in foot |
+| **Alt+D** | `lazyos menu apps` (`rofi-drun`) | the applications: the `.desktop` entries, including this image's own (LazyOS Menu, Settings, Wi-Fi, Bluetooth, audio, media, notifications, power, Files, Camera, Learn, Keys, Dictate, Agents…) |
+| **Alt+Tab** | `lazyos menu window` (`rofi-window`) | the open windows (sway has no switcher of its own; this uses wlroots' foreign-toplevel protocol) |
+| **Alt+Shift+D** | `lazyos menu run` (`rofi-run`) | every executable in `$PATH`. **Enter** runs it, **Shift+Enter** runs it in foot |
 | **Alt+Space** | `lazyos menu` (`bar-menu`) | the root menu: what opens something, the AI rows (Ask among them), the system panels, and the session actions - type to narrow it |
-| **Alt+Ctrl+K** | `rofi-keys` | every key binding this session defines, parsed from `/etc/sway` and `~/.config/sway`. Enter copies the command |
+| **Alt+Ctrl+K** | `lazyos menu keys` (`rofi-keys`) | every key binding this session defines, parsed from `/etc/sway` and `~/.config/sway`. Enter copies the command |
 | **Alt+Ctrl+F** | `lazyos menu files` (`rofi-files`) | the filesystem with a preview beside it: directories first, sizes and dates dimmed. Enter opens a directory or the file; the dotfiles are Ctrl+H away |
 | **Alt+Ctrl+G** | `lazyos menu grep` (`rofi-grep`) | **search inside the files**: ripgrep over your home, one row per match; Enter opens the file at that line, in the same window |
-| **Alt+Ctrl+D** | `rofi-dev` | **developer**: export your profile (keys, configs, package list) into an encrypted archive on a disk, restore one, or save a diagnostics bundle |
+| **Alt+Ctrl+D** | `lazyos menu dev` (`rofi-dev`) | **developer**: export your profile (keys, configs, package list) into an encrypted archive on a disk, restore one, or save a diagnostics bundle |
 | **Download** (root menu, launcher) | `rofi-download` | a link - or the one in the clipboard - kept in `~/Downloads`, as a video or as audio |
-| **Alt+Ctrl+C** | `rofi-capture` | **capture**: a screenshot (screen, area or window), annotate it, read the text or a QR code out of a region, and start or stop a recording |
-| **Alt+Ctrl+O** | `rofi-quick` | **Settings**: the switches (Wi-Fi and Bluetooth radios, night light, do-not-disturb, touchpad, tablet mode, rotation, display arrangement, screen sharing, auto-mount of USB drives) and the panels, in one list |
-| **Alt+Ctrl+P** or **Alt+Escape** | `rofi-power` | **power**: lock, suspend, hibernate, log out, reboot, shut down - the last three ask once more |
-| **Alt+Ctrl+N** | `rofi-notify` | the notification history, with do-not-disturb and "copy this notification" |
-| **Alt+Ctrl+Q** | `rofi-calc` | a calculator: type `(3*4)/2`, Enter copies `6` |
-| **Alt+Ctrl+V** | `rofi-clip` | **clipboard history**: what was copied, Enter puts it back, Alt+1 deletes that entry |
-| **Alt+Ctrl+E** | `rofi-emoji` | **emoji**: type a name, Enter inserts the glyph at the cursor, Alt+1 only copies it |
+| **Alt+Ctrl+C** | `lazyos menu capture` (`rofi-capture`) | **capture**: a screenshot (screen, area or window), annotate it, read the text or a QR code out of a region, and start or stop a recording |
+| **Alt+Ctrl+O** | `lazyos menu settings` (`rofi-quick`) | **Settings**: the switches (Wi-Fi and Bluetooth radios, night light, do-not-disturb, touchpad, tablet mode, rotation, display arrangement, screen sharing, auto-mount of USB drives) and the panels, in one list |
+| **Alt+Ctrl+P** or **Alt+Escape** | `lazyos menu power` (`rofi-power`) | **power**: lock, suspend, hibernate, log out, reboot, shut down - the last three ask once more |
+| **Alt+Ctrl+N** | `lazyos menu notify` (`rofi-notify`) | the notification history, with do-not-disturb and "copy this notification" |
+| **Alt+Ctrl+Q** | `lazyos menu calc` (`rofi-calc`) | a calculator: type `(3*4)/2`, Enter copies `6` |
+| **Alt+Ctrl+V** | `lazyos menu clip` (`rofi-clip`) | **clipboard history**: what was copied, Enter puts it back, Alt+1 deletes that entry |
+| **Alt+Ctrl+E** | `lazyos menu emoji` (`rofi-emoji`) | **emoji**: type a name, Enter inserts the glyph at the cursor, Alt+1 only copies it |
 | **Alt+Ctrl+T** | `translate` | **translate** the selected text (or the clipboard) into the language Settings sets, English until it is set; the answer is copied, and a long one opens in a read window |
 | any bar module click | `bar-pick` → `rofi -dmenu` | the fixed list that module hands it (Wi-Fi networks, sinks, devices, power actions, …) |
-| **Learn** (root menu) | `rofi-learn` | these pages, rendered with glow, plus a search across all of them |
+| **Learn** (root menu) | `lazyos menu learn` (`rofi-learn`) | these pages, rendered with glow, plus a search across all of them |
 
 The root menu is also a launcher entry: **LazyOS Menu** (`Alt+D`, type
 `lazy`). It runs the same `bar-menu` that **Alt+Space** opens, so the list is

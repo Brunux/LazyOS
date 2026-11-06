@@ -40,17 +40,34 @@ else
 fi
 
 install -m 0755 "$LAZYOS_STAGE/lazyos" "$ROOTFS/usr/bin/lazyos"
-ln -sfn lazyos "$ROOTFS/usr/bin/lazyos-menu"
-ln -sfn lazyos "$ROOTFS/usr/bin/lazyos-task"
+
+# Every name the command table says is installed, made here - not just the two
+# the framework bootstrapped with. The table's `installed` field is what
+# check-system.sh validates, so a name it lists and this script does not create
+# is a FAIL on the device for a surface that works when typed. Reading the list
+# out of the binary (rather than repeating it here) is what keeps the two from
+# drifting: the binary is the source of truth, and `--symlinks` is its own
+# answer.
+while IFS='	' read -r _name _path; do
+	[ -n "$_name" ] || continue
+	ln -sfn lazyos "$ROOTFS/usr/bin/$_name"
+done < <("$ROOTFS/usr/bin/lazyos" --symlinks)
 
 # Read back what was written: a binary that does not answer is a broken copy,
 # and the version is what check-system.sh compares with the image's record.
 REPORTED="$("$ROOTFS/usr/bin/lazyos" --version 2>/dev/null || true)"
 [ "$REPORTED" = "$(cat "$REPO_DIR/VERSION")" ] ||
 	die "$ROOTFS/usr/bin/lazyos does not report $(cat "$REPO_DIR/VERSION") (got '$REPORTED')"
-[ -x "$ROOTFS/usr/bin/lazyos-menu" ] ||
-	die "$ROOTFS/usr/bin/lazyos-menu does not resolve to the binary"
-[ -x "$ROOTFS/usr/bin/lazyos-task" ] ||
-	die "$ROOTFS/usr/bin/lazyos-task does not resolve to the binary"
+
+# One FAIL-shaped answer per name here beats a dozen on the card: a link that
+# does not resolve is the key that opens nothing, and only this script can say
+# so before the image is written.
+_missing=
+while IFS='	' read -r _name _path; do
+	[ -n "$_name" ] || continue
+	[ -x "$ROOTFS/usr/bin/$_name" ] || _missing="$_missing $_name"
+done < <("$ROOTFS/usr/bin/lazyos" --symlinks)
+[ -z "$_missing" ] ||
+	die "these installed names do not resolve to the binary:$_missing"
 
 log "lazyos $REPORTED installed; its menu opens with 'lazyos menu' from the session"

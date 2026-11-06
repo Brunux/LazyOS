@@ -229,6 +229,48 @@ impl Screen for BluetoothScreen {
 
 impl BluetoothScreen {}
 
+/// The `--status` (`status`) JSON output for waybar (`custom/bt`).
+pub fn status() -> String {
+    let powered = BluetoothScreen::get_powered();
+    if !powered {
+        return format_status(false, &[]);
+    }
+    let connected = out(&["bluetoothctl", "devices", "Connected"]).unwrap_or_default();
+    let names: Vec<String> = connected
+        .lines()
+        .filter_map(|line| {
+            let rest = line.strip_prefix("Device ")?;
+            let (_, name) = rest.split_once(' ')?;
+            Some(name.trim().to_string())
+        })
+        .collect();
+    format_status(true, &names)
+}
+
+fn format_status(powered: bool, connected_names: &[String]) -> String {
+    const ICON: &str = "\u{f294}"; // Font Awesome bluetooth-b
+    if !powered {
+        return format!(
+            "{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span>\",\"class\":\"off\",\"tooltip\":\"Bluetooth off (click to turn on)\"}}",
+            ICON
+        );
+    }
+    if connected_names.is_empty() {
+        format!(
+            "{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span>\",\"class\":\"on\",\"tooltip\":\"Bluetooth on · nothing connected\"}}",
+            ICON
+        )
+    } else {
+        let tooltip = connected_names.join("\\n").replace('"', "'");
+        format!(
+            "{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span> {}\",\"class\":\"on\",\"tooltip\":\"{}\"}}",
+            ICON,
+            connected_names.len(),
+            tooltip
+        )
+    }
+}
+
 /// `lazyos menu bluetooth` (`bar-bt`): the window.
 pub fn menu(
     terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
@@ -363,5 +405,16 @@ mod tests {
     fn bluetooth_needed_tools() {
         assert!(NEEDED.contains(&"bluetoothctl"));
         assert!(NEEDED.contains(&"foot"));
+    }
+
+    #[test]
+    fn status_json_for_waybar() {
+        let off = format_status(false, &[]);
+        assert!(off.contains("\"class\":\"off\""));
+        assert!(off.contains("\u{f294}"));
+        let on = format_status(true, &["Buds".to_string()]);
+        assert!(on.contains("\"class\":\"on\""));
+        assert!(on.contains("</span> 1\""));
+        assert!(on.contains("\"tooltip\":\"Buds\""));
     }
 }

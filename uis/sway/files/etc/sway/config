@@ -22,15 +22,17 @@ set $up k
 set $right l
 # Your preferred terminal emulator
 set $term foot
-# Your preferred application launcher. rofi does three jobs with one binary and
-# one theme (~/.config/rofi/{config,solarized}.rasi): the applications
-# ($launcher, the .desktop entries including this port's own session actions in
-# usr/share/applications/org.lazyos.*), the command palette ($runner, $PATH, where
-# Shift+Enter runs the choice in foot) and the window switcher ($switcher, which
-# sway does not have). See uis/sway/README.md, "The launcher".
-set $launcher rofi -show drun
-set $runner rofi -show run
-set $switcher rofi -show window
+# Your preferred application launcher. The three jobs rofi used to do with its
+# own modes are the framework's now (spec 012) - one binary, one palette:
+# the applications ($launcher, the .desktop entries including this port's own
+# session actions in usr/share/applications/org.lazyos.*), the command palette
+# ($runner, $PATH, where Shift+Enter runs the choice in foot) and the window
+# switcher ($switcher, which sway does not have). They draw a Nerd Font glyph
+# per row and filter as you type, which is what rofi's rows could not do in
+# foot. See uis/sway/README.md, "The launcher".
+set $launcher lazyos menu apps
+set $runner lazyos menu run
+set $switcher lazyos menu window
 
 ### Output configuration
 #

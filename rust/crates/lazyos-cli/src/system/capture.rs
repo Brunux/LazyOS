@@ -49,6 +49,7 @@ pub struct CaptureScreen {
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
     keys: Vec<String>,
+    open_qr: bool,
 }
 
 impl CaptureScreen {
@@ -61,6 +62,7 @@ impl CaptureScreen {
             header: Header::new("LazyOS").subtitle("Capture"),
             keybar: vec![KeyHint::new("Enter", "run"), KeyHint::new("Esc", "close")],
             rows_height: Cell::new(20),
+            open_qr: false,
         };
         screen.check_recording();
         screen.build_rows();
@@ -269,17 +271,20 @@ impl CaptureScreen {
             let target = action.split(':').nth(1).unwrap_or("");
             let act = action.split(':').next().unwrap_or("");
             Self::screenshot(act, target);
-            Outcome::Continue
+            Outcome::Done(lazyos_ui::app::exit::OK)
         } else {
             match key.as_str() {
                 "annotate" => {
                     Self::annotate();
+                    return Outcome::Done(lazyos_ui::app::exit::OK);
                 }
                 "ocr" => {
                     Self::ocr();
+                    return Outcome::Done(lazyos_ui::app::exit::OK);
                 }
                 "qr" => {
                     Self::scan_qr();
+                    return Outcome::Done(lazyos_ui::app::exit::OK);
                 }
                 "rec:none" => {
                     Self::start_recording(None);
@@ -299,8 +304,8 @@ impl CaptureScreen {
                     self.build_rows();
                 }
                 "make-qr" => {
-                    // Delegate to QR menu
-                    return Outcome::Continue; // Will be handled by the caller
+                    self.open_qr = true;
+                    return Outcome::Done(lazyos_ui::app::exit::OK);
                 }
                 "folder" => {
                     let shotdir = dirs::picture_dir()
@@ -312,6 +317,7 @@ impl CaptureScreen {
                         .stdout(std::process::Stdio::null())
                         .stderr(std::process::Stdio::null())
                         .spawn();
+                    return Outcome::Done(lazyos_ui::app::exit::OK);
                 }
                 _ => {}
             }
@@ -319,13 +325,25 @@ impl CaptureScreen {
         }
     }
 
-    fn screenshot(action: &str, target: &str) {
-        let mut args = vec!["-n", action];
+    /// Build the argv to invoke `~/.config/bin/screenshot` so saved screenshots
+    /// land in `~/Pictures/Screenshots/<date>/` instead of `XDG_PICTURES_DIR`.
+    pub fn screenshot_argv(home: &str, action: &str, target: &str) -> Vec<String> {
+        let mut argv = vec![
+            format!("{home}/.config/bin/screenshot"),
+            "-n".to_string(),
+            action.to_string(),
+        ];
         if !target.is_empty() {
-            args.push(target);
+            argv.push(target.to_string());
         }
-        let _ = std::process::Command::new("grimshot")
-            .args(&args)
+        argv
+    }
+
+    fn screenshot(action: &str, target: &str) {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
+        let argv = Self::screenshot_argv(&home, action, target);
+        let _ = std::process::Command::new(&argv[0])
+            .args(&argv[1..])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -333,17 +351,54 @@ impl CaptureScreen {
     }
 
     fn annotate() {
-        // grimshot save area -> path, then swappy -f path
-        if let Some(output) = out(&["grimshot", "save", "area"]) {
-            let path = output.trim();
-            if !path.is_empty() {
-                let _ = std::process::Command::new("swappy")
-                    .args(["-f", path])
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
+        let script = format!("{home}/.config/bin/screenshot");
+        let shotdir = dirs::picture_dir()
+            .map(|p| p.join("Screenshots"))
+            .unwrap_or_else(|| Path::new(&home).join("Pictures/Screenshots"));
+        let day = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let dir = shotdir.join(day);
+        let _ = std::fs::create_dir_all(&dir);
+        let out_file = dir.join(format!(
+            "annotated-{}.png",
+            chrono::Local::now().format("%H%M%S")
+        ));
+        let tmp = std::env::temp_dir().join(format!("annotate-{}.png", std::process::id()));
+        if Self::region_image(&tmp) {
+            let _ = std::process::Command::new("swappy")
+                .args([
+                    "-f",
+                    &tmp.to_string_lossy(),
+                    "-o",
+                    &out_file.to_string_lossy(),
+                ])
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+            let _ = std::fs::remove_file(&tmp);
+            if out_file.exists() && out_file.metadata().map(|m| m.len()).unwrap_or(0) > 0 {
+                let name = out_file
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                say(
+                    "Capture",
+                    format!("Saved {name}"),
+                    lazyos_ui::Urgency::Normal,
+                    Glyph::Camera,
+                );
+            } else {
+                say(
+                    "Capture",
+                    "The annotation was not saved",
+                    lazyos_ui::Urgency::Normal,
+                    Glyph::Camera,
+                );
             }
+        } else {
+            let _ = script;
         }
     }
 
@@ -606,6 +661,9 @@ pub fn menu(
     }
     let mut screen = CaptureScreen::new();
     let code = crate::run_screen(terminal, design, "Capture", &mut screen)?;
+    if screen.open_qr {
+        return super::qr::menu(terminal, design);
+    }
     Ok(code)
 }
 
@@ -617,5 +675,14 @@ mod tests {
     fn capture_needed_tools() {
         assert!(NEEDED.contains(&"grimshot"));
         assert!(NEEDED.contains(&"wf-recorder"));
+    }
+
+    #[test]
+    fn screenshot_uses_wrapper_in_config_bin() {
+        let argv = CaptureScreen::screenshot_argv("/home/brunux", "save", "area");
+        assert_eq!(
+            argv,
+            vec!["/home/brunux/.config/bin/screenshot", "-n", "save", "area"]
+        );
     }
 }

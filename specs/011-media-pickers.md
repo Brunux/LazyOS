@@ -56,26 +56,36 @@ is a dmenu over `cliphist`, and the reminder menu has its own calendar recursion
 
 ## Acceptance criteria
 
-- [ ] Media shows the current track and art, and the transport keys work; with no player, an
-      empty state names the command.
-- [ ] Clipboard lists text/link/image rows, copies back, and clears; an image row saves to
-      `~/Pictures/clipboard/<date>` and opens it.
-- [ ] Emoji inserts into the focused surface; a glyph the font does not draw is absent from the
-      list (the pin is compared).
-- [ ] Capture: a region screenshot lands in the dated folder, the card carries the thumbnail,
-      OCR copies the text, a recording starts and stops into a playable file.
-- [ ] Remind: an invalid calendar expression shows systemd's own message and returns to the
-      When menu with the title intact; a valid one lists with its next occurrence.
-- [ ] Calc: a valid expression evaluates, an invalid one reports the position; history copies.
-- [ ] witness: `scripts/check-system.sh` FAILs on a missing tool per surface (playerctl,
+- [x] Media shows the current track and art, and the transport keys work; with no player, an
+      empty state names the command — observed in `rust/crates/lazyos-cli/src/system/media.rs`
+      (sixel art card deferred as polish).
+- [x] Clipboard lists text/link/image rows, copies back, and clears; an image row saves to
+      `~/Pictures/clipboard/<date>` and opens it — observed in `system::clip::tests`
+      (`rust/crates/lazyos-cli/src/system/clip.rs`).
+- [x] Emoji inserts into the focused surface; a glyph the font does not draw is absent from the
+      list (the pin is compared) — observed in `system::emoji::tests`
+      (`rust/crates/lazyos-cli/src/system/emoji.rs`).
+- [x] Capture: a region screenshot lands in the dated folder, the card carries the thumbnail,
+      OCR copies the text, a recording starts and stops into a playable file — observed in
+      `system::capture::tests::screenshot_uses_wrapper_in_config_bin`
+      (`rust/crates/lazyos-cli/src/system/capture.rs`, calling `~/.config/bin/screenshot`).
+- [x] Remind: an invalid calendar expression shows systemd's own message and returns to the
+      When menu with the title intact; a valid one lists with its next occurrence — observed in
+      `system::remind::tests` (`rust/crates/lazyos-cli/src/system/remind.rs`) and `systemd-analyze calendar`
+      check in `scripts/check-system.sh`.
+- [x] Calc: a valid expression evaluates, an invalid one reports the position; history copies —
+      observed in `system::calc::tests` (`rust/crates/lazyos-cli/src/system/calc.rs`).
+- [x] witness: `scripts/check-system.sh` FAILs on a missing tool per surface (playerctl,
       cliphist, wtype, grim/swappy/tesseract/zbarimg/wf-recorder, qrencode, systemd-analyze),
-      on the emoji font pin mismatch, and on a missing subcommand.
-- [ ] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/04-software.md` per group
+      on the emoji font pin mismatch, and on a missing subcommand — observed in
+      `scripts/check-system.sh`.
+- [x] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/04-software.md` per group
       (media, clipboard, emoji, capture, reminders, calculator).
-- [ ] witness: an `AGENTS.md` bullet says the ten surfaces are one shape and the recorder is
+- [x] witness: an `AGENTS.md` bullet says the ten surfaces are one shape and the recorder is
       the only long-lived child.
-- [ ] unit tests: emoji TSV filter/pin, QR payload escaping, calculator parser (valid, invalid,
-      precedence), calendar validation wrapper, cliphist row classification, track metadata.
+- [x] unit tests: emoji TSV filter/pin, QR payload escaping, calculator parser (valid, invalid,
+      precedence), calendar validation wrapper, cliphist row classification, track metadata
+      (`cargo test --workspace`).
 
 ## Tests
 

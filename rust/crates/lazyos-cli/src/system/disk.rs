@@ -332,6 +332,13 @@ pub fn candidates(listing: &str, facts: &Facts) -> Vec<Disk> {
         .collect()
 }
 
+/// The disks this machine currently offers to `menu format` and `menu swap`.
+pub fn candidates_from_machine() -> Vec<Disk> {
+    let listing = super::out(&["lsblk", "-dnro", "NAME,SIZE,MODEL,TRAN"]).unwrap_or_default();
+    let facts = Facts::from_machine();
+    candidates(&listing, &facts)
+}
+
 /// The first partition of a disk: `sda1` but `mmcblk1p1`, because the kernel
 /// inserts a `p` when the device name already ends in a digit. A menu that
 /// wrote `/dev/mmcblk11` would create a device node nobody asked for.

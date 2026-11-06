@@ -377,7 +377,12 @@ impl KeysScreen {
     }
 
     fn binding_row(b: &KeyBinding) -> Row {
-        let mut row = Row::new(&format!("{}  {}", b.keys, b.description)).glyph(Glyph::Key);
+        let desc = if b.description.trim().is_empty() {
+            b.command.trim()
+        } else {
+            b.description.trim()
+        };
+        let mut row = Row::new(&format!("{}  {}", b.keys, desc)).glyph(Glyph::Key);
         if let Some(mode) = &b.mode {
             row = row.detail(&format!("mode: {}", mode));
         }
@@ -539,6 +544,11 @@ impl KeysScreen {
     }
 }
 
+/// All parsed sway bindings for `lazyos menu keys --rows`.
+pub fn rows() -> Vec<KeyBinding> {
+    KeysScreen::load_bindings()
+}
+
 /// `lazyos menu keys` (`rofi-keys`): the keys viewer.
 pub fn menu(
     terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
@@ -601,5 +611,19 @@ mod tests {
         tools.insert("rofi-files".to_string(), ());
         let icon = KeysScreen::binding_icon("rofi-files --search", "Launcher", &tools);
         assert_eq!(icon, "rofi-files");
+    }
+
+    #[test]
+    fn uncommented_binding_falls_back_to_command() {
+        let b = KeyBinding {
+            keys: "Alt+Return".to_string(),
+            command: "exec foot".to_string(),
+            description: String::new(),
+            mode: None,
+            icon: "utilities-terminal".to_string(),
+            category: "Session".to_string(),
+        };
+        let row = KeysScreen::binding_row(&b);
+        assert_eq!(row.label, "Alt+Return  exec foot");
     }
 }

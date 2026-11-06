@@ -253,32 +253,129 @@ fn global(args: &[String]) -> Option<i32> {
 }
 
 /// A question a command answers on stdout without a window: what
-/// `check-system.sh` reads. It is decided before the host, because from the
-/// session the host would open a `foot` for a line of text.
+/// `check-system.sh` or waybar reads. It is decided before the host, because
+/// from the session the host would open a `foot` for a line of text.
 fn query(resolved: &Resolved) -> Option<i32> {
-    if resolved.args.first().map(String::as_str) != Some("--rows") {
-        return None;
+    let args: Vec<&str> = resolved.args.iter().map(String::as_str).collect();
+    match (resolved.spec.path, args.as_slice()) {
+        ("menu", ["--rows"]) | ("menu palette", ["--rows"]) => {
+            let surface = if resolved.spec.path == "menu" {
+                menu::Surface::Root
+            } else {
+                menu::Surface::Palette
+            };
+            // `key<TAB>group<TAB>label<TAB>runs`, in the order the menu draws them.
+            // The table alone, not this machine's context: the check compares rows,
+            // and a row's detail (which agent it starts) is not part of what it is.
+            let mut out = io::stdout();
+            for entry in menu::entries(surface, &menu::Context::default()) {
+                let _ = writeln!(
+                    out,
+                    "{}\t{}\t{}\t{}",
+                    entry.key,
+                    entry.group.label(),
+                    entry.label,
+                    menu::runs(entry.action)
+                );
+            }
+            Some(EXIT_OK)
+        }
+        ("menu display", ["--status"] | ["status"]) => {
+            println!("{}", system::display::status());
+            Some(EXIT_OK)
+        }
+        ("menu display", ["--panel-on", "--command"] | ["--command"]) => {
+            println!("{}", system::display::panel_on_command());
+            Some(EXIT_OK)
+        }
+        ("menu display", ["--panel-on"]) => match system::display::panel_on() {
+            Ok(()) => Some(EXIT_OK),
+            Err(err) => {
+                eprintln!("{err}");
+                Some(EXIT_FAILED)
+            }
+        },
+        ("menu display", ["--rows"]) => {
+            let mut out = io::stdout();
+            for (key, label, detail) in system::display::rows() {
+                let _ = writeln!(out, "{key}\t{label}\t{detail}");
+            }
+            Some(EXIT_OK)
+        }
+        ("menu vnc", ["status", "--bar"] | ["--status", "--bar"]) => {
+            println!("{}", system::vnc::status_bar());
+            Some(EXIT_OK)
+        }
+        ("menu vnc", ["status"] | ["--status"]) => {
+            println!("{}", system::vnc::status());
+            Some(EXIT_OK)
+        }
+        ("menu vnc", ["start"]) => match system::vnc::start() {
+            Ok(()) => Some(EXIT_OK),
+            Err(err) => {
+                eprintln!("{err}");
+                Some(EXIT_FAILED)
+            }
+        },
+        ("menu vnc", ["stop"]) => match system::vnc::stop() {
+            Ok(()) => Some(EXIT_OK),
+            Err(err) => {
+                eprintln!("{err}");
+                Some(EXIT_FAILED)
+            }
+        },
+        ("menu vnc", ["--command"]) => {
+            println!("{}", system::vnc::command_line().join(" "));
+            println!("{}", system::vnc::tunnel_command());
+            Some(EXIT_OK)
+        }
+        ("menu bluetooth", ["status"] | ["--status"]) => {
+            println!("{}", system::bluetooth::status());
+            Some(EXIT_OK)
+        }
+        ("menu qr", ["--wifi"]) => Some(system::qr::wifi_dialog()),
+        ("menu format" | "menu swap", ["--candidates"]) => {
+            let mut out = io::stdout();
+            for d in system::disk::candidates_from_machine() {
+                let _ = writeln!(out, "{}", d.dev());
+            }
+            Some(EXIT_OK)
+        }
+        ("menu swap", ["--status"] | ["status"]) => {
+            println!("{}", system::swap::Status::from_machine().line());
+            Some(EXIT_OK)
+        }
+        ("menu settings", ["--rows"]) => {
+            let mut out = io::stdout();
+            for (key, label, runs) in system::settings::rows() {
+                let _ = writeln!(out, "{key}\t{label}\t{runs}");
+            }
+            Some(EXIT_OK)
+        }
+        ("menu settings", ["--status"] | ["status"]) => {
+            println!("{}", system::settings::status());
+            Some(EXIT_OK)
+        }
+        ("menu keys", ["--rows"]) => {
+            let mut out = io::stdout();
+            for b in system::keys::rows() {
+                let _ = writeln!(
+                    out,
+                    "{}\t{}\t{}\t{}",
+                    b.keys, b.description, b.command, b.category
+                );
+            }
+            Some(EXIT_OK)
+        }
+        ("menu about", ["--views"]) => {
+            let mut out = io::stdout();
+            for (key, title, cmd) in system::about::views() {
+                let _ = writeln!(out, "{key}\t{title}\t{cmd}");
+            }
+            Some(EXIT_OK)
+        }
+        _ => None,
     }
-    let surface = match resolved.spec.path {
-        "menu" => menu::Surface::Root,
-        "menu palette" => menu::Surface::Palette,
-        _ => return None,
-    };
-    // `key<TAB>group<TAB>label<TAB>runs`, in the order the menu draws them.
-    // The table alone, not this machine's context: the check compares rows,
-    // and a row's detail (which agent it starts) is not part of what it is.
-    let mut out = io::stdout();
-    for entry in menu::entries(surface, &menu::Context::default()) {
-        let _ = writeln!(
-            out,
-            "{}\t{}\t{}\t{}",
-            entry.key,
-            entry.group.label(),
-            entry.label,
-            menu::runs(entry.action)
-        );
-    }
-    Some(EXIT_OK)
 }
 
 fn print_commands(out: &mut impl Write) {

@@ -229,14 +229,17 @@ CRTC has no gamma table and the panel's own backlight is the monitor's.
 
 ## The launcher opens empty, or shows an error dialog
 
-* An error dialog naming a file, line and column is a **rofi theme parse error**;
-  run `rofi -show drun` in a terminal after editing `~/.config/rofi/*.rasi`.
-* An empty window means the list was empty - check that `/usr/share/applications`
-  has entries and that `~/.config/rofi/config.rasi` exists.
+* The launcher (`Alt+D` / Search key), window switcher (`Alt+Tab`), and command
+  runner (`Alt+Shift+D`) are `lazyos menu apps|window|run` (`rofi-drun`,
+  `rofi-window`, `rofi-run`), drawn in a floating `foot` window. An empty
+  applications list means `/usr/share/applications` has no visible entries.
+* If a remaining rofi helper (`bar-pick`) shows a theme parse error naming a
+  file, line and column, run `rofi -show drun` in a terminal after editing
+  `~/.config/rofi/*.rasi`.
 * A bar click that does nothing: `~/.config/bin/bar-pick` must be executable.
-  The same goes for every row of the root menu: each one is a `rofi-*` script in
-  `~/.config/bin/`, and a missing script is a row that silently does nothing.
-  `check-system.sh` fails for each one.
+  The same goes for every row of the root menu: each one is a symlink to
+  `/usr/bin/lazyos` or a shell script in `~/.config/bin/`, and a missing entry
+  is a row that silently does nothing. `check-system.sh` fails for each one.
 * **A hole where an icon should be.** The launcher draws application *images*,
   and the session's own entries take theirs from the small **LazyOS** theme
   (`/usr/share/icons/LazyOS`, 48x48 PNGs rendered from the icon fonts). If the

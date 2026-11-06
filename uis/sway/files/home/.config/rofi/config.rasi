@@ -1,15 +1,16 @@
-/* rofi: the session launcher, the window switcher and the bar's dmenu.
+/* rofi: the bar's dmenu and every menu that is still a script.
  *
- * Three roles, one process, and only while it is on screen:
- *   $mod+d / Search key   rofi -show drun     applications (.desktop entries)
- *   $mod+Tab              rofi -show window   window switcher (there is no other one in sway)
- *   $mod+Shift+d          rofi -show run      commands from $PATH; Shift+Enter runs the
- *                                             choice in foot (rofi's run-shell-command,
- *                                             which is why `terminal` is set below)
- *   bar-pick              rofi -dmenu         the bar's click-through panels
+ * The three jobs below moved to the framework (spec 012) and are listed here
+ * only so the file is not mistaken for the launcher's theme:
+ *   $mod+d / Search key   lazyos menu apps    applications (.desktop entries)
+ *   $mod+Tab              lazyos menu window  window switcher
+ *   $mod+Shift+d          lazyos menu run     commands from $PATH; Shift+Enter
+ *                                             runs the choice in foot
+ * What rofi still draws is `bar-pick` (rofi -dmenu) and the menus whose surface
+ * has not been ported, so its theme is still the session's palette.
  *
- * Measured on this machine (headless swayfx, /proc PSS): drun 16.4 MB, run 15.8 MB,
- * window 15.0 MB while open, nothing resident afterwards. That replaced both tofi
+ * Measured on this machine (headless swayfx, /proc PSS): rofi's dmenu 14.2-15.6 MB
+ * while open, nothing resident afterwards. That replaced both tofi
  * (14.6 MB, applications only, its run mode only printed the selection) and fuzzel
  * (40.5 MB per bar popup), so the session went from two pickers to one.
  *

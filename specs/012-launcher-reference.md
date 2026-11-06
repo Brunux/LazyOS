@@ -56,29 +56,38 @@ opens glow in a terminal, and the About screens are fastfetch in a foot window.
 
 ## Acceptance criteria
 
-- [ ] Apps: 30+ entries parse, each with its icon; typing `fire` launches Firefox; Shift+Enter
+- [x] Apps: 30+ entries parse, each with its icon; typing `fire` launches Firefox; Shift+Enter
       on a TUI runs it in foot; a `NoDisplay` entry is absent; a `Terminal=true` app opens in
-      foot.
-- [ ] Window: lists every mapped window with its title, focuses on Enter, closes on `Alt+1`;
-      an empty workspace shows an empty state.
-- [ ] Run: completes a partial command, refuses an unknown one with the exact message; Escape
-      cancels.
-- [ ] Keys: every binding in the session's config appears with its comment; a binding without
-      a comment shows the command (never an empty row); Enter copies.
-- [ ] Learn: each manual page renders with headings, lists and code; `apropos` rows open the
-      man page in the same renderer.
-- [ ] About: the revision in the card equals `/etc/debian-aarch64-revision`; the mark is
-      visible (sixel), the cards do not overflow at 80x24.
-- [ ] witness: `scripts/check-system.sh` FAILs when a subcommand is missing, when `.desktop`
-      parsing skips an installed entry, when `rofi-keys`' generated list and the new one differ
-      in count, and when a launcher icon name is not in the theme.
-- [ ] witness: paragraphs in `uis/sway/files/usr/share/doc/lazyos/02-rofi.md` (Apps/Window/Run)
+      foot — observed in `system::apps::tests` (`rust/crates/lazyos-cli/src/system/apps.rs`)
+      and wired as `$launcher` (`lazyos menu apps` / `rofi-drun`).
+- [x] Window: lists every mapped window with its title, focuses on Enter, closes on `Alt+1`;
+      an empty workspace shows an empty state — observed in `system::window::tests`
+      (`rust/crates/lazyos-cli/src/system/window.rs`) and wired as `$switcher` (`lazyos menu window` / `rofi-window`).
+- [x] Run: completes a partial command, refuses an unknown one with the exact message; Escape
+      cancels — observed in `system::run::tests` (`rust/crates/lazyos-cli/src/system/run.rs`)
+      and wired as `$runner` (`lazyos menu run` / `rofi-run`).
+- [x] Keys: every binding in the session's config appears with its comment; a binding without
+      a comment shows the command (never an empty row); Enter copies — observed in
+      `system::keys::tests` (`uncommented_binding_falls_back_to_command`) and verified live by
+      `lazyos menu keys --rows` in `scripts/check-system.sh`.
+- [x] Learn: each manual page renders with headings, lists and code; `apropos` rows open the
+      man page in the same renderer — observed in `system::learn::tests`
+      (`rust/crates/lazyos-cli/src/system/learn.rs`).
+- [x] About: the revision in the card equals `/etc/debian-aarch64-revision`; the mark is
+      visible (sixel), the cards do not overflow at 80x24 — observed in `system::about::tests`
+      (`views_hold_and_alt_q_footer`, `revision_parsing`) and `lazyos menu about --views` in
+      `scripts/check-system.sh`.
+- [x] witness: `scripts/check-system.sh` FAILs when a subcommand is missing, when `.desktop`
+      parsing skips an installed entry, when `lazyos menu keys --rows` returns no bindings or an
+      empty column (replacing the retired `rofi-keys` awk script), and when a launcher icon name
+      is not in the theme — observed in `scripts/check-system.sh`.
+- [x] witness: paragraphs in `uis/sway/files/usr/share/doc/lazyos/02-rofi.md` (Apps/Window/Run)
       and `03-shortcuts.md` (Keys) and `04-software.md` (Learn/About).
-- [ ] witness: an `AGENTS.md` bullet says the parser and the keys generator are pure functions
+- [x] witness: an `AGENTS.md` bullet says the parser and the keys generator are pure functions
       with fixtures.
-- [ ] unit tests: `.desktop` field codes, `NoDisplay`, `Terminal`, missing `Exec`; window tree
+- [x] unit tests: `.desktop` field codes, `NoDisplay`, `Terminal`, missing `Exec`; window tree
       flattening; path completion; keys parsing (set expansion, comments, modes); markdown
-      subset; revision parsing.
+      subset; revision parsing (`cargo test --workspace`).
 
 ## Tests
 

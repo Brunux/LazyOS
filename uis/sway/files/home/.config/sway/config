@@ -14,8 +14,8 @@ input type:keyboard {
 }
 
 # Use the Chromebook Search key by itself for the applications: it opens the
-# same launcher as $mod+d ($launcher in /etc/sway/config, rofi -show drun, the
-# .desktop entries including this port's own session actions). That is what the
+# same launcher as $mod+d ($launcher in /etc/sway/config, `lazyos menu apps`,
+# the .desktop entries including this port's own session actions). That is what the
 # key did before the file search borrowed it, and it is the question the
 # magnifier answers for most people.
 #

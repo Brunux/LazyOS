@@ -95,7 +95,7 @@ Two caches are built once, inside the image, instead of on your first session:
 * **fontconfig's system cache** (`/var/cache/fontconfig`) - without it the first
   terminal to draw a glyph walks every font directory;
 * **the icon theme's index** (`/usr/share/icons/LazyOS/icon-theme.cache`) -
-  without it the first `rofi -show drun` scans 220 files before it shows a row.
+  without it the first launcher or notification lookup scans 220 files before it shows a picture.
 
 Both are rebuilt by `scripts/rootfs-setup.sh` at build time. `check-system.sh`
 warns when either is missing - a rebuilt theme that did not refresh its index is

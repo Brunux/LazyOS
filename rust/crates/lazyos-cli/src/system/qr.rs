@@ -17,8 +17,8 @@
 use std::cell::Cell;
 
 use lazyos_ui::{
-    BodyCtx, Design, Glyph, Header, KeyHint, ListAction, ListState, Outcome, Row, Screen,
-    TextStyle, draw_card,
+    BodyCtx, Design, Glyph, Header, Input, InputAction, KeyHint, ListAction, ListState, Outcome,
+    Row, Screen, TextStyle, draw_card,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
@@ -36,6 +36,111 @@ pub struct QrScreen {
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
     keys: Vec<String>,
+    typing: Option<Input>,
+}
+
+/// Format a Wi-Fi QR payload (`WIFI:T:WPA;S:...;P:...;;` or `nopass`).
+pub fn format_wifi_payload(ssid: &str, psk: &str) -> String {
+    if psk.is_empty() {
+        format!("WIFI:T:nopass;S:{};;", QrScreen::qr_escape(ssid))
+    } else {
+        format!(
+            "WIFI:T:WPA;S:{};P:{};;",
+            QrScreen::qr_escape(ssid),
+            QrScreen::qr_escape(psk)
+        )
+    }
+}
+
+/// Read the connected Wi-Fi network's QR payload and window title.
+pub fn payload_wifi() -> Option<(String, String)> {
+    let dev = out(&["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"])?;
+    let dev = dev
+        .lines()
+        .find(|l| l.split(':').nth(1) == Some("wifi"))
+        .and_then(|l| l.split(':').next())?;
+    let con = out(&["nmcli", "-g", "GENERAL.CONNECTION", "device", "show", dev])?;
+    let con = con.lines().next().unwrap_or("").trim();
+    if con.is_empty() || con == "--" {
+        return None;
+    }
+    let ssid = out(&[
+        "nmcli",
+        "-g",
+        "802-11-wireless.ssid",
+        "connection",
+        "show",
+        con,
+    ])
+    .unwrap_or_default()
+    .trim()
+    .to_string();
+    if ssid.is_empty() {
+        return None;
+    }
+    let psk = sudo(&[
+        "nmcli",
+        "-s",
+        "-g",
+        "802-11-wireless-security.psk",
+        "connection",
+        "show",
+        con,
+    ])
+    .unwrap_or_default()
+    .trim()
+    .to_string();
+    Some((format_wifi_payload(&ssid, &psk), format!("Wi-Fi · {}", con)))
+}
+
+/// Write `payload` to a 0600 temp file and draw it with `qrencode` in a `foot` popup.
+pub fn show(payload: &str, title: &str) {
+    let tmp = std::env::temp_dir().join(format!("qr-{}.txt", std::process::id()));
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .mode(0o600)
+            .open(&tmp)
+        {
+            let _ = f.write_all(payload.as_bytes());
+        }
+    }
+    let _ = std::process::Command::new("foot")
+        .args([
+            "--app-id=popup",
+            "-T",
+            title,
+            "-e",
+            "sh",
+            "-c",
+            "qrencode -t ANSIUTF8 -r \"$1\" || printf 'qrencode could not draw that\\n'; rm -f \"$1\"; printf '\\nEnter closes\\n'; IFS= read -r _ || true",
+            "sh",
+            &tmp.to_string_lossy(),
+        ])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+/// `lazyos menu qr --wifi` (`rofi-qr --wifi`): show the current Wi-Fi QR directly.
+pub fn wifi_dialog() -> i32 {
+    if let Some((payload, title)) = payload_wifi() {
+        show(&payload, &title);
+        crate::EXIT_OK
+    } else {
+        say(
+            "QR code",
+            "Not connected to a Wi-Fi network",
+            lazyos_ui::Urgency::Normal,
+            Glyph::Wifi,
+        );
+        crate::EXIT_FAILED
+    }
 }
 
 impl QrScreen {
@@ -51,6 +156,7 @@ impl QrScreen {
                 KeyHint::new("Esc", "close"),
             ],
             rows_height: Cell::new(20),
+            typing: None,
         };
         screen.reload();
         screen
@@ -108,80 +214,24 @@ impl QrScreen {
     }
 
     fn show_qr(payload: &str, title: &str) {
-        let tmp = std::env::temp_dir().join(format!("qr-{}.txt", std::process::id()));
-        let _ = std::fs::write(&tmp, payload);
-        let _ = std::process::Command::new("foot")
-            .args(["--app-id=popup", "-T", title, "-e", "sh", "-c", &format!(
-                "qrencode -t ANSIUTF8 -r '{}' || printf 'qrencode could not draw that\\n'; printf '\\nEnter closes\\n'; IFS= read -r _ || true",
-                tmp.display()
-            )])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn();
-        let _ = std::fs::remove_file(&tmp);
+        show(payload, title);
     }
 
     fn wifi_qr(&self) {
-        let dev =
-            out(&["nmcli", "-t", "-f", "DEVICE,TYPE", "device", "status"]).unwrap_or_default();
-        let dev = dev
-            .lines()
-            .find(|l| l.split(':').nth(1) == Some("wifi"))
-            .and_then(|l| l.split(':').next());
-        if let Some(dev) = dev {
-            let con = out(&["nmcli", "-g", "GENERAL.CONNECTION", "device", "show", dev])
-                .unwrap_or_default();
-            let con = con.lines().next().unwrap_or("").trim();
-            if !con.is_empty() && con != "--" {
-                let ssid = out(&[
-                    "nmcli",
-                    "-g",
-                    "802-11-wireless.ssid",
-                    "connection",
-                    "show",
-                    con,
-                ])
-                .unwrap_or_default()
-                .trim()
-                .to_string();
-                if !ssid.is_empty() {
-                    let psk = sudo(&[
-                        "nmcli",
-                        "-s",
-                        "-g",
-                        "802-11-wireless-security.psk",
-                        "connection",
-                        "show",
-                        con,
-                    ])
-                    .unwrap_or_default()
-                    .trim()
-                    .to_string();
-                    let payload = if psk.is_empty() {
-                        format!("WIFI:T:nopass;S:{};;", Self::qr_escape(&ssid))
-                    } else {
-                        format!(
-                            "WIFI:T:WPA;S:{};P:{};;",
-                            Self::qr_escape(&ssid),
-                            Self::qr_escape(&psk)
-                        )
-                    };
-                    Self::show_qr(&payload, &format!("Wi-Fi · {}", con));
-                }
-            }
+        if let Some((payload, title)) = payload_wifi() {
+            Self::show_qr(&payload, &title);
+        } else {
+            say(
+                "QR code",
+                "Not connected to a Wi-Fi network",
+                lazyos_ui::Urgency::Normal,
+                Glyph::Wifi,
+            );
         }
     }
 
-    fn text_qr(&self) {
-        // For now, we can't easily prompt for text in this context
-        // The old script used bar-pick -free; we'll just say it's not available
-        say(
-            "QR code",
-            "Text input not available from this menu; use the command line",
-            lazyos_ui::Urgency::Normal,
-            Glyph::Qr,
-        );
+    fn text_qr(&mut self) {
+        self.typing = Some(Input::new());
     }
 }
 
@@ -189,6 +239,20 @@ impl Screen for QrScreen {
     fn draw(&mut self, ctx: &mut BodyCtx) {
         draw_card(ctx.buf, ctx.area, ctx.design, Some("QR code"), true);
         let (filter, rows) = super::pick::list_layout(ctx.area);
+        if let Some(input) = &self.typing {
+            ctx.buf.set_string(
+                filter.x,
+                filter.y,
+                "Type text or URL · Enter shows the code · Escape returns",
+                ctx.design.style(TextStyle::Dim),
+            );
+            let field = Rect {
+                height: 1.min(rows.height),
+                ..rows
+            };
+            input.render(field, ctx.buf, ctx.design, "text or URL…");
+            return;
+        }
         ctx.buf.set_string(
             filter.x,
             filter.y,
@@ -202,6 +266,24 @@ impl Screen for QrScreen {
     fn key(&mut self, key: KeyEvent, design: &Design) -> Outcome {
         if key.kind != KeyEventKind::Press {
             return Outcome::Continue;
+        }
+        if let Some(input) = &mut self.typing {
+            match input.handle(key) {
+                InputAction::Submitted => {
+                    let trimmed = input.text().trim().to_string();
+                    self.typing = None;
+                    if !trimmed.is_empty() {
+                        Self::show_qr(&trimmed, "QR code");
+                        return Outcome::Done(lazyos_ui::app::exit::OK);
+                    }
+                    return Outcome::Consumed;
+                }
+                InputAction::Cancelled => {
+                    self.typing = None;
+                    return Outcome::Consumed;
+                }
+                _ => return Outcome::Consumed,
+            }
         }
         let rows_height = self.rows_height.get();
         match key.code {
@@ -220,6 +302,9 @@ impl Screen for QrScreen {
     }
 
     fn hit(&self, area: Rect, x: u16, y: u16, design: &Design) -> Option<usize> {
+        if self.typing.is_some() {
+            return None;
+        }
         let (_, rows) = super::pick::list_layout(area);
         self.list.hit_row(rows, x, y, design)
     }
@@ -244,11 +329,16 @@ impl QrScreen {
             return Outcome::Continue;
         }
         match key.as_str() {
-            "wifi" => self.wifi_qr(),
-            "text" => self.text_qr(),
-            _ => {}
+            "wifi" => {
+                self.wifi_qr();
+                Outcome::Done(lazyos_ui::app::exit::OK)
+            }
+            "text" => {
+                self.text_qr();
+                Outcome::Consumed
+            }
+            _ => Outcome::Continue,
         }
-        Outcome::Continue
     }
 }
 
@@ -279,5 +369,38 @@ mod tests {
     fn qr_escape_chars() {
         assert_eq!(QrScreen::qr_escape("a\\b;c,d:e"), "a\\\\b\\;c\\,d\\:e");
         assert_eq!(QrScreen::qr_escape("plain"), "plain");
+    }
+
+    #[test]
+    fn wifi_payload_formats_wpa_and_nopass() {
+        assert_eq!(
+            format_wifi_payload("My:Net;1", "pa,ss\\2"),
+            "WIFI:T:WPA;S:My\\:Net\\;1;P:pa\\,ss\\\\2;;"
+        );
+        assert_eq!(
+            format_wifi_payload("OpenNet", ""),
+            "WIFI:T:nopass;S:OpenNet;;"
+        );
+    }
+
+    #[test]
+    fn text_row_opens_input_and_esc_returns_to_list() {
+        let mut screen = QrScreen {
+            keys: vec!["wifi".into(), "text".into()],
+            wifi_detail: "not connected".into(),
+            wifi_colour: lazyos_ui::ColorRole::Dim,
+            list: ListState::new(),
+            header: Header::new("LazyOS").subtitle("QR code"),
+            keybar: Vec::new(),
+            rows_height: Cell::new(20),
+            typing: None,
+        };
+        screen.build_rows();
+        assert_eq!(screen.activate(1), Outcome::Consumed);
+        assert!(screen.typing.is_some());
+        let design = Design::solarized();
+        let esc = KeyEvent::from(KeyCode::Esc);
+        assert_eq!(screen.key(esc, &design), Outcome::Consumed);
+        assert!(screen.typing.is_none());
     }
 }

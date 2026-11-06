@@ -52,6 +52,23 @@ pub enum FactAction {
     Fastfetch,
 }
 
+/// Popup commands launched from the action rows in About.
+pub const CMD_ERRORS: &str =
+    "exec foot --app-id=popup -T 'journalctl -p err -b' -e sudo -n journalctl -p err -b";
+pub const CMD_BOOT: &str = "exec foot --app-id=popup --hold -e sh -c 'systemd-analyze blame; printf \"\\n  systemd-analyze blame · close this window with Alt+Q\\n\"'";
+pub const CMD_DEVICES: &str = "exec foot --app-id=popup --hold -e sh -c 'lspci; printf \"\\n\"; lsusb; printf \"\\n  close this window with Alt+Q\\n\"'";
+pub const CMD_FASTFETCH: &str = "exec foot --app-id=popup --hold -e sh -c 'fastfetch; printf \"\\n  fastfetch done · close this window with Alt+Q\\n\"'";
+
+/// The popup views (`key`, `title`, `command`), exposed for `lazyos menu about --views`.
+pub fn views() -> Vec<(&'static str, &'static str, &'static str)> {
+    vec![
+        ("errors", "Errors this boot", CMD_ERRORS),
+        ("boot", "Boot time", CMD_BOOT),
+        ("devices", "Devices", CMD_DEVICES),
+        ("fastfetch", "Full picture", CMD_FASTFETCH),
+    ]
+}
+
 /// Mode of the about screen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AboutMode {
@@ -518,7 +535,7 @@ impl AboutScreen {
             }
             FactAction::Errors => {
                 let _ = std::process::Command::new("setsid")
-                    .args(["sh", "-c", "exec foot --app-id=popup -T 'journalctl -p err -b' -e sudo -n journalctl -p err -b"])
+                    .args(["sh", "-c", CMD_ERRORS])
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
@@ -526,7 +543,7 @@ impl AboutScreen {
             }
             FactAction::BootTime => {
                 let _ = std::process::Command::new("setsid")
-                    .args(["sh", "-c", "exec foot --app-id=popup --hold -e sh -c 'systemd-analyze blame; printf \"\\n  systemd-analyze blame · close with Alt+Q\\n\"'"])
+                    .args(["sh", "-c", CMD_BOOT])
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
@@ -534,7 +551,7 @@ impl AboutScreen {
             }
             FactAction::Devices => {
                 let _ = std::process::Command::new("setsid")
-                    .args(["sh", "-c", "exec foot --app-id=popup --hold -e sh -c 'lspci; printf \"\\n\"; lsusb; printf \"\\n  close with Alt+Q\\n\"'"])
+                    .args(["sh", "-c", CMD_DEVICES])
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
@@ -543,7 +560,7 @@ impl AboutScreen {
             FactAction::Fastfetch => {
                 if have("fastfetch") {
                     let _ = std::process::Command::new("setsid")
-                        .args(["sh", "-c", "exec foot --app-id=popup --hold -e sh -c 'fastfetch; printf \"\\n  fastfetch done · close with Alt+Q\\n\"'"])
+                        .args(["sh", "-c", CMD_FASTFETCH])
                         .stdin(std::process::Stdio::null())
                         .stdout(std::process::Stdio::null())
                         .stderr(std::process::Stdio::null())
@@ -786,5 +803,17 @@ mod tests {
         }
         assert_eq!(total, 4000000);
         assert_eq!(available, 2000000);
+    }
+
+    #[test]
+    fn views_hold_and_alt_q_footer() {
+        let v = views();
+        let hold_count = v.iter().filter(|(_, _, c)| c.contains("--hold")).count();
+        let footer_count = v
+            .iter()
+            .filter(|(_, _, c)| c.contains("close this window with Alt+Q"))
+            .count();
+        assert_eq!(hold_count, 3);
+        assert_eq!(footer_count, 3);
     }
 }

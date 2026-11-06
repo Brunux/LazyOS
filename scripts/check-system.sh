@@ -68,6 +68,12 @@ menu_runs() { awk -F'\t' -v want="$1" '$4 == want { found = 1 } END { exit !foun
 # menu_label LABEL: some root-menu row is called exactly LABEL.
 menu_label() { awk -F'\t' -v want="$1" '$3 == want { found = 1 } END { exit !found }' <<<"$MENU_ROWS"; }
 
+# The Settings menu's rows (`rofi-quick` / `lazyos menu settings --rows`):
+# `key<TAB>label<TAB>runs`.
+SETTINGS_ROWS=$(lazyos menu settings --rows 2>/dev/null || :)
+settings_runs() { awk -F'\t' -v want="$1" '$3 == want { found = 1 } END { exit !found }' <<<"$SETTINGS_ROWS"; }
+settings_label() { awk -F'\t' -v want="$1" '$2 == want { found = 1 } END { exit !found }' <<<"$SETTINGS_ROWS"; }
+
 # A session started by greetd does not necessarily export the sbin directories,
 # and several tools this report needs live there (swapon, findfs, blkid, iw,
 # tuigreet). Fix the PATH once here instead of discovering each of them as a
@@ -545,10 +551,10 @@ fi
 _disp="$HOME/.config/bin/rofi-display"
 if [ -x "$_disp" ]; then
 	ok "rofi-display is executable"
-	if grep -qs rofi-display "$HOME/.config/bin/rofi-quick"; then
+	if settings_runs rofi-display; then
 		ok "Settings has the display arrangement row"
 	else
-		fail "rofi-quick has no display arrangement row: the menu is unreachable"
+		fail "Settings (lazyos menu settings) has no display arrangement row: the menu is unreachable"
 	fi
 	if grep -qs 'config\.d' "$HOME/.config/sway/config"; then
 		ok "the saved arrangement is read at login (config.d included)"
@@ -567,13 +573,12 @@ fi
 # The one state with no other exit: the panel off and no monitor.  That is a
 # black screen, so the menu has to keep offering the row that brings the panel
 # back - and a missing row is invisible until the day it is needed.  Exercised
-# with a stub swaymsg (the real one would change the session) and a stub picker
-# that keeps the rows it was offered.
-if [ -x "$_disp" ] && [ -f "$HOME/.config/bin/lib-rofi.sh" ]; then
+# with a stub swaymsg (the real one would change the session) via `--rows` and
+# `--status` (which run before the host and never open a window).
+if [ -x "$_disp" ]; then
 	_bt=$(mktemp -d "${TMPDIR:-/tmp}/lazyos-display.XXXXXX" 2>/dev/null || true)
 	if [ -n "$_bt" ]; then
 		mkdir -p "$_bt/bin"
-		cp "$_disp" "$HOME/.config/bin/lib-rofi.sh" "$_bt/" 2>/dev/null || true
 		cat >"$_bt/bin/swaymsg" <<'SH'
 #!/bin/sh
 case $1 in
@@ -581,13 +586,11 @@ case $1 in
 esac
 exit 0
 SH
-		printf '%s\n' '#!/bin/sh' 'cat >"$DISPLAY_TEST_ROWS"' 'exit 1' >"$_bt/bar-pick"
-		chmod 0755 "$_bt/bin/swaymsg" "$_bt/bar-pick" "$_bt/rofi-display" 2>/dev/null || true
+		chmod 0755 "$_bt/bin/swaymsg" 2>/dev/null || true
 		_black=$(
-			export PATH="$_bt/bin:$PATH" DISPLAY_TEST_ROWS="$_bt/rows"
-			"$_bt/rofi-display" >/dev/null 2>&1 || true
-			grep -qs 'Bring the internal panel back' "$_bt/rows" && printf 'ok '
-			"$_bt/rofi-display" --status 2>/dev/null
+			export PATH="$_bt/bin:$PATH"
+			"$_disp" --rows 2>/dev/null | grep -qs 'Bring the internal panel back' && printf 'ok '
+			"$_disp" --status 2>/dev/null
 		)
 		case $_black in
 		'ok internal panel off')
@@ -609,7 +612,7 @@ if grep -qs 'rofi-display --panel-on' /etc/sway/config.d/*.conf \
 else
 	fail "no binding runs 'rofi-display --panel-on': a black screen has no way back"
 fi
-if grep -qs -- '--panel-on' "$_disp" 2>/dev/null; then
+if [ "$("$_disp" --panel-on --command 2>/dev/null)" = "swaymsg output eDP-1 enable" ]; then
 	ok "rofi-display --panel-on exists"
 else
 	fail "$_disp has no --panel-on mode: the recovery key would run nothing"
@@ -1528,8 +1531,8 @@ grep -qs '^exec .*/night-light login' /etc/sway/config ||
 	_night_light="$_night_light config(night-light-login)"
 grep -qs 'after-resume .*night-light resume' "$_nl_cfg" ||
 	_night_light="$_night_light config.d/23-lazyos-screensaver.conf(resume)"
-grep -qs 'night-light" start' "$HOME/.config/bin/rofi-quick" ||
-	_night_light="$_night_light bin/rofi-quick(start)"
+settings_runs 'night-light start' ||
+	_night_light="$_night_light settings(start)"
 if [ -x "$HOME/.config/bin/night-light" ]; then
 	case $("$HOME/.config/bin/night-light" status 2>/dev/null || true) in
 	on\ *|off|off\ *) ;;
@@ -2008,21 +2011,25 @@ else
 	fail "format a disk incomplete:$_missing_fmt (the Places row does nothing)"
 fi
 
-# A fixed disk and the disk the system runs from must never be offered, and that
-# is one function plus one last gate in each of the two menus that repartition a
-# disk. The eMMC is the case that matters: it is not mounted as a whole and, with
-# its partition table wiped, it carries no ChromeOS kernel partition either, so
-# without this guard it would be offered for formatting.
+# A fixed disk and the disk the system runs from must never be offered.
+# `lib-rofi.sh` still guards `rofi-places`; `rofi-format` and `rofi-swap` are
+# now in `lazyos` (`system::disk`, tested on fixtures by `system::disk::tests`
+# and asked live here via `--candidates`).
 _fmt_guard=ok
 grep -qs 'ui_disk_system()' "$HOME/.config/bin/lib-rofi.sh" || _fmt_guard=
 grep -qs 'device/removable' "$HOME/.config/bin/lib-rofi.sh" || _fmt_guard=
 grep -qs 'kern_guid' "$HOME/.config/bin/lib-rofi.sh" || _fmt_guard=
-grep -qs 'ui_disk_system "\$name"' "$HOME/.config/bin/rofi-format" || _fmt_guard=
-grep -qs 'ui_disk_system "\$name"' "$HOME/.config/bin/rofi-swap" || _fmt_guard=
+_cands=$(
+	lazyos menu format --candidates 2>/dev/null
+	lazyos menu swap --candidates 2>/dev/null
+) || _fmt_guard=
+if printf '%s\n' "$_cands" | grep -qE '^/dev/(mmcblk0|mtd|zram)'; then
+	_fmt_guard=
+fi
 if [ -n "$_fmt_guard" ]; then
-	ok "format a disk refuses fixed storage and the disk this system runs from (ui_disk_system)"
+	ok "format a disk refuses fixed storage and the disk this system runs from (ui_disk_system, system::disk)"
 else
-	fail "the disk guard is gone from lib-rofi.sh or from one of the two disk menus: the internal eMMC can be offered for formatting"
+	fail "the disk guard is gone from lib-rofi.sh or from lazyos menu format/swap: the internal eMMC can be offered for formatting"
 fi
 
 # The two disk menus test their tools with `command -v` before they draw a row,
@@ -2239,7 +2246,8 @@ fi
 grep -qs 'Alt+Ctrl+T' /usr/share/doc/lazyos/03-shortcuts.md ||
 	fail "03-shortcuts.md does not name Alt+Ctrl+T (the only place the translate key is taught)"
 
-# Every menu behind the root menu is a rofi-* script. A missing one is the
+# Every menu behind the root menu is a command or script in `~/.config/bin`
+# (the ported surfaces are symlinks to `/usr/bin/lazyos`). A missing one is the
 # quietest failure in the session: the row is still listed (the menu draws it
 # from a static table) and choosing it does nothing at all.
 _missing_menus=""
@@ -2276,6 +2284,8 @@ fi
 # silently take half the menu away is a missing systemd-analyze (every custom
 # date is then refused while the five delays keep working) and a missing
 # notification icon (the card has no picture and nothing logs it).
+# Note: `rofi-remind` is now `lazyos menu remind` (unit-tested in
+# `system::remind::tests`).
 _reminder=""
 have systemd-analyze || _reminder="$_reminder systemd-analyze"
 have notify-send || _reminder="$_reminder notify-send"
@@ -2287,15 +2297,6 @@ if [ -z "$_reminder" ]; then
 	ok "reminders complete (systemd-analyze, notify-send, jq, the clock icon)"
 else
 	fail "reminders incomplete:$_reminder (custom dates or the notification icon disappear)"
-fi
-# The formats are what people ask about in the When menu, so it ends with a help
-# row. Both halves are needed: the row in the list and the arm that answers it -
-# a row whose arm is gone reads as a dead key.
-if grep -qs 'How do I fill these in?' "$HOME/.config/bin/rofi-remind" &&
-	grep -qs '^[[:space:]]*help)' "$HOME/.config/bin/rofi-remind"; then
-	ok "the reminder When menu carries its format help row"
-else
-	warn "rofi-remind lost the 'How do I fill these in?' row or its help arm"
 fi
 
 # A repeat is a calendar expression handed to the timer itself, so the parser that
@@ -2339,54 +2340,35 @@ if [ -n "$MENU_ROWS" ]; then
 		fail "root-menu rows whose program is missing (the row does nothing):$_dead_rows"
 fi
 
-# The key view draws one picture per row by name, and a dropped flag makes the
-# list silently text-only - the same class of bug as the file browser's.
-if [ -r "$HOME/.config/bin/rofi-keys" ] &&
-	grep -qs -- '-show-icons' "$HOME/.config/bin/rofi-keys" &&
-	grep -qs -- '-icon-theme LazyOS' "$HOME/.config/bin/rofi-keys"; then
-	ok "rofi-keys asks the theme for a picture per row (-show-icons, LazyOS)"
+# The key view (`rofi-keys` -> `lazyos menu keys`, spec 012) is now a TUI in
+# `lazyos`: each row draws `Glyph::Key` (verified by `lazyos --glyphs` in the
+# framework section) and parses `/etc/sway/config` + `/etc/sway/config.d/*.conf`
+# (unit-tested in `system::keys::tests`). Verify that `--rows` returns bindings
+# from the live config with no empty description column.
+_keys_rows=$(lazyos menu keys --rows 2>/dev/null || :)
+if [ -n "$_keys_rows" ] && ! awk -F'\t' '$1 == "" || $2 == "" { exit 1 }' <<<"$_keys_rows"; then
+	fail "lazyos menu keys --rows emitted an empty key or description column"
+elif [ -n "$_keys_rows" ]; then
+	ok "lazyos menu keys parses the sway configuration ($(printf '%s\n' "$_keys_rows" | wc -l) bindings, no empty rows)"
 else
-	warn "rofi-keys no longer passes -show-icons/-icon-theme LazyOS: the key view shows no pictures"
-fi
-# And a name the theme does not carry is worse than a missing picture: rofi drops
-# the icon column for that row alone, so its text starts 34 px to the left of its
-# neighbours (that is what the key view looked like when only its section lines had
-# one).  Every name the script can emit is asked of the theme: the pictures its
-# icon() returns and the tool names it recognises in a command, both read out of the
-# script itself - its awk returns them as `return "name"` and as one list in
-# split("...", tl).
-if [ -r "$HOME/.config/bin/rofi-keys" ]; then
-	_keys_pics=$(sed -n 's/.*return "\([a-z0-9.-]*\)".*/\1/p' "$HOME/.config/bin/rofi-keys"
-		sed -n 's/.*split("\([a-z0-9 .-]*\)", tl.*/\1/p' "$HOME/.config/bin/rofi-keys" | tr ' ' '\n')
-	_keys_missing=""
-	for _k in $_keys_pics; do
-		[ -r "/usr/share/icons/LazyOS/48x48/apps/$_k.png" ] || _keys_missing="$_keys_missing $_k"
-	done
-	if [ -z "$_keys_pics" ]; then
-		warn "rofi-keys names no pictures at all: the key view is text-only"
-	elif [ -z "$_keys_missing" ]; then
-		ok "the key view's pictures all resolve in the LazyOS theme (sections, actions and tools)"
-	else
-		fail "LazyOS theme has no key-view icon for:$_keys_missing (those rows lose the icon column)"
-	fi
+	fail "lazyos menu keys --rows returned no bindings"
 fi
 
 # fastfetch exits when it has drawn, so without --hold the About window flashes
-# and closes - which reads as "the row does nothing".
-if [ -r "$HOME/.config/bin/rofi-about" ] && grep -qs -- '--hold' "$HOME/.config/bin/rofi-about"; then
-	ok "rofi-about holds its fastfetch window open (--hold)"
+# and closes - which reads as "the row does nothing". And the footer must name
+# a close key this keyboard answers (`Alt+Q`, not `Ctrl+Shift+W`). Read from
+# `lazyos menu about --views` (unit-tested in `system::about::tests`).
+_about_views=$(lazyos menu about --views 2>/dev/null || :)
+if printf '%s\n' "$_about_views" | grep -qs -- '--hold'; then
+	ok "lazyos menu about holds its popup windows open (--hold)"
 else
-	warn "rofi-about no longer passes --hold: the fastfetch picture flashes and closes"
+	warn "lazyos menu about no longer passes --hold: the fastfetch picture flashes and closes"
 fi
-# The About windows stay open until dismissed, and the footer is the only
-# instruction on the screen. The key it names must be one this keyboard
-# answers: Ctrl+Shift+W (foot's built-in close) did not reach them; Alt+Q is
-# sway's own `kill` and does.
-_about_footer=$(grep -c 'close this window with Alt+Q' "$HOME/.config/bin/rofi-about" 2>/dev/null || true)
-if [ "${_about_footer:-0}" -eq 3 ] && ! grep -qs 'Ctrl+Shift+W' "$HOME/.config/bin/rofi-about"; then
+_about_footer=$(printf '%s\n' "$_about_views" | grep -c 'close this window with Alt+Q' || true)
+if [ "${_about_footer:-0}" -eq 3 ] && ! printf '%s\n' "$_about_views" | grep -qs 'Ctrl+Shift+W'; then
 	ok "the About windows name a close key this keyboard answers (Alt+Q)"
 else
-	warn "rofi-about footers do not all say 'close this window with Alt+Q' (found ${_about_footer:-0}/3)"
+	warn "lazyos menu about footers do not all say 'close this window with Alt+Q' (found ${_about_footer:-0}/3)"
 fi
 
 # The capture menu (Alt+Ctrl+C) is a list over external tools: grimshot for the
@@ -2411,15 +2393,14 @@ fi
 # when it is called through bin/screenshot: grimshot itself writes to $HOME on this
 # image (there is no user-dirs.dirs), so one key that calls it directly drops the
 # picture among the dotfiles again - which was the report.
+# (`lazyos menu capture`'s `screenshot_argv` is verified by
+# `system::capture::tests::screenshot_uses_wrapper_in_config_bin`.)
 grep -qs 'bin/screenshot' /etc/sway/config.d/90-screenshot-shortcuts.conf &&
 	ok "the screenshot keys go through bin/screenshot" ||
 	fail "90-screenshot-shortcuts.conf does not call bin/screenshot: the files land in \$HOME"
 [ -z "$(grep -rs '^[[:space:]]*bindsym.*exec grimshot' /etc/sway/config.d/)" ] &&
 	ok "no key calls grimshot directly" ||
 	fail "a key calls grimshot directly: that screenshot lands in \$HOME"
-grep -qs -- '"$dir/screenshot"' "$HOME/.config/bin/rofi-capture" &&
-	ok "the capture menu saves through bin/screenshot" ||
-	fail "rofi-capture calls grimshot directly: its screenshots land in \$HOME"
 if [ -r /usr/share/applications/org.lazyos.screenshot-area.desktop ]; then
 	grep -qs 'Exec=.*bin/screenshot' /usr/share/applications/org.lazyos.screenshot-area.desktop &&
 		ok "the Screenshot (area) launcher entry uses bin/screenshot" ||
@@ -2427,15 +2408,9 @@ if [ -r /usr/share/applications/org.lazyos.screenshot-area.desktop ]; then
 fi
 
 # Screen sharing (Settings > Share this screen, and the root menu) is wayvnc
-# served on the loopback address.  Three things fail quietly and one fails
-# loudly, and only the last is visible: a missing binary (the menu says so when
-# it is opened), a script without its execute bit (the row closes and nothing
-# happens), and - the one that matters - a script that starts listening on the
-# network with remote input enabled, which is an unauthenticated desktop on
-# every network the machine joins.  `--disable-input` is the read-only decision
-# and 127.0.0.1 is the authentication (wayvnc 0.10 only authenticates through a
-# certificate and a password file this image does not ship), so both are asked
-# of the file itself instead of being trusted to a comment.
+# served on the loopback address (`lazyos menu vnc`, unit-tested in
+# `system::vnc::tests`). `--command` prints the exact wayvnc argv and the ssh
+# tunnel command without opening a window.
 _missing_vnc=""
 have wayvnc || _missing_vnc="$_missing_vnc wayvnc"
 [ -x "$HOME/.config/bin/rofi-vnc" ] || _missing_vnc="$_missing_vnc bin/rofi-vnc"
@@ -2444,36 +2419,31 @@ if [ -z "$_missing_vnc" ]; then
 else
 	fail "screen sharing incomplete:$_missing_vnc (wayvnc is the server, bin/rofi-vnc is the menu)"
 fi
-if [ -r "$HOME/.config/bin/rofi-vnc" ]; then
-	if grep -qs -- '--disable-input' "$HOME/.config/bin/rofi-vnc"; then
+_vnc_cmd=$(lazyos menu vnc --command 2>/dev/null || :)
+if [ -n "$_vnc_cmd" ]; then
+	if printf '%s\n' "$_vnc_cmd" | grep -qs -- '--disable-input'; then
 		ok "screen sharing is read-only (wayvnc --disable-input)"
 	else
-		fail "rofi-vnc no longer passes --disable-input: a viewer could type into this session"
+		fail "lazyos menu vnc no longer passes --disable-input: a viewer could type into this session"
 	fi
-	# A bare 0.0.0.0 (or a bind to the interface address) with no auth configured
-	# is the failure this feature must not have.  Matching the literal address is
-	# enough: the script has exactly one wayvnc invocation and check 1 fails
-	# without the binary.
-	if grep -qs '127\.0\.0\.1' "$HOME/.config/bin/rofi-vnc" &&
-		! grep -qs '0\.0\.0\.0' "$HOME/.config/bin/rofi-vnc"; then
+	if printf '%s\n' "$_vnc_cmd" | grep -qs '127\.0\.0\.1' &&
+		! printf '%s\n' "$_vnc_cmd" | grep -qs '0\.0\.0\.0'; then
 		ok "screen sharing listens on the loopback address only"
 	else
-		fail "rofi-vnc does not bind 127.0.0.1 only: that is an unauthenticated desktop on the network"
+		fail "lazyos menu vnc does not bind 127.0.0.1 only: that is an unauthenticated desktop on the network"
 	fi
-	# The tunnel command is the only way in, so it is not decoration: the row
-	# copies what the manual prints, and both have to name the same port.
-	if grep -qs 'ssh -L' "$HOME/.config/bin/rofi-vnc" &&
+	if printf '%s\n' "$_vnc_cmd" | grep -qs 'ssh -L' &&
 		grep -qs 'ssh -L 5900:127.0.0.1:5900' /usr/share/doc/lazyos/05-system.md; then
 		ok "the ssh tunnel command is on the menu row and in the manual (5900, loopback)"
 	else
-		warn "the tunnel command is missing from rofi-vnc or from 05-system.md: the way in is undocumented"
+		warn "the tunnel command is missing from lazyos menu vnc or from 05-system.md: the way in is undocumented"
 	fi
 fi
 # A row and its arm, in both menus: a row whose key has no arm closes the list
 # and does nothing, which is the quietest failure a menu can have.
-grep -qs 'rofi-vnc' "$HOME/.config/bin/rofi-quick" &&
+settings_runs rofi-vnc &&
 	ok "Settings carries the Share this screen row" ||
-	fail "rofi-quick has no Share this screen row: the only way in would be the root menu"
+	fail "Settings (lazyos menu settings) has no Share this screen row: the only way in would be the root menu"
 menu_runs rofi-vnc &&
 	ok "the root menu reaches Share this screen" ||
 	fail "the root menu has no Share this screen row"
@@ -3184,10 +3154,10 @@ if systemctl is-active --quiet polkit 2>/dev/null; then
 else
 	warn "polkitd is not running: a plugged stick will not mount (the rule is not read)"
 fi
-if grep -qs 'Auto-mount USB drives' "$HOME/.config/bin/rofi-quick"; then
+if settings_label 'Auto-mount USB drives'; then
 	ok "Settings has the auto-mount switch"
 else
-	fail "rofi-quick lost the 'Auto-mount USB drives' row: the switch is unreachable"
+	fail "Settings (lazyos menu settings) lost the 'Auto-mount USB drives' row: the switch is unreachable"
 fi
 # favnyr's removal action unmounts through udisksctl and, when udisks answers
 # that something holds the mount, runs `fuser -m <mountpoint>` to fill its
@@ -3381,8 +3351,8 @@ done
 grep -qs 'bindsym $mod+Ctrl+t exec .*/translate' \
 	/etc/sway/config.d/24-keys.conf 2>/dev/null ||
 	_missing_translate="$_missing_translate 24-keys.conf(no-binding)"
-grep -qs 'translate" config' "$HOME/.config/bin/rofi-quick" 2>/dev/null ||
-	_missing_translate="$_missing_translate rofi-quick(no-row)"
+settings_runs 'translate config' ||
+	_missing_translate="$_missing_translate settings(no-row)"
 [ -r /usr/share/icons/LazyOS/48x48/apps/globe.png ] ||
 	_missing_translate="$_missing_translate globe.png"
 if [ -z "$_missing_translate" ]; then
@@ -3809,6 +3779,60 @@ if have lazyos; then
 			ok "~/.config/bin/$_fw_base is a framework symlink the table knows"
 		else
 			warn "~/.config/bin/$_fw_base points at lazyos but the command table does not list it"
+		fi
+	done
+
+	# And the reverse shadow: a *script* in ~/.config/bin whose name the table
+	# installs.  ~/.config/bin comes before /usr/bin in the session's PATH, so
+	# the port is present and unreachable - the old surface answers the key,
+	# which is exactly what `rofi-media` and ten others did while the table
+	# already called them installed.
+	_fw_scripted=
+	for _fw_file in "$HOME"/.config/bin/*; do
+		[ -e "$_fw_file" ] || continue
+		[ -L "$_fw_file" ] && continue
+		_fw_base=$(basename "$_fw_file")
+		grep -q "^$_fw_base	" <<<"$_fw_links" && _fw_scripted="$_fw_scripted $_fw_base"
+	done
+	if [ -z "$_fw_scripted" ]; then
+		ok "no script shadows a name the command table installs"
+	else
+		fail "these are scripts in ~/.config/bin that shadow the framework's own name:$_fw_scripted (the port exists and the old script answers the key)"
+	fi
+
+	# Specs 010-013: every surface those four specs port is a subcommand, and a
+	# subcommand the table loses is a key that opens nothing.  The link loop
+	# above only covers names with an old script; these lists are what makes
+	# `menu power`, `menu apps`, `menu keys` and the rest fail here instead of
+	# in the session.
+	for _fw_sub in settings power display swap format tz dns vnc ssh \
+		media notify clip emoji capture qr remind calc colour audio bluetooth pkg dev \
+		apps window run keys learn about palette; do
+		_fw_port="menu $_fw_sub"
+		grep -qE "^  $_fw_port " <<<"$_fw_help" ||
+			fail "lazyos --help does not list \`$_fw_port\`: the surface is gone (spec 010-012)"
+	done
+	ok "every surface specs 010-012 port is a command (menu settings…power, media…dev, apps…palette)"
+
+	# Spec 012 moved the three rofi modes onto the framework.  The bindings read
+	# `$launcher`/`$runner`/`$switcher`, so the variable is what has to say the
+	# new command - a binding that still expands to `rofi -show drun` opens
+	# rofi's launcher while the ported one exists and is unreachable.
+	_sway_cfg_sys=/etc/sway/config
+	[ -n "$REPO" ] && [ -f "$REPO/uis/sway/files/etc/sway/config" ] && _sway_cfg_sys="$REPO/uis/sway/files/etc/sway/config"
+	_fw_launcher=$(sed -n 's/^set \$launcher //p' "$_sway_cfg_sys" 2>/dev/null | head -n 1)
+	_fw_runner=$(sed -n 's/^set \$runner //p' "$_sway_cfg_sys" 2>/dev/null | head -n 1)
+	_fw_switcher=$(sed -n 's/^set \$switcher //p' "$_sway_cfg_sys" 2>/dev/null | head -n 1)
+	for _fw_pair in "launcher:$_fw_launcher:menu apps" "runner:$_fw_runner:menu run" \
+		"switcher:$_fw_switcher:menu window"; do
+		_fw_var=${_fw_pair%%:*}
+		_fw_rest=${_fw_pair#*:}
+		_fw_cmd=${_fw_rest%:*}
+		_fw_want=${_fw_pair##*:}
+		if [ "$_fw_cmd" = "lazyos $_fw_want" ]; then
+			ok "\$$_fw_var runs \`lazyos $_fw_want\` (spec 012)"
+		else
+			fail "\$$_fw_var is '$_fw_cmd', not 'lazyos $_fw_want': the key still opens the old surface"
 		fi
 	done
 else

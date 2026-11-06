@@ -118,9 +118,8 @@ the thing to press is on the screen.
 |---|---|
 | `/etc/sway/` | the system half of the session: `config` plus `config.d/*.conf` drop-ins |
 | `~/.config/sway/` | your half: it includes the system one and adds your own settings |
-| `~/.config/{bar-*,rofi-keys,rofi-learn,dictate,sway-*}` | the scripts the bar and the keys call |
+| `~/.config/bin/` | the commands the bar and the keys call (symlinks to `/usr/bin/lazyos` for ported surfaces, plus shell helpers) |
 | `~/.config/{waybar,foot,rofi,mako}/` | the look of each piece |
-| `~/.config/bin/` | every script this desktop ships; they are all plain shell |
 | `/usr/share/doc/lazyos/` | these pages |
 | `~/Dev/LazyOS/` | a **snapshot** of the repository this image was built from, with a `REVISION` file naming the commit. The directory is named after the repository: if it is ever renamed, the copy takes the new name |
 
