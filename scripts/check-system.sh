@@ -2840,6 +2840,29 @@ if [ -x /usr/local/bin/xdg-open ]; then
 else
 	fail "/usr/local/bin/xdg-open is missing: ctrl+click in foot and URL-printing tools fail"
 fi
+
+# Spec 015: Browser optimization (vertical tabs, compact density, zero Marionette daemons)
+if have firefox-esr; then
+	_ff_pol=/usr/lib/firefox-esr/distribution/policies.json
+	[ -n "$REPO" ] && [ -f "$REPO/uis/sway/files/usr/lib/firefox-esr/distribution/policies.json" ] &&
+		_ff_pol="$REPO/uis/sway/files/usr/lib/firefox-esr/distribution/policies.json"
+	if [ -f "$_ff_pol" ]; then
+		if python3 -c "import json, sys; d=json.load(open('$_ff_pol')); p=d['policies']['Preferences']; assert p['sidebar.verticalTabs']['Value'] is True; assert p['browser.uidensity']['Value'] == 1" 2>/dev/null; then
+			ok "browser policies configured (vertical tabs and compact density in $_ff_pol)"
+		else
+			fail "browser policies in $_ff_pol are invalid or missing vertical tabs / compact density"
+		fi
+	else
+		fail "browser policies missing: $_ff_pol does not exist (spec 015)"
+	fi
+	if ss -tlnp 2>/dev/null | grep -q ":2828 "; then
+		fail "Marionette port 2828 is listening: dropped automation server is running"
+	else
+		ok "browser port 2828 is not listening (no Marionette automation daemon)"
+	fi
+else
+	skip "firefox-esr is not installed: browser policies skipped"
+fi
 # Thumbnails in the file browser: rofi draws a row's picture through
 # lazyos-thumbnail, which is ffmpeg for images and video and pdftocairo for a
 # PDF's first page. A missing binary is silent - the row simply has no picture -

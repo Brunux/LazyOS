@@ -209,7 +209,7 @@ specs.
 | 012 | [`012-launcher-reference.md`](012-launcher-reference.md) — launcher, window, run, reference | 4 | in progress |
 | 013 | [`013-themes-greeter.md`](013-themes-greeter.md) — 7 themes, wallpapers, greeter | 5 | in progress |
 | 014 | [`014-perf-witnesses.md`](014-perf-witnesses.md) — budget, ledger, closure | 5 | draft |
-| 015 | [`015-browser-bar.md`](015-browser-bar.md) — browser chrome optimization: vertical tabs and compact density | - | draft |
+| 015 | [`015-browser-bar.md`](015-browser-bar.md) — browser chrome optimization: vertical tabs and compact density | - | in progress |
 | 016 | [`016-local-models.md`](016-local-models.md) — a local model, measured and pinned | - | merged |
 | 017 | [`017-remaining-surfaces.md`](017-remaining-surfaces.md) — remaining interactive surfaces: network, places, clean, agents, and utilities | 4 | draft |
 | 018 | [`018-tui-installer.md`](018-tui-installer.md) — full TUI installer: user setup, timezone, disk safety, progress | 4-5 | draft |

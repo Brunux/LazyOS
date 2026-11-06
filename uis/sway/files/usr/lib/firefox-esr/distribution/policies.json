@@ -1,0 +1,31 @@
+{
+  "policies": {
+    "DisableAppUpdate": true,
+    "Preferences": {
+      "browser.compactmode.show": {
+        "Value": true,
+        "Status": "default"
+      },
+      "browser.uidensity": {
+        "Value": 1,
+        "Status": "default"
+      },
+      "sidebar.revamp": {
+        "Value": true,
+        "Status": "default"
+      },
+      "sidebar.revamp.round-content-area": {
+        "Value": true,
+        "Status": "default"
+      },
+      "sidebar.verticalTabs": {
+        "Value": true,
+        "Status": "default"
+      },
+      "browser.fullscreen.autohide": {
+        "Value": true,
+        "Status": "default"
+      }
+    }
+  }
+}

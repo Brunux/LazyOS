@@ -148,6 +148,32 @@ The variable comes from `/etc/profile.d/90-cli-tools.sh` (a login shell and this
 terminal read it) and only when nothing has set it already, so an `EDITOR` you
 export yourself wins.
 
+## The browser
+
+The image ships **Firefox ESR** (`firefox-esr`), bound to **Alt+Shift+Return**
+and selectable from the launcher (`Alt+D`).
+
+On the Hayato panel's 3:2 screen (1366×912), vertical height is scarce while
+horizontal width is plentiful. To give the web viewport maximum vertical reading
+room without sacrificing browser functionality, LazyOS configures Firefox through
+`/usr/lib/firefox-esr/distribution/policies.json`:
+
+- **Native Vertical Tabs**: tabs sit in a vertical sidebar on the left instead
+  of a stacked horizontal strip at the top. The top `#TabsToolbar` is completely
+  removed, reclaiming ~38 px of vertical display height. The sidebar can be
+  collapsed to icons only when reading wide pages.
+- **Compact Toolbar**: the navigation and address bar runs at compact density
+  (~30 px), keeping URL autocomplete, SSL certificate badges, and extension
+  icons (like uBlock Origin) fully visible and accessible.
+- **Auto-Hide Fullscreen**: pressing **F11** or Sway's **Mod+F** gives 100% of the
+  panel to web content, with the toolbar revealing smoothly when the pointer
+  touches the top edge.
+
+These defaults are shipped with `Status: "default"` rather than locked. If you
+prefer traditional horizontal tabs, right-click the sidebar and toggle horizontal
+tabs, or adjust your preferences in `about:preferences` without system restrictions.
+
+
 ## Emoji
 
 **Alt+Ctrl+E** opens the emoji picker (the root menu and the launcher carry the

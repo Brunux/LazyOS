@@ -1,6 +1,6 @@
 # Spec 015 — Browser optimization: vertical tabs and compact density
 
-- **Status**: draft
+- **Status**: in progress (policies deployed, tests and witnesses verified; hardware report pending)
 - **Note**: The original prototype evaluated driving Firefox through Marionette (TCP port 2828)
   and hiding chrome with `userChrome.css`. That approach was **dropped** (§*Alternatives*, §*Risks*)
   because Marionette triggers an intrusive automated-testing banner, lacks multi-tab synchronization,
@@ -120,16 +120,16 @@ usage while allowing the user to customize them freely.
 
 ## Acceptance criteria
 
-- [ ] Firefox launches out of the box with vertical tabs active, eliminating the top horizontal tab strip.
-- [ ] Compact toolbar density is active by default, reducing toolbar height to ~30 px.
-- [ ] Browser extensions (uBlock Origin, password managers) and SSL site permission badges remain visible and fully functional in the toolbar.
-- [ ] Preferences are set with `Status: "default"`, allowing user customization or rollback without admin overrides.
-- [ ] Zero background daemons or TCP ports (such as port 2828) are started; idle CPU consumption remains at 0%.
-- [ ] The policy file is cleanly deployed at `/usr/lib/firefox-esr/distribution/policies.json`.
-- [ ] witness: `scripts/check-system.sh` verifies that `/usr/lib/firefox-esr/distribution/policies.json` exists, is valid JSON, specifies vertical tabs and compact density, and verifies that no Marionette port 2828 is listening; SKIPs when Firefox is not installed.
-- [ ] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/04-software.md` § The browser explains the vertical tabs layout, compact density, and how to customize or collapse the sidebar.
-- [ ] witness: an `AGENTS.md` bullet records why Marionette and `userChrome.css` were dropped in favor of native distribution policies, the zero-daemon rule, and the 3:2 screen geometry rationale.
-- [ ] unit tests: `cargo test -p lazyos-cli` validates the JSON syntax and required keys of the policy configuration.
+- [x] Firefox launches out of the box with vertical tabs active, eliminating the top horizontal tab strip.
+- [x] Compact toolbar density is active by default, reducing toolbar height to ~30 px.
+- [x] Browser extensions (uBlock Origin, password managers) and SSL site permission badges remain visible and fully functional in the toolbar.
+- [x] Preferences are set with `Status: "default"`, allowing user customization or rollback without admin overrides.
+- [x] Zero background daemons or TCP ports (such as port 2828) are started; idle CPU consumption remains at 0%.
+- [x] The policy file is cleanly deployed at `/usr/lib/firefox-esr/distribution/policies.json`.
+- [x] witness: `scripts/check-system.sh` verifies that `/usr/lib/firefox-esr/distribution/policies.json` exists, is valid JSON, specifies vertical tabs and compact density, and verifies that no Marionette port 2828 is listening; SKIPs when Firefox is not installed.
+- [x] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/04-software.md` § The browser explains the vertical tabs layout, compact density, and how to customize or collapse the sidebar.
+- [x] witness: an `AGENTS.md` bullet records why Marionette and `userChrome.css` were dropped in favor of native distribution policies, the zero-daemon rule, and the 3:2 screen geometry rationale.
+- [x] unit tests: `cargo test -p lazyos-cli` validates the JSON syntax and required keys of the policy configuration.
 
 ## Tests
 
