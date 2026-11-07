@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="360" viewBox="0 0 1440 360">
+<defs><style>
+.bg{fill:#002b36}.panel{fill:#073642;stroke:#0b5663;stroke-width:1.5}.muted{fill:#839496}.text{fill:#eee8d5}.cyan{fill:#2aa198}.blue{fill:#268bd2}.yellow{fill:#b58900}.green{fill:#859900}.red{fill:#dc322f}.mono{font-family:'JetBrains Mono','DejaVu Sans Mono',monospace}.small{font-size:13px}.tiny{font-size:11px}.label{font-size:12px;letter-spacing:1px}
+</style></defs>
+<rect width="1440" height="360" rx="12" class="bg"/>
+<text x="32" y="35" class="mono cyan" font-size="13">LAZYOS / NATIVE BAR — VISUAL SPEC 001</text>
+<text x="32" y="58" class="mono muted small">Graphical Wayland layer · terminal language · Solarized Dark reference palette</text>
+<rect x="28" y="82" width="1384" height="58" rx="5" class="panel"/>
+<text x="48" y="117" class="mono cyan" font-size="24" font-weight="bold">z_</text>
+<text x="98" y="116" class="mono muted small">LazyOS</text>
+<path d="M180 95V127" stroke="#586e75"/>
+<rect x="198" y="94" width="42" height="34" rx="3" fill="#2aa198"/><text x="214" y="116" class="mono bg small" font-weight="bold">1</text>
+<rect x="246" y="94" width="42" height="34" rx="3" class="panel"/><text x="262" y="116" class="mono muted small">2</text>
+<rect x="294" y="94" width="42" height="34" rx="3" class="panel"/><text x="310" y="116" class="mono muted small">3</text>
+<rect x="342" y="94" width="42" height="34" rx="3" class="panel"/><text x="358" y="116" class="mono muted small">4</text>
+<rect x="390" y="94" width="42" height="34" rx="3" class="panel"/><text x="406" y="116" class="mono muted small">5</text>
+<rect x="450" y="94" width="92" height="34" rx="3" fill="#b58900"/><text x="466" y="116" class="mono bg tiny">⌨ Sway</text>
+<text x="660" y="116" class="mono text small">Thu 06 Nov 2026  18:42</text>
+<rect x="920" y="94" width="80" height="34" rx="3" class="panel"/><text x="936" y="116" class="mono yellow tiny">◉ BUSY</text>
+<rect x="1008" y="94" width="54" height="34" rx="3" class="panel"/><text x="1022" y="116" class="mono yellow small">↑ 2</text>
+<rect x="1070" y="94" width="54" height="34" rx="3" class="panel"/><text x="1085" y="116" class="mono muted small">▣</text>
+<rect x="1132" y="94" width="76" height="34" rx="3" class="panel"/><text x="1146" y="116" class="mono blue tiny">BT ON</text>
+<rect x="1216" y="94" width="78" height="34" rx="3" class="panel"/><text x="1230" y="116" class="mono cyan tiny">WiFi 82%</text>
+<rect x="1302" y="94" width="92" height="34" rx="3" class="panel"/><text x="1315" y="116" class="mono green tiny">BAT 94%</text>
+<text x="32" y="180" class="mono yellow label">LAYOUT RULES</text>
+<text x="32" y="210" class="mono text small">01  Fixed top layer · 30–34 px target height · one-pixel separators</text>
+<text x="32" y="238" class="mono text small">02  Left: launcher + workspaces + compositor mode</text>
+<text x="32" y="266" class="mono text small">03  Center: clock/date · right: compact system indicators</text>
+<text x="32" y="294" class="mono text small">04  Sharp corners, monospaced labels, restrained transparency</text>
+<text x="32" y="322" class="mono muted tiny">Conceptual reference — dimensions and glyphs are starting values, not pixel-locked assets.</text>
+<text x="1110" y="180" class="mono yellow label">STATE LANGUAGE</text>
+<text x="1110" y="210" class="mono cyan small">● healthy / connected</text>
+<text x="1110" y="238" class="mono yellow small">● attention / activity</text>
+<text x="1110" y="266" class="mono red small">● critical / disconnected</text>
+<text x="1110" y="294" class="mono muted small">○ disabled / unavailable</text>
+</svg>
