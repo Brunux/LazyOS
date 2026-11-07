@@ -374,6 +374,33 @@ fn query(resolved: &Resolved) -> Option<i32> {
             }
             Some(EXIT_OK)
         }
+        ("menu net", ["--status"] | ["status"]) => {
+            println!("{}", system::net::status_json());
+            Some(EXIT_OK)
+        }
+        ("menu clean", ["--dry-run"] | ["dry-run"]) => {
+            system::clean::dry_run();
+            Some(EXIT_OK)
+        }
+        ("menu places", ["--rows"] | ["rows"]) => {
+            let mut out = io::stdout();
+            for (key, label, target) in system::places::rows() {
+                let _ = writeln!(out, "{key}\t{label}\t{target}");
+            }
+            Some(EXIT_OK)
+        }
+        ("menu agents", ["--default"]) => Some(system::agents::cli_default()),
+        ("menu agents", ["--env", agent, account]) => Some(system::agents::cli_env(agent, account)),
+        ("menu agents", ["--new", agent]) => Some(system::agents::cli_new(agent)),
+        ("menu translate", ["--languages"]) => {
+            system::translate::print_languages();
+            Some(EXIT_OK)
+        }
+        ("menu translate", ["--target-name"]) => {
+            system::translate::print_target_name();
+            Some(EXIT_OK)
+        }
+        ("menu translate", []) => Some(system::translate::run_translate()),
         _ => None,
     }
 }
@@ -395,6 +422,7 @@ fn run_direct(resolved: &Resolved) -> i32 {
         "mcp" => mcp::run(resolved),
         "task stop" => task_cmd::stop(resolved),
         "open" => open_path(resolved),
+        "menu dictate" => system::dictate::toggle(),
         other => {
             eprintln!("lazyos {other}: this command has no direct handler");
             EXIT_USAGE
@@ -478,6 +506,16 @@ fn execute(
         "menu pkg" => system::pkg::menu(terminal, design),
         "menu dev" => system::dev::menu(terminal, design),
         "menu about" => system::about::menu(terminal, design),
+        "menu net" => system::net::menu(terminal, design),
+        "menu agents" => system::agents::menu(terminal, design),
+        "menu places" => system::places::menu(terminal, design),
+        "menu clean" => system::clean::menu(terminal, design),
+        "menu kill" => system::kill::menu(terminal, design),
+        "menu download" => system::download::menu(terminal, design),
+        "menu layout" => system::layout::menu(terminal, design),
+        "menu file-actions" => system::file_actions::menu(&resolved.args, terminal, design),
+        "menu translate" => system::translate::menu(&resolved.args, terminal, design),
+        "menu dictate" => system::dictate::menu(),
         "task attach" => task_cmd::attach(resolved, terminal, design),
         other => Err(Failure::new(
             format!("`{other}` is in the table but has no implementation"),

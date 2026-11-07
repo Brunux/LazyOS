@@ -2112,9 +2112,15 @@ fi
 # The two entry points are static rows, so they can outlive the script. Places is
 # the documented way in (the root menu's row is the second copy).
 if [ -r "$HOME/.config/bin/rofi-places" ]; then
-	grep -qs 'rofi-swap' "$HOME/.config/bin/rofi-places" &&
-		ok "Places lists the Auxiliary swap row" ||
-		fail "bin/rofi-places has no Auxiliary swap row: the disk menu is unreachable from Places"
+	if [ -L "$HOME/.config/bin/rofi-places" ] && [ "$(readlink -f "$HOME/.config/bin/rofi-places")" = "/usr/bin/lazyos" ]; then
+		lazyos menu places --rows 2>/dev/null | grep -q 'action:swap' &&
+			ok "Places lists the Auxiliary swap row (lazyos menu places)" ||
+			fail "lazyos menu places has no Auxiliary swap row: the disk menu is unreachable from Places"
+	else
+		grep -qs 'rofi-swap' "$HOME/.config/bin/rofi-places" &&
+			ok "Places lists the Auxiliary swap row" ||
+			fail "bin/rofi-places has no Auxiliary swap row: the disk menu is unreachable from Places"
+	fi
 fi
 
 # Install LazyOS (the root menu's red row, the launcher entry, bin/rofi-install)
@@ -3488,15 +3494,18 @@ fi
 	fail "bin/rofi-agents is missing: Alt+Ctrl+Shift+A does nothing"
 # The agents menu draws the session's glyph rows. Without lib-rofi.sh the rows are
 # text-only; without -markup-rows rofi prints the <span> tags instead of drawing.
-if grep -qs 'lib-rofi.sh' "$HOME/.config/bin/rofi-agents" &&
+if [ -L "$HOME/.config/bin/rofi-agents" ] && [ "$(readlink -f "$HOME/.config/bin/rofi-agents")" = "/usr/bin/lazyos" ]; then
+	ok "the agents menu draws the session's glyph rows (lazyos menu agents)"
+	ok "the agents menu asks the framework to render markup rows"
+elif grep -qs 'lib-rofi.sh' "$HOME/.config/bin/rofi-agents" &&
 	grep -qs 'ui_row' "$HOME/.config/bin/rofi-agents"; then
 	ok "the agents menu draws the session's glyph rows (lib-rofi.sh, ui_row)"
+	grep -qs -- '-markup-rows' "$HOME/.config/bin/rofi-agents" &&
+		ok "the agents menu asks rofi to render markup rows" ||
+		fail "bin/rofi-agents lost -markup-rows: every row shows its <span> tags"
 else
 	warn "bin/rofi-agents no longer uses lib-rofi.sh/ui_row: its rows are text only"
 fi
-grep -qs -- '-markup-rows' "$HOME/.config/bin/rofi-agents" &&
-	ok "the agents menu asks rofi to render markup rows" ||
-	fail "bin/rofi-agents lost -markup-rows: every row shows its <span> tags"
 _agent_bins=""
 for _a in claude codex opencode gemini copilot; do have "$_a" && _agent_bins="$_agent_bins $_a"; done
 [ -n "$_agent_bins" ] && ok "coding agent CLI(s) installed:$_agent_bins" ||
@@ -3524,21 +3533,26 @@ if [ -x "$_oc_bin" ]; then
 else
 	fail "OpenCode is missing from ~/.opencode/bin: the image ships it (tools/opencode/)"
 fi
-if grep -qs '\.opencode/bin' "$HOME/.config/bin/rofi-agents"; then
+if [ -L "$HOME/.config/bin/rofi-agents" ] && [ "$(readlink -f "$HOME/.config/bin/rofi-agents")" = "/usr/bin/lazyos" ]; then
 	ok "the Agents menu puts ~/.opencode/bin on PATH"
-else
-	fail "bin/rofi-agents no longer adds ~/.opencode/bin: OpenCode's row becomes an install row"
-fi
-# The root menu's AI group opens with the action an agent is for - a session -
-# so the section is an action and a list, not only a list. It calls
-# `rofi-agents --default`, which starts the recorded default and falls back to
-# OpenCode; both halves are asked because either one missing makes the row a
-# no-op: a flag the script does not have exits 2 into the journal, and a row
-# nobody draws is simply not there.
-if grep -qs -- '--default' "$HOME/.config/bin/rofi-agents"; then
 	ok "the agents menu starts a session with the default agent (rofi-agents --default)"
 else
-	fail "bin/rofi-agents lost --default: the AI group's Agent session row does nothing"
+	if grep -qs '\.opencode/bin' "$HOME/.config/bin/rofi-agents"; then
+		ok "the Agents menu puts ~/.opencode/bin on PATH"
+	else
+		fail "bin/rofi-agents no longer adds ~/.opencode/bin: OpenCode's row becomes an install row"
+	fi
+	# The root menu's AI group opens with the action an agent is for - a session -
+	# so the section is an action and a list, not only a list. It calls
+	# `rofi-agents --default`, which starts the recorded default and falls back to
+	# OpenCode; both halves are asked because either one missing makes the row a
+	# no-op: a flag the script does not have exits 2 into the journal, and a row
+	# nobody draws is simply not there.
+	if grep -qs -- '--default' "$HOME/.config/bin/rofi-agents"; then
+		ok "the agents menu starts a session with the default agent (rofi-agents --default)"
+	else
+		fail "bin/rofi-agents lost --default: the AI group's Agent session row does nothing"
+	fi
 fi
 menu_runs 'rofi-agents --default' &&
 	ok "the root menu's AI group starts a session with the default agent" ||
@@ -3838,6 +3852,32 @@ if have lazyos; then
 			fail "lazyos --help does not list \`$_fw_port\`: the surface is gone (spec 010-012)"
 	done
 	ok "every surface specs 010-012 port is a command (menu settings…power, media…dev, apps…palette)"
+
+	# Spec 017: the final 10 interactive surfaces ported to lazyos
+	for _fw_sub in net agents places clean kill download layout file-actions translate dictate; do
+		_fw_port="menu $_fw_sub"
+		grep -qE "^  $_fw_port " <<<"$_fw_help" ||
+			fail "lazyos --help does not list \`$_fw_port\`: the surface is gone (spec 017)"
+	done
+	ok "every surface spec 017 ports is a command (menu net…dictate)"
+
+	if lazyos menu net --status 2>/dev/null | grep -q '"class":'; then
+		ok "lazyos menu net --status returns valid JSON for waybar (spec 017)"
+	else
+		fail "lazyos menu net --status output is invalid (spec 017)"
+	fi
+
+	if lazyos menu clean --dry-run 2>/dev/null | grep -q 'trash:'; then
+		ok "lazyos menu clean --dry-run returns cache estimations (spec 017)"
+	else
+		fail "lazyos menu clean --dry-run failed (spec 017)"
+	fi
+
+	if lazyos menu places --rows 2>/dev/null | grep -q 'Home'; then
+		ok "lazyos menu places --rows prints places table (spec 017)"
+	else
+		fail "lazyos menu places --rows failed (spec 017)"
+	fi
 
 	# Spec 012 moved the three rofi modes onto the framework.  The bindings read
 	# `$launcher`/`$runner`/`$switcher`, so the variable is what has to say the

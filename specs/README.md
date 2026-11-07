@@ -211,7 +211,7 @@ specs.
 | 014 | [`014-perf-witnesses.md`](014-perf-witnesses.md) — budget, ledger, closure | 5 | draft |
 | 015 | [`015-browser-bar.md`](015-browser-bar.md) — browser chrome optimization: vertical tabs and compact density | - | in progress |
 | 016 | [`016-local-models.md`](016-local-models.md) — a local model, measured and pinned | - | merged |
-| 017 | [`017-remaining-surfaces.md`](017-remaining-surfaces.md) — remaining interactive surfaces: network, places, clean, agents, and utilities | 4 | draft |
+| 017 | [`017-remaining-surfaces.md`](017-remaining-surfaces.md) — remaining interactive surfaces: network, places, clean, agents, and utilities | 4 | in progress |
 | 018 | [`018-tui-installer.md`](018-tui-installer.md) — full TUI installer: user setup, timezone, disk safety, progress | 4-5 | draft |
 | 019 | [`019-notification-daemon.md`](019-notification-daemon.md) — eye-candy layer-shell notification daemon, actions, progress | 5 | draft |
 

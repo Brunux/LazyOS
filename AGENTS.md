@@ -70,6 +70,20 @@ yet present in `scripts/` as not implemented.
   `lazyos mcp` serves tools to OpenCode, and `specs/017-remaining-surfaces.md` scopes the
   final 10 interactive surfaces leading to rofi closure; `docs/plan-ui.md` §16 is the order,
   and each tier lands with its three witnesses like everything else.
+- **The final 10 interactive surfaces migrate to the framework, retiring `rofi -dmenu` workflows**
+  (spec 017). `bar-net` (`menu net`), `rofi-agents` (`menu agents`), `rofi-places` (`menu places`),
+  `rofi-clean` (`menu clean`), `rofi-kill` (`menu kill`), `rofi-download` (`menu download`),
+  `rofi-layout` (`menu layout`), `rofi-file-actions` (`menu file-actions`), `translate`
+  (`menu translate`), and `dictate` (`menu dictate`) are native subcommands in `lazyos`. Each legacy
+  script in `~/.config/bin/` is replaced with a symlink to `/usr/bin/lazyos`, preserving all ~55
+  keyboard shortcuts and bar panel actions without resident daemons. Every surface adheres to the
+  framework standards: Nerd Font single-advance glyphs, case-folded filtering, atomic actions
+  without shell string interpolation, and safe discovery (cleaner estimates space before confirmation;
+  Wi-Fi passwords use masked in-memory inputs). Headless query modes (`menu net --status`,
+  `menu clean --dry-run`, `menu places --rows`, `menu translate --languages`,
+  `menu translate --target-name`) serve waybar and system scripts directly. `check-system.sh`
+  witnesses that all 10 subcommands exist in `lazyos --symlinks` and `lazyos --help`, and passes live
+  behavioral checks on the query flags.
 - **Ratatui is not the expensive part, and that is measured rather than assumed**
   ([`docs/optimization.md`](docs/optimization.md) §13). Against a crossterm-only app doing the same
   job it adds 23.6 s to a clean build, 89 MB of `target/`, 328 KB of stripped binary, **no**
