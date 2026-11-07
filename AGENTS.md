@@ -49,7 +49,7 @@ yet present in `scripts/` as not implemented.
   **and** a bar spinner, says whether it can be stopped, and **ends by showing its own result in
   the task window** instead of a toast that expires.
   The rule is a test, not only a paragraph: `check-system.sh` FAILs when a **declined daemon** is
-  running (`udiskie`, `swaync`, `dunst`, `picom`, `blueman-applet`, `packagekitd`,
+  running (`mako`, `udiskie`, `swaync`, `dunst`, `picom`, `blueman-applet`, `packagekitd`,
   `localsearch-3`, `tracker-miner-fs-3` - each is a package the comments and `docs/omarchy-gap.md`
   already answered "no" to) and WARNs when a user unit outside the session's own set (PipeWire,
   WirePlumber, the portals, gvfs, dconf, mpris) appears. The two agreed exceptions are `exec`'d by
@@ -392,6 +392,7 @@ yet present in `scripts/` as not implemented.
 - **The eMMC installer is a standalone TUI wizard in `lazyos`, not a rofi prompt** (spec 018). It replaces `rofi-install`, `lazyos-install-run`, and `lazyos-install-log`. It guides the user through account creation, password confirmation, timezone selection, strict host eMMC safety gates, and live progress bars with TaskView log streaming, resolving `~/.config/bin/rofi-install` as a compatibility symlink to `/usr/bin/lazyos`.
 
 - **The notification daemon moves to native Wayland layer-shell with `tiny-skia` 2D rendering, replacing `mako`** (spec 019). Ratatui cannot draw floating transparent overlay surfaces without a terminal window, and GTK4/Adwaita brings 50+ MB of resident libraries. `lazyos-notify` implements the D-Bus `org.freedesktop.Notifications` protocol in a dedicated binary, rendering antialiased cards, action buttons, progress bars, and unified palette theming with minimal memory and sub-millisecond redraws.
+  The daemon anchors to `top-right` on the `overlay` layer (margin 36px top, 12px right) directly under Waybar, dynamically adjusting surface geometry and releasing pointer input regions when empty so underlying windows never suffer click occlusion. Cards feature antialiased rounded rectangles, layered soft drop shadows, dynamic urgency borders and status dots, high-resolution theme PNG loading with Nerd Font symbol fallbacks, pill action buttons with hover state feedback, and progress tracks for system volume/brightness overlays and slow background tasks. Structured history logs to `$XDG_STATE_HOME/lazyos/notify/history.jsonl`, queried by `lazyos menu notify` (Alt+Ctrl+N) without resident daemon overhead, and quiet mode is managed via `$XDG_RUNTIME_DIR/lazyos/notify/dnd` while letting critical system alerts pass through. Witnesses: `cargo test -p lazyos-notify`, `check-system.sh` busctl check for `lazyos-notify` owning `org.freedesktop.Notifications`, and documentation in `05-system.md`.
 
 ## Critical upstream facts
 

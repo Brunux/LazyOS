@@ -40,6 +40,9 @@ else
 fi
 
 install -m 0755 "$LAZYOS_STAGE/lazyos" "$ROOTFS/usr/bin/lazyos"
+if [ -f "$LAZYOS_STAGE/lazyos-notify" ]; then
+	install -m 0755 "$LAZYOS_STAGE/lazyos-notify" "$ROOTFS/usr/bin/lazyos-notify"
+fi
 
 # Every name the command table says is installed, made here - not just the two
 # the framework bootstrapped with. The table's `installed` field is what

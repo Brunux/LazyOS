@@ -1,0 +1,22 @@
+[package]
+name = "lazyos-notify"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+lazyos-theme = { path = "../lazyos-theme" }
+lazyos-ui = { path = "../lazyos-ui" }
+tiny-skia = "0.11"
+fontdue = "0.9"
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+libc = "0.2"
+zbus = { version = "5", features = ["blocking-api", "async-io"] }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+calloop = "0.14"
+calloop-wayland-source = "0.3"
+tempfile = "3"

@@ -1,15 +1,18 @@
-//! Notify history: mako's history with dismiss/clear (`rofi-notify`).
+//! Notify history: structured JSONL history with dismiss/clear (`rofi-notify`).
 //!
-//! The old script used `makoctl history -j` to get the JSON history, parsed it
-//! with `jq`, and showed each notification with its summary and body. The two
-//! footer rows were dismiss-all and toggle DND. Enter on a row copied the
-//! notification to the clipboard.
+//! Notifications are logged to `$XDG_STATE_HOME/lazyos/notify/history.jsonl`
+//! by `lazyos-notify`. Enter on a row copies the notification to the clipboard,
+//! DND toggles quiet mode without suppressing critical system alerts, and
+//! dismiss clears the log.
 
 #![allow(unused_imports)]
 #![allow(dead_code)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
+use std::fs;
+use std::io::BufRead;
+use std::path::PathBuf;
 
 use lazyos_ui::{
     BodyCtx, Design, Glyph, Header, KeyHint, ListAction, ListState, Outcome, Row, Screen,
@@ -20,7 +23,7 @@ use ratatui::layout::Rect;
 
 use crate::system::{missing, out, say};
 
-const NEEDED: &[&str] = &["makoctl", "jq", "wl-copy"];
+const NEEDED: &[&str] = &["wl-copy"];
 
 /// The notify screen.
 pub struct NotifyScreen {
@@ -38,6 +41,24 @@ struct Notification {
     app: String,
     summary: String,
     body: String,
+}
+
+fn history_path() -> PathBuf {
+    let base = std::env::var("XDG_STATE_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+            PathBuf::from(home).join(".local").join("state")
+        });
+    base.join("lazyos").join("notify").join("history.jsonl")
+}
+
+fn dnd_path() -> PathBuf {
+    let runtime = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+    PathBuf::from(runtime)
+        .join("lazyos")
+        .join("notify")
+        .join("dnd")
 }
 
 impl NotifyScreen {
@@ -61,50 +82,65 @@ impl NotifyScreen {
     }
 
     fn get_notifications() -> Vec<Notification> {
-        let output = out(&["makoctl", "history", "-j"]).unwrap_or_default();
+        let path = history_path();
+        let file = match fs::File::open(&path) {
+            Ok(f) => f,
+            Err(_) => return Vec::new(),
+        };
+
         let mut notifications = Vec::new();
-        // Parse JSON with a simple approach - each notification is an object
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output) {
-            if let Some(arr) = json.as_array() {
-                for item in arr {
-                    let id = item
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let app = item
-                        .get("app_name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let summary = item
-                        .get("summary")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    let body = item
-                        .get("body")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    if !id.is_empty() {
-                        notifications.push(Notification {
-                            id,
-                            app,
-                            summary,
-                            body,
-                        });
-                    }
+        let reader = std::io::BufReader::new(file);
+
+        for line in reader.lines().map_while(Result::ok) {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                let id = json
+                    .get("id")
+                    .and_then(|v| {
+                        if let Some(n) = v.as_u64() {
+                            Some(n.to_string())
+                        } else {
+                            v.as_str().map(|s| s.to_string())
+                        }
+                    })
+                    .unwrap_or_default();
+                let app = json
+                    .get("app_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let summary = json
+                    .get("summary")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let body = json
+                    .get("body")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !id.is_empty() || !summary.is_empty() {
+                    notifications.push(Notification {
+                        id,
+                        app,
+                        summary,
+                        body,
+                    });
                 }
             }
         }
+
+        // Most recent first
+        notifications.reverse();
         notifications
     }
 
     fn get_dnd() -> bool {
-        out(&["makoctl", "mode"])
-            .map(|m| m.contains("do-not-disturb"))
-            .unwrap_or(false)
+        dnd_path().exists()
     }
 
     fn build_rows(&mut self) {
@@ -265,35 +301,43 @@ impl NotifyScreen {
         } else {
             match key {
                 "dnd" => {
-                    let _ = std::process::Command::new("makoctl")
-                        .args(["mode", "-t", "do-not-disturb"])
-                        .stdin(std::process::Stdio::null())
-                        .stdout(std::process::Stdio::null())
-                        .stderr(std::process::Stdio::null())
-                        .status();
+                    let path = dnd_path();
+                    if path.exists() {
+                        let _ = fs::remove_file(&path);
+                    } else {
+                        if let Some(parent) = path.parent() {
+                            let _ = fs::create_dir_all(parent);
+                        }
+                        let _ = fs::write(&path, "1\n");
+                    }
                     self.reload();
                 }
                 "restore" => {
-                    let _ = std::process::Command::new("makoctl")
-                        .args(["restore"])
-                        .stdin(std::process::Stdio::null())
-                        .stdout(std::process::Stdio::null())
-                        .stderr(std::process::Stdio::null())
-                        .status();
-                    say(
-                        "Notifications",
-                        "Last notification restored",
-                        lazyos_ui::Urgency::Normal,
-                        Glyph::Bell,
-                    );
+                    if let Some(last) = self.notifications.first() {
+                        let mut cmd = std::process::Command::new("notify-send");
+                        if !last.app.is_empty() {
+                            cmd.arg("-a").arg(&last.app);
+                        }
+                        cmd.arg(&last.summary);
+                        if !last.body.is_empty() {
+                            cmd.arg(&last.body);
+                        }
+                        let _ = cmd
+                            .stdin(std::process::Stdio::null())
+                            .stdout(std::process::Stdio::null())
+                            .stderr(std::process::Stdio::null())
+                            .spawn();
+                        say(
+                            "Notifications",
+                            "Last notification restored",
+                            lazyos_ui::Urgency::Normal,
+                            Glyph::Bell,
+                        );
+                    }
                 }
                 "dismiss" => {
-                    let _ = std::process::Command::new("makoctl")
-                        .args(["dismiss", "-a"])
-                        .stdin(std::process::Stdio::null())
-                        .stdout(std::process::Stdio::null())
-                        .stderr(std::process::Stdio::null())
-                        .status();
+                    let path = history_path();
+                    let _ = fs::write(&path, "");
                     say(
                         "Notifications",
                         "Everything dismissed",
@@ -336,7 +380,7 @@ pub fn menu(
     if let Some(said) = missing(NEEDED) {
         say(
             "Notifications",
-            format!("{said} (makoctl, jq, wl-clipboard)"),
+            format!("{said} (wl-clipboard)"),
             lazyos_ui::Urgency::Critical,
             Glyph::Bell,
         );
