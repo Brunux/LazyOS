@@ -201,6 +201,18 @@ yet present in `scripts/` as not implemented.
   rows, with allocations that do not scale with the list (`lazyos-ui/tests/filter.rs`,
   `optimization.md` §13). Two matchers would be two case rules, so a surface with a search field
   uses `ListState` and nothing else.
+- **Monospace queries resolve to text fonts, never symbol fonts.** Upstream `fonts-nerd-symbols`
+  ships `/etc/fonts/conf.d/10-nerd-font-symbols.conf`, which aliases 50+ monospace families
+  (including `Liberation Mono`, `Roboto Mono`, `Fira Code`) to `Symbols Nerd Font` with
+  `binding="same"`. Because `Symbols Nerd Font` is DFSG-stripped and carries zero Latin alphanumeric
+  characters, web pages (notably Firefox rendering GitHub or documentation code blocks) resolve to a
+  symbols font with no letters, showing tofu boxes or blank lines unless font choosing is disabled.
+  LazyOS removes that symlink, ships `fonts-liberation` for web metric compatibility, and installs
+  `/etc/fonts/conf.d/46-monospace-aliases.conf` so modern monospace faces fall back to `monospace`
+  (`DejaVu Sans Mono`). Terminals (`foot`, `kitty`) configure `Symbols Nerd Font Mono` explicitly in
+  their fallback chains, so terminal icons remain intact. `check-system.sh` witnesses that
+  `10-nerd-font-symbols.conf` is absent, that `Liberation Mono` and `monospace` resolve to text fonts,
+  and that `fonts-liberation` is present.
 - **The palette is one file, and every surface is generated from it** (spec 004).
   `lazyos-theme` parses `theme.toml` - the 18 colours a terminal asks for by name plus the
   semantic roles a surface asks for (`text`, `accent`, `danger`, `hover`, `faint`, …) - ships

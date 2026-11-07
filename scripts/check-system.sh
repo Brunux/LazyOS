@@ -4424,13 +4424,40 @@ section "Fonts and icons"
 # ---------------------------------------------------------------------------
 if have fc-list; then
 	_families="$(fc-list : family 2>/dev/null | tr ',' '\n' | sed 's/^ *//' | sort -u)"
-	for _f in "JetBrains Mono" "FontAwesome" "Material Design Icons" "Symbols Nerd Font"; do
+	for _f in "JetBrains Mono" "FontAwesome" "Material Design Icons" "Symbols Nerd Font" "Liberation Mono"; do
 		if grep -qF "$_f" <<<"$_families"; then
 			ok "font family present: $_f"
 		else
-			fail "font family missing: $_f (waybar icons render as tofu boxes)"
+			fail "font family missing: $_f"
 		fi
 	done
+	if [ -e /etc/fonts/conf.d/10-nerd-font-symbols.conf ]; then
+		fail "10-nerd-font-symbols.conf is active in /etc/fonts/conf.d: monospace queries resolve to symbols-only font"
+	else
+		ok "10-nerd-font-symbols.conf is disabled (monospace queries remain clean)"
+	fi
+	if have fc-match; then
+		_mono_match="$(fc-match monospace -f '%{family}' 2>/dev/null || true)"
+		if [ "$_mono_match" != "Symbols Nerd Font" ] && [ -n "$_mono_match" ]; then
+			ok "monospace resolves to text font ($_mono_match)"
+		else
+			fail "monospace resolves to Symbols Nerd Font (code blocks will render as boxes)"
+		fi
+
+		_lib_match="$(fc-match "Liberation Mono" -f '%{family}' 2>/dev/null || true)"
+		if [ "$_lib_match" != "Symbols Nerd Font" ] && [ -n "$_lib_match" ]; then
+			ok "Liberation Mono resolves to text font ($_lib_match)"
+		else
+			fail "Liberation Mono resolves to Symbols Nerd Font (code blocks in Firefox render as boxes)"
+		fi
+
+		_roboto_match="$(fc-match "Roboto Mono" -f '%{family}' 2>/dev/null || true)"
+		if [ "$_roboto_match" != "Symbols Nerd Font" ] && [ -n "$_roboto_match" ]; then
+			ok "Roboto Mono resolves to text font ($_roboto_match)"
+		else
+			fail "Roboto Mono resolves to Symbols Nerd Font (code blocks in Firefox render as boxes)"
+		fi
+	fi
 else
 	skip "fc-list is not installed"
 fi
