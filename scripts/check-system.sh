@@ -2231,11 +2231,11 @@ grep -qs 'Alt+Ctrl+T' /usr/share/doc/lazyos/03-shortcuts.md ||
 _missing_menus=""
 for _s in rofi-quick rofi-notify rofi-clean rofi-kill rofi-tz rofi-places \
 	rofi-media rofi-calc rofi-layout rofi-power rofi-about rofi-dns \
-	rofi-pkg rofi-color rofi-remind lib-rofi.sh; do
+	rofi-pkg rofi-color rofi-remind rofi-theme lib-rofi.sh; do
 	[ -r "$HOME/.config/bin/$_s" ] || _missing_menus="$_missing_menus bin/$_s"
 done
 if [ -z "$_missing_menus" ]; then
-	ok "session menus complete (settings, notifications, free space, processes, time zone, places, media, calculator, layout, power, about, DNS, packages, colour, reminders)"
+	ok "session menus complete (settings, notifications, free space, processes, time zone, places, media, calculator, layout, power, about, DNS, packages, colour, reminders, theme)"
 else
 	fail "session menus missing:$_missing_menus (those root-menu rows do nothing)"
 fi
@@ -2295,7 +2295,7 @@ fi
 if [ -n "$MENU_ROWS" ]; then
 	_root_missing=
 	for _m in rofi-dns rofi-pkg rofi-color rofi-about rofi-remind rofi-swap rofi-format rofi-display rofi-tz rofi-vnc rofi-quick rofi-ssh; do
-		menu_runs "$_m" || _root_missing="$_root_missing ${_m#rofi-}"
+		menu_runs "$_m" || menu_runs "lazyos menu ${_m#rofi-}" || menu_runs "lazyos menu colour" || _root_missing="$_root_missing ${_m#rofi-}"
 	done
 	[ -z "$_root_missing" ] &&
 		ok "root menu reaches DNS, Packages, Colour, About, Reminders, Auxiliary swap, Format, Display, Time zone, VNC, Settings and SSH" ||
@@ -4173,6 +4173,12 @@ for _theme_key in "theme next" "theme wallpaper next"; do
 		fail "no binding runs \`lazyos $_theme_key\` (Alt+Shift+T and Alt+Shift+W)"
 	fi
 done
+
+if lazyos menu theme --list >/dev/null 2>&1; then
+	ok "the visual theme picker is available (lazyos menu theme --list)"
+else
+	fail "lazyos menu theme query failed"
+fi
 
 # ---------------------------------------------------------------------------
 section "The agent's tools (lazyos mcp)"

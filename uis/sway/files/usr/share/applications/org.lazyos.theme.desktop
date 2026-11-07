@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Themes
+GenericName=Theme Selector
+Comment=Browse, preview and apply session color themes and wallpapers
+Exec=/home/brunux/.config/bin/rofi-theme
+Icon=preferences-desktop-theme
+Terminal=false
+Categories=System;Settings;Appearance;
+Keywords=theme;color;palette;wallpaper;appearance;style;dark;preview;

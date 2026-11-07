@@ -297,7 +297,15 @@ impl<'a> App<'a> {
                 if let Some(screen) = self.screen.as_mut() {
                     match screen.key(key, &self.design) {
                         Outcome::Continue => {}
-                        Outcome::Consumed => return Outcome::Continue,
+                        Outcome::Consumed => {
+                            let current = Design::for_session(
+                                std::env::var("XDG_RUNTIME_DIR").ok().as_deref(),
+                            );
+                            if current.palette() != self.design.palette() {
+                                self.design = current;
+                            }
+                            return Outcome::Continue;
+                        }
                         done => return done,
                     }
                 }
@@ -313,10 +321,19 @@ impl<'a> App<'a> {
                 let row = self.screen.as_ref().and_then(|screen| {
                     screen.hit(self.body_area, mouse.column, mouse.row, &self.design)
                 });
-                match self.screen.as_mut() {
+                let outcome = match self.screen.as_mut() {
                     Some(screen) => screen.click(row),
                     None => Outcome::Continue,
+                };
+                if outcome == Outcome::Consumed {
+                    let current =
+                        Design::for_session(std::env::var("XDG_RUNTIME_DIR").ok().as_deref());
+                    if current.palette() != self.design.palette() {
+                        self.design = current;
+                    }
+                    return Outcome::Continue;
                 }
+                outcome
             }
             _ => Outcome::Continue,
         }

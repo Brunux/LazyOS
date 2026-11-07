@@ -1,9 +1,11 @@
-LazyOS · Palette                                                                                                                                10 rows
+LazyOS · Palette                                                                                                                                12 rows
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ╭ Palette ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │  theme                                                                                                                                              │
 │                                                                                                                                                      │
-│ ▍     Theme: Nord  lazyos theme set nord                                                                                                   system   │
+│ ▍     Themes  browse and preview color palettes and wallpapers                                                                             system   │
+│       Theme: Nord  lazyos theme set nord                                                                                                   system   │
+│       Theme Selector  browse themes with live palette & wallpaper preview                                                                  system   │
 │       Theme: Gruvbox  lazyos theme set gruvbox                                                                                             system   │
 │       Theme: Kanagawa  lazyos theme set kanagawa                                                                                           system   │
 │       Theme: Solarized  lazyos theme set solarized                                                                                         system   │
@@ -13,8 +15,6 @@ LazyOS · Palette                                                               
 │       Theme: Tokyo Night  lazyos theme set tokyo-night                                                                                     system   │
 │       Next theme  the palette after this one (Alt+Shift+T)                                                                                 system   │
 │       Next wallpaper  of the active theme (Alt+Shift+W)                                                                                    system   │
-│                                                                                                                                                      │
-│                                                                                                                                                      │
 │                                                                                                                                                      │
 │                                                                                                                                                      │
 │                                                                                                                                                      │

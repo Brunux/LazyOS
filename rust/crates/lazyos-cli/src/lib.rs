@@ -402,6 +402,21 @@ fn query(resolved: &Resolved) -> Option<i32> {
             Some(EXIT_OK)
         }
         ("menu translate", []) => Some(system::translate::run_translate()),
+        ("menu theme", ["--list"] | ["list"]) => {
+            system::theme_picker::print_list();
+            Some(EXIT_OK)
+        }
+        ("menu theme", ["--current"] | ["current"]) => {
+            system::theme_picker::print_current();
+            Some(EXIT_OK)
+        }
+        ("menu theme", ["--rows"] | ["rows"]) => {
+            let mut out = io::stdout();
+            for (key, label, detail) in system::theme_picker::rows() {
+                let _ = writeln!(out, "{key}\t{label}\t{detail}");
+            }
+            Some(EXIT_OK)
+        }
         ("installer", ["--check"] | ["check"]) => Some(installer::check()),
         ("installer", ["apply", ..]) => {
             let rest: Vec<String> = resolved.args.iter().skip(1).cloned().collect();
@@ -522,6 +537,7 @@ fn execute(
         "menu file-actions" => system::file_actions::menu(&resolved.args, terminal, design),
         "menu translate" => system::translate::menu(&resolved.args, terminal, design),
         "menu dictate" => system::dictate::menu(),
+        "menu theme" => system::theme_picker::menu(terminal, design),
         "task attach" => task_cmd::attach(resolved, terminal, design),
         "installer" => {
             let dry_run = resolved.args.iter().any(|a| a == "--dry-run");
