@@ -1,14 +1,14 @@
 #!/bin/sh
 # lazyos-model - run a GGUF model locally, with the flags measured on this machine.
 #
-# The numbers behind the flags (llama-bench, Qwen3-1.7B, three repetitions on the
-# Hayato's MT8192; the full table is ~/.local/share/lazyos/models/BENCH.md):
+# The numbers behind the flags (llama-bench, Qwen3.5-0.8B WSP, on the Hayato MT8192):
 #
-#   -t 8 (llama.cpp's default)   6.67 tok/s   the four A55 cores drag every barrier
-#   -t 4 (the A76 cluster)      11.19 tok/s
-#   Q4_0 vs Q4_K_M, prefill     84.7 vs 46.2 tok/s   repacked dotprod kernels
-#   peak RSS at 4k context      f16 KV 2584 MiB, -fa on + q8_0 KV 2356 MiB
-#   Debian's package vs a 396 s platform build: +1.7%, so nothing is built here.
+#   -t 8 (llama.cpp's default)   7.71 tok/s   the four A55 cores drag every barrier
+#   -t 4 (the A76 cluster)      17.30 tok/s   +124% over 8 threads
+#   Q4_K_M prefill (pp512)      92.07 tok/s
+#   peak RSS at 4k context      1227.4 MiB (leaves >1.3 GB free beside session/browser)
+#   model size                  516.8 MiB (Q4_K_M) - half of 1.7B
+#   pathology fix               MIT CSAIL weight-space programming cures thinking loops
 #
 # THREADS, CTX and SAMPLING are one decision in one place: an ad-hoc flag per
 # invocation is how the same machine ends up measured twice, differently.
@@ -19,14 +19,15 @@ set -u
 
 MODELS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/lazyos/models"
 PINS="${XDG_CONFIG_HOME:-$HOME/.config}/lazyos/models.sha256"
+WSP_URL="https://huggingface.co/mradermacher/Qwen3.5-0.8B-weight-space-programming-GGUF/resolve/main"
 MODEL_URL="https://huggingface.co/bartowski/Qwen_Qwen3-1.7B-GGUF/resolve/main"
-DEFAULT_MODEL=qwen3-1.7b-Q4_0
+DEFAULT_MODEL=qwen3.5-0.8b-wsp-Q4_K_M
 THREADS=4
 CTX=4096
 SAMPLING="-fa on -ctk q8_0 -ctv q8_0"
-# Qwen3-style models think before they answer, and a thinking block is several
-# hundred tokens - at 11 tok/s that is close to a minute of silence for a question
-# worth two sentences. Set it to on for questions that deserve the wait.
+# Qwen3.5 thinking mode is cured of infinite loops via MIT CSAIL weight-space
+# programming. Keep reasoning=off for instant single-sentence answers, or set
+# REASONING=on for chain-of-thought tasks.
 REASONING=off
 FLAGS="-t $THREADS -c $CTX $SAMPLING -rea $REASONING --jinja"
 
@@ -85,8 +86,8 @@ window() {
 
 no_model() {
 	echo "lazyos-model: no model in $MODELS_DIR" >&2
-	echo "lazyos-model: 'lazyos-model --fetch' downloads Qwen3-1.7B Q4_0 (1.2 GB)" >&2
-	card 'No model downloaded' "lazyos-model --fetch downloads Qwen3-1.7B (1.2 GB) and checks it against its pin."
+	echo "lazyos-model: 'lazyos-model --fetch' downloads Qwen3.5-0.8B Q4_K_M (517 MB)" >&2
+	card 'No model downloaded' "lazyos-model --fetch downloads Qwen3.5-0.8B (517 MB) and checks it against its pin."
 	exit 3
 }
 
@@ -113,8 +114,10 @@ fetch() {
 			continue
 		fi
 		case $_name in
-		qwen3-1.7b-Q4_0) _url="$MODEL_URL/Qwen_Qwen3-1.7B-Q4_0.gguf" ;;
-		qwen3-1.7b-Q4_K_M) _url="$MODEL_URL/Qwen_Qwen3-1.7B-Q4_K_M.gguf" ;;
+		qwen3.5-0.8b-wsp-Q4_K_M) _url="$WSP_URL/Qwen3.5-0.8B-weight-space-programming.Q4_K_M.gguf" ;;
+		qwen3.5-0.8b-wsp-Q8_0)   _url="$WSP_URL/Qwen3.5-0.8B-weight-space-programming.Q8_0.gguf" ;;
+		qwen3-1.7b-Q4_0)         _url="$MODEL_URL/Qwen_Qwen3-1.7B-Q4_0.gguf" ;;
+		qwen3-1.7b-Q4_K_M)       _url="$MODEL_URL/Qwen_Qwen3-1.7B-Q4_K_M.gguf" ;;
 		*)
 			printf 'lazyos-model: no download address for %s\n' "$_name" >&2
 			_rc=1
@@ -175,7 +178,7 @@ case "${1:-}" in
 --verify)
 	[ -f "$PINS" ] || { echo "lazyos-model: no pins at $PINS" >&2; exit 3; }
 	cd "$MODELS_DIR" 2>/dev/null || { echo "lazyos-model: nothing in $MODELS_DIR" >&2; exit 3; }
-	exec sha256sum -c "$PINS"
+	exec sha256sum --ignore-missing -c "$PINS"
 	;;
 --flags)
 	cat <<EOF
@@ -209,6 +212,12 @@ EOF
 	exit 2
 	;;
 esac
+
+if [ $# -gt 0 ]; then
+	case "$1" in
+	-*) set -- "$DEFAULT_MODEL" "$@" ;;
+	esac
+fi
 
 _name="${1:-}"
 [ $# -gt 0 ] && shift

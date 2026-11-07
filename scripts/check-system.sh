@@ -3359,7 +3359,7 @@ fi
 # reads the whole file, so it is only run when there is something to read.
 _lm_count=$(ls "$HOME"/.local/share/lazyos/models/*.gguf 2>/dev/null | wc -l)
 if [ "$_lm_count" -eq 0 ]; then
-	skip "no local model yet: 'lazyos-model --fetch' downloads Qwen3-1.7B (1.2 GB), checked against its pin"
+	skip "no local model yet: 'lazyos-model --fetch' downloads Qwen3.5-0.8B (517 MB), checked against its pin"
 elif [ -x "$HOME/.config/bin/lazyos-model" ]; then
 	_lm_verify=$("$HOME/.config/bin/lazyos-model" --verify 2>&1)
 	if [ $? -eq 0 ]; then
