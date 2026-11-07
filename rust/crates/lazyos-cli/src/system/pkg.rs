@@ -177,7 +177,6 @@ impl PkgScreen {
         match result {
             Ok(_) => {
                 let _ = busy_end("pkg", "Packages", &format!("Installed {}", name));
-                print(&format!("Installed {}", name));
                 say(
                     "Packages",
                     format!("Installed {} · lists updated", name),

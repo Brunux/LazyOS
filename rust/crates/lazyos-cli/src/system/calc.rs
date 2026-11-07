@@ -183,7 +183,6 @@ impl Screen for CalcScreen {
                     match Self::evaluate(&expr) {
                         Ok(result) => {
                             self.add_to_history(&expr, &result);
-                            let _ = print(&format!("{expr} = {result}"));
                             if have("wl-copy") {
                                 let _ = std::process::Command::new("wl-copy")
                                     .arg(&result)

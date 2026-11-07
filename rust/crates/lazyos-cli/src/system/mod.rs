@@ -227,24 +227,43 @@ pub fn wait_for(node: &str) -> bool {
     crate::system::format::wait_for(node)
 }
 
+fn busy_bin() -> std::path::PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        let p = std::path::PathBuf::from(home).join(".config/bin/busy");
+        if p.exists() {
+            return p;
+        }
+    }
+    std::path::PathBuf::from("busy")
+}
+
 /// Start a busy card with the bar spinner.
 pub fn busy(tag: &str, title: &str, message: &str, icon: &str) {
-    let _ = std::process::Command::new("lazyos")
-        .args(["notify", "busy", tag, title, message, icon])
+    let _ = std::process::Command::new(busy_bin())
+        .args(["start", tag, title, message, icon])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status();
 }
 
 /// End a busy card with success.
-pub fn busy_end(tag: &str, title: &str, message: &str) {
-    let _ = std::process::Command::new("lazyos")
-        .args(["notify", "busy-end", tag, title, message])
+pub fn busy_end(tag: &str, _title: &str, message: &str) {
+    let _ = std::process::Command::new(busy_bin())
+        .args(["end", tag, message])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status();
 }
 
 /// End a busy card with failure.
-pub fn busy_fail(tag: &str, title: &str, message: &str, urgency: &str) {
-    let _ = std::process::Command::new("lazyos")
-        .args(["notify", "busy-fail", tag, title, message, urgency])
+pub fn busy_fail(tag: &str, _title: &str, message: &str, icon: &str) {
+    let _ = std::process::Command::new(busy_bin())
+        .args(["fail", tag, message, icon])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status();
 }
 

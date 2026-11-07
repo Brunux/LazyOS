@@ -4,21 +4,20 @@
 /// Developer: profile export, restore, and diagnostics bundle (`rofi-dev`).
 ///
 /// The old `rofi-dev` was a three-row front end over `lazyos-profile` helper.
-/// This version keeps the same structure but uses the task window for the
-/// export/restore operations (with passphrase handling).
+/// This version provides structured pickers for archive selection and target
+/// destinations, dispatching operations detached from the terminal so that
+/// no child output leaks onto the screen.
 use std::cell::Cell;
-use std::collections::HashSet;
-use std::fs;
 use std::path::Path;
 
 use lazyos_ui::{
-    BodyCtx, Design, Glyph, Header, Input, KeyHint, ListAction, ListState, Outcome, Row, Screen,
-    TextStyle, draw_card,
+    BodyCtx, Design, Glyph, Header, KeyHint, ListState, Outcome, Row, Screen, TextStyle, draw_card,
 };
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{busy, busy_end, busy_fail, have, missing, print, say, sudo};
+use crate::system::pick::{Picker, Question};
+use crate::system::{have, missing, say};
 
 /// A developer action entry.
 #[derive(Clone, Debug)]
@@ -53,21 +52,6 @@ pub struct DevScreen {
     header: Header,
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
-    stage: DevStage,
-    current_action: Option<DevAction>,
-    archives: Vec<ArchiveEntry>,
-    archive_list: ListState,
-    target_dir: String,
-    pick_keyhints: Vec<KeyHint>,
-    running_keyhints: Vec<KeyHint>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DevStage {
-    Main,
-    PickTarget,
-    PickArchive,
-    Running,
 }
 
 impl DevScreen {
@@ -107,16 +91,6 @@ impl DevScreen {
                 KeyHint::new("Esc", "close"),
             ],
             rows_height: Cell::new(20),
-            stage: DevStage::Main,
-            current_action: None,
-            archives: Vec::new(),
-            archive_list: ListState::new().ranked(),
-            target_dir: String::new(),
-            pick_keyhints: vec![
-                KeyHint::new("Enter", "confirm"),
-                KeyHint::new("Esc", "cancel"),
-            ],
-            running_keyhints: vec![KeyHint::new("Esc", "back")],
         }
     }
 
@@ -130,7 +104,7 @@ impl DevScreen {
         std::path::PathBuf::from("lazyos-profile")
     }
 
-    fn entry_row(e: &DevEntry) -> Row {
+    pub fn entry_row(e: &DevEntry) -> Row {
         Row::new(&e.label)
             .glyph(Self::icon_from_str(&e.icon))
             .detail(&e.detail)
@@ -158,14 +132,7 @@ impl DevScreen {
         }
     }
 
-    fn pick_target(&mut self, _prompt: &str, _message: &str) -> Option<String> {
-        let dir = std::env::var("HOME").unwrap_or_default() + "/Downloads";
-        let _ = std::fs::create_dir_all(&dir);
-        Some(dir)
-    }
-
-    fn list_archives(&mut self) -> Vec<ArchiveEntry> {
-        // Call lazyos-profile list-archives
+    pub fn list_archives() -> Vec<ArchiveEntry> {
         let profile = Self::profile_bin();
         let output = std::process::Command::new(profile)
             .args(["list-archives"])
@@ -189,9 +156,7 @@ impl DevScreen {
                             .unwrap_or_default()
                             .to_string_lossy()
                             .to_string();
-                        // Convert epoch to date string without chrono
                         let when = if let Ok(epoch_secs) = epoch.parse::<i64>() {
-                            // Use date command for formatting
                             std::process::Command::new("date")
                                 .args(["-d", &format!("@{epoch_secs}"), "+%Y-%m-%d %H:%M"])
                                 .output()
@@ -215,7 +180,7 @@ impl DevScreen {
         archives
     }
 
-    fn human_size(bytes: &str) -> String {
+    pub fn human_size(bytes: &str) -> String {
         if let Ok(b) = bytes.parse::<u64>() {
             if b >= 1_073_741_824 {
                 format!("{:.1} GiB", b as f64 / 1_073_741_824.0)
@@ -230,198 +195,20 @@ impl DevScreen {
             bytes.to_string()
         }
     }
-
-    fn run_export(&mut self, target: &str) {
-        self.stage = DevStage::Running;
-        let _ = busy("dev-export", "Developer", "Exporting profile...", "box");
-
-        let profile = Self::profile_bin();
-        let result = std::process::Command::new(profile)
-            .args(["export", target])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .output();
-
-        match result {
-            Ok(output) if output.status.success() => {
-                let _ = busy_end("dev-export", "Developer", "Profile exported");
-                print(&format!("Exported to {}", target));
-                say(
-                    "Developer",
-                    format!("Profile exported to {}", target),
-                    lazyos_ui::Urgency::Normal,
-                    Glyph::Box,
-                );
-            }
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                let err = stderr.lines().last().unwrap_or("export failed");
-                let _ = busy_fail("dev-export", "Developer", err, "dialog-error");
-                say(
-                    "Developer",
-                    err,
-                    lazyos_ui::Urgency::Critical,
-                    Glyph::Warning,
-                );
-            }
-            Err(e) => {
-                let _ = busy_fail("dev-export", "Developer", &e.to_string(), "dialog-error");
-            }
-        }
-        self.stage = DevStage::Main;
-    }
-
-    fn run_import(&mut self, archive: &str) {
-        self.stage = DevStage::Running;
-        let _ = busy("dev-import", "Developer", "Restoring profile...", "undo");
-
-        let profile = Self::profile_bin();
-        let result = std::process::Command::new(profile)
-            .args(["import", archive])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .output();
-
-        match result {
-            Ok(output) if output.status.success() => {
-                let _ = busy_end("dev-import", "Developer", "Profile restored");
-                print("Profile restored");
-                say(
-                    "Developer",
-                    "Profile restored · current files backed up",
-                    lazyos_ui::Urgency::Normal,
-                    Glyph::Undo,
-                );
-            }
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                let err = stderr.lines().last().unwrap_or("import failed");
-                let _ = busy_fail("dev-import", "Developer", err, "dialog-error");
-                say(
-                    "Developer",
-                    err,
-                    lazyos_ui::Urgency::Critical,
-                    Glyph::Warning,
-                );
-            }
-            Err(e) => {
-                let _ = busy_fail("dev-import", "Developer", &e.to_string(), "dialog-error");
-            }
-        }
-        self.stage = DevStage::Main;
-    }
-
-    fn run_report(&mut self, target: &str) {
-        self.stage = DevStage::Running;
-        let _ = busy(
-            "dev-report",
-            "Developer",
-            "Generating diagnostics...",
-            "bug",
-        );
-
-        let profile = Self::profile_bin();
-        let result = std::process::Command::new(profile)
-            .args(["report", target])
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .output();
-
-        match result {
-            Ok(output) if output.status.success() => {
-                let _ = busy_end("dev-report", "Developer", "Diagnostics saved");
-                print(&format!("Report saved to {}", target));
-                say(
-                    "Developer",
-                    format!("Diagnostics bundle saved to {}", target),
-                    lazyos_ui::Urgency::Normal,
-                    Glyph::Bug,
-                );
-            }
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                let err = stderr.lines().last().unwrap_or("report failed");
-                let _ = busy_fail("dev-report", "Developer", err, "dialog-error");
-                say(
-                    "Developer",
-                    err,
-                    lazyos_ui::Urgency::Critical,
-                    Glyph::Warning,
-                );
-            }
-            Err(e) => {
-                let _ = busy_fail("dev-report", "Developer", &e.to_string(), "dialog-error");
-            }
-        }
-        self.stage = DevStage::Main;
-    }
 }
 
 impl Screen for DevScreen {
     fn draw(&mut self, ctx: &mut BodyCtx) {
         draw_card(ctx.buf, ctx.area, ctx.design, Some("Developer"), true);
-
-        match self.stage {
-            DevStage::Main => {
-                let (filter, rows) = Self::list_layout(ctx.area);
-                ctx.buf.set_string(
-                    filter.x,
-                    filter.y,
-                    "The archive carries ~/.ssh and ~/.gnupg · the passphrase protects it",
-                    ctx.design.style(TextStyle::Dim),
-                );
-                self.rows_height.set(rows.height);
-                self.list.render(rows, ctx.buf, ctx.design, true);
-            }
-            DevStage::PickTarget => {
-                let inner = Rect {
-                    x: ctx.area.x + 2,
-                    y: ctx.area.y + 1,
-                    width: ctx.area.width.saturating_sub(4),
-                    height: ctx.area.height.saturating_sub(2),
-                };
-                ctx.buf.set_string(
-                    inner.x,
-                    inner.y,
-                    &format!("Target: {}", self.target_dir),
-                    ctx.design.style(TextStyle::Body),
-                );
-                ctx.buf.set_string(
-                    inner.x,
-                    inner.y + 2,
-                    "Press Enter to confirm, Esc to cancel",
-                    ctx.design.style(TextStyle::Dim),
-                );
-            }
-            DevStage::PickArchive => {
-                let (filter, rows) = Self::list_layout(ctx.area);
-                ctx.buf.set_string(
-                    filter.x,
-                    filter.y,
-                    "Select archive to restore · Esc to cancel",
-                    ctx.design.style(TextStyle::Dim),
-                );
-                self.rows_height.set(rows.height);
-                self.archive_list.render(rows, ctx.buf, ctx.design, true);
-            }
-            DevStage::Running => {
-                let inner = Rect {
-                    x: ctx.area.x + 2,
-                    y: ctx.area.y + 1,
-                    width: ctx.area.width.saturating_sub(4),
-                    height: ctx.area.height.saturating_sub(2),
-                };
-                ctx.buf.set_string(
-                    inner.x,
-                    inner.y,
-                    "Running...",
-                    ctx.design.style(TextStyle::Title),
-                );
-            }
-        }
+        let (filter, rows) = Self::list_layout(ctx.area);
+        ctx.buf.set_string(
+            filter.x,
+            filter.y,
+            "The archive carries ~/.ssh and ~/.gnupg · the passphrase protects it",
+            ctx.design.style(TextStyle::Dim),
+        );
+        self.rows_height.set(rows.height);
+        self.list.render(rows, ctx.buf, ctx.design, true);
     }
 
     fn key(&mut self, key: KeyEvent, design: &Design) -> Outcome {
@@ -429,179 +216,28 @@ impl Screen for DevScreen {
             return Outcome::Continue;
         }
 
-        match self.stage {
-            DevStage::Main => {
-                let rows_height = self.rows_height.get();
-                match key.code {
-                    KeyCode::Enter => {
-                        if let Some(selected) = self.list.selected_index() {
-                            if let Some(entry) = self.entries.get(selected) {
-                                self.current_action = Some(entry.action.clone());
-                                match entry.action {
-                                    DevAction::Export => {
-                                        if let Some(target) = self.pick_target(
-                                            "Export the profile to",
-                                            "Mounted disks first · Escape closes",
-                                        ) {
-                                            self.target_dir = target;
-                                            self.stage = DevStage::PickTarget;
-                                        }
-                                    }
-                                    DevAction::Restore => {
-                                        self.archives = self.list_archives();
-                                        if self.archives.is_empty() {
-                                            say(
-                                                "Developer",
-                                                "No exported profile on a mounted disk · insert the stick, mount it in Places, then try again",
-                                                lazyos_ui::Urgency::Normal,
-                                                Glyph::Info,
-                                            );
-                                        } else {
-                                            self.archive_list.set_rows(
-                                                self.archives
-                                                    .iter()
-                                                    .map(|a| {
-                                                        Row::new(&a.name)
-                                                            .glyph(Self::icon_from_str("key"))
-                                                            .detail(&format!(
-                                                                "{} · {}",
-                                                                a.date, a.size
-                                                            ))
-                                                    })
-                                                    .collect(),
-                                            );
-                                            self.stage = DevStage::PickArchive;
-                                        }
-                                    }
-                                    DevAction::Report => {
-                                        if let Some(target) = self.pick_target(
-                                            "Save the diagnostics bundle to",
-                                            "No keys and no passwords are in it",
-                                        ) {
-                                            self.target_dir = target;
-                                            self.stage = DevStage::PickTarget;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    KeyCode::Esc => return Outcome::Done(lazyos_ui::app::exit::ESCAPE),
-                    _ => {}
+        let rows_height = self.rows_height.get();
+        match key.code {
+            KeyCode::Enter => {
+                if let Some(selected) = self.list.selected_index() {
+                    return Outcome::Done(selected as i32);
                 }
-                let _ = self.list.handle(key, rows_height, design);
-                Outcome::Continue
             }
-            DevStage::PickTarget => {
-                match key.code {
-                    KeyCode::Enter => {
-                        let target = self.target_dir.clone();
-                        match self.current_action {
-                            Some(DevAction::Export) => self.run_export(&target),
-                            Some(DevAction::Report) => self.run_report(&target),
-                            _ => {}
-                        }
-                        self.stage = DevStage::Main;
-                    }
-                    KeyCode::Esc => self.stage = DevStage::Main,
-                    _ => {}
-                }
-                Outcome::Continue
-            }
-            DevStage::PickArchive => {
-                let rows_height = self.rows_height.get();
-                match key.code {
-                    KeyCode::Enter => {
-                        if let Some(selected) = self.archive_list.selected_index() {
-                            if let Some(archive) = self.archives.get(selected).cloned() {
-                                self.run_import(&archive.path);
-                            }
-                        }
-                        self.stage = DevStage::Main;
-                    }
-                    KeyCode::Esc => self.stage = DevStage::Main,
-                    _ => {}
-                }
-                let _ = self.archive_list.handle(key, rows_height, design);
-                Outcome::Continue
-            }
-            DevStage::Running => {
-                if key.code == KeyCode::Esc {
-                    self.stage = DevStage::Main
-                }
-                Outcome::Continue
-            }
+            KeyCode::Esc => return Outcome::Done(lazyos_ui::app::exit::ESCAPE),
+            _ => {}
         }
+        let _ = self.list.handle(key, rows_height, design);
+        Outcome::Continue
     }
 
     fn click(&mut self, row: Option<usize>) -> Outcome {
-        match self.stage {
-            DevStage::Main => {
-                if let Some(row) = row {
-                    self.list.set_cursor(row);
-                    if let Some(index) = self.list.selected_index() {
-                        if let Some(entry) = self.entries.get(index) {
-                            match entry.action {
-                                DevAction::Export => {
-                                    if let Some(target) = self.pick_target(
-                                        "Export the profile to",
-                                        "Mounted disks first · Escape closes",
-                                    ) {
-                                        self.target_dir = target;
-                                        self.stage = DevStage::PickTarget;
-                                    }
-                                }
-                                DevAction::Restore => {
-                                    self.archives = self.list_archives();
-                                    if self.archives.is_empty() {
-                                        say(
-                                            "Developer",
-                                            "No exported profile on a mounted disk · insert the stick, mount it in Places, then try again",
-                                            lazyos_ui::Urgency::Normal,
-                                            Glyph::Info,
-                                        );
-                                    } else {
-                                        self.archive_list.set_rows(
-                                            self.archives
-                                                .iter()
-                                                .map(|a| {
-                                                    Row::new(&a.name)
-                                                        .glyph(Self::icon_from_str("key"))
-                                                        .detail(&format!("{} · {}", a.date, a.size))
-                                                })
-                                                .collect(),
-                                        );
-                                        self.stage = DevStage::PickArchive;
-                                    }
-                                }
-                                DevAction::Report => {
-                                    if let Some(target) = self.pick_target(
-                                        "Save the diagnostics bundle to",
-                                        "No keys and no passwords are in it",
-                                    ) {
-                                        self.target_dir = target;
-                                        self.stage = DevStage::PickTarget;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                Outcome::Continue
+        if let Some(row) = row {
+            self.list.set_cursor(row);
+            if let Some(index) = self.list.selected_index() {
+                return Outcome::Done(index as i32);
             }
-            DevStage::PickArchive => {
-                if let Some(row) = row {
-                    self.archive_list.set_cursor(row);
-                    if let Some(index) = self.archive_list.selected_index() {
-                        if let Some(archive) = self.archives.get(index).cloned() {
-                            self.run_import(&archive.path);
-                        }
-                    }
-                }
-                Outcome::Continue
-            }
-            _ => Outcome::Continue,
         }
+        Outcome::Continue
     }
 
     fn hit(&self, area: Rect, x: u16, y: u16, design: &Design) -> Option<usize> {
@@ -610,11 +246,7 @@ impl Screen for DevScreen {
     }
 
     fn keybar(&self) -> Option<&[KeyHint]> {
-        match self.stage {
-            DevStage::Main => Some(&self.keybar),
-            DevStage::PickTarget | DevStage::PickArchive => Some(&self.pick_keyhints),
-            DevStage::Running => Some(&self.running_keyhints),
-        }
+        Some(&self.keybar)
     }
 
     fn header(&self) -> Option<&Header> {
@@ -643,12 +275,91 @@ impl DevScreen {
     }
 }
 
+/// Collect destinations for export and diagnostics report.
+fn collect_targets() -> (Vec<Row>, Vec<String>) {
+    let mut rows = Vec::new();
+    let mut keys = Vec::new();
+
+    // Check findmnt for mounted writable removable / external filesystems
+    if let Ok(output) = std::process::Command::new("findmnt")
+        .args(["-rn", "-o", "TARGET,FSTYPE,OPTIONS"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 3 {
+                    let target = parts[0];
+                    let fstype = parts[1];
+                    let options = parts[2];
+                    if matches!(
+                        fstype,
+                        "ext2"
+                            | "ext3"
+                            | "ext4"
+                            | "vfat"
+                            | "exfat"
+                            | "btrfs"
+                            | "xfs"
+                            | "f2fs"
+                            | "ntfs"
+                            | "ntfs3"
+                    ) {
+                        if target == "/"
+                            || target == "/boot"
+                            || target.starts_with("/boot/")
+                            || options.contains(",ro")
+                            || options.starts_with("ro,")
+                            || options == "ro"
+                        {
+                            continue;
+                        }
+                        if let Ok(md) = std::fs::metadata(target) {
+                            if !md.permissions().readonly() {
+                                let label = Path::new(target)
+                                    .file_name()
+                                    .unwrap_or_default()
+                                    .to_string_lossy()
+                                    .to_string();
+                                rows.push(
+                                    Row::new(&label)
+                                        .glyph(Glyph::Disk)
+                                        .detail(&format!("{} · removable disk", target)),
+                                );
+                                keys.push(target.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Always include $HOME/Downloads
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+    let downloads = format!("{home}/Downloads");
+    let _ = std::fs::create_dir_all(&downloads);
+    rows.push(
+        Row::new("This home folder")
+            .glyph(Glyph::Download)
+            .detail(&format!("{} · copy it to the stick later", downloads)),
+    );
+    keys.push(downloads);
+
+    (rows, keys)
+}
+
 /// `lazyos menu dev` (`rofi-dev`): developer profile tools.
 pub fn menu(
     terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
     design: &Design,
 ) -> Result<i32, crate::Failure> {
-    let profile_exists = DevScreen::profile_bin().exists() || have("lazyos-profile");
+    let profile_bin = DevScreen::profile_bin();
+    let profile_exists = profile_bin.exists() || have("lazyos-profile");
     let mut needed = vec!["wl-copy", "sudo", "tar", "gpg", "zstd"];
     if !profile_exists {
         needed.push("lazyos-profile");
@@ -662,9 +373,176 @@ pub fn menu(
         );
         return Ok(3);
     }
-    let mut screen = DevScreen::new();
-    let code = crate::run_screen(terminal, design, "Developer", &mut screen)?;
-    Ok(code)
+
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+
+    loop {
+        let mut main_picker = Picker::new(
+            "Developer",
+            vec![Question::choose(
+                "Developer",
+                "The archive carries ~/.ssh and ~/.gnupg · the passphrase protects it",
+                vec![
+                    Row::new("Export my profile")
+                        .glyph(Glyph::Box)
+                        .detail("keys, configs and packages, encrypted · to a disk"),
+                    Row::new("Restore a profile")
+                        .glyph(Glyph::Undo)
+                        .detail("from an exported archive · the current files are backed up first"),
+                    Row::new("Save a diagnostics bundle")
+                        .glyph(Glyph::Bug)
+                        .detail("the system report and this boot's journal, for a bug report"),
+                ],
+                vec![
+                    "export".to_string(),
+                    "restore".to_string(),
+                    "report".to_string(),
+                ],
+            )],
+        );
+
+        let code = crate::run_screen(terminal, design, "Developer", &mut main_picker)?;
+        if code != 0 {
+            return Ok(code);
+        }
+
+        let Some(action) = main_picker.answers().first().cloned() else {
+            return Ok(1);
+        };
+
+        match action.as_str() {
+            "restore" => {
+                let archives = DevScreen::list_archives();
+                if archives.is_empty() {
+                    say(
+                        "Developer",
+                        "No exported profile on a mounted disk · insert the stick, mount it in Places, then try again",
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Info,
+                    );
+                    return Ok(0);
+                }
+
+                let rows: Vec<Row> = archives
+                    .iter()
+                    .map(|a| {
+                        Row::new(&a.name)
+                            .glyph(Glyph::Key)
+                            .detail(&format!("{} · {}", a.date, a.size))
+                    })
+                    .collect();
+                let keys: Vec<String> = archives.iter().map(|a| a.path.clone()).collect();
+                let mut archive_picker = Picker::new(
+                    "Restore a profile",
+                    vec![Question::choose(
+                        "Restore a profile",
+                        "Enter restores · the current files are backed up first · Escape closes",
+                        rows,
+                        keys,
+                    )],
+                );
+
+                let r_code =
+                    crate::run_screen(terminal, design, "Restore a profile", &mut archive_picker)?;
+                if r_code == 1 {
+                    // Escape: step back to main Developer menu
+                    continue;
+                }
+                if r_code != 0 {
+                    return Ok(r_code);
+                }
+
+                if let Some(archive_path) = archive_picker.answers().first() {
+                    let _ = crate::menu::spawn_detached(
+                        &[
+                            profile_bin.to_string_lossy().to_string(),
+                            "import".to_string(),
+                            archive_path.to_string(),
+                        ],
+                        &home,
+                    );
+                    return Ok(0);
+                }
+            }
+            "export" => {
+                let (target_rows, target_keys) = collect_targets();
+                let mut target_picker = Picker::new(
+                    "Export the profile to",
+                    vec![Question::choose(
+                        "Export the profile to",
+                        "Mounted disks first · Escape closes",
+                        target_rows,
+                        target_keys,
+                    )],
+                );
+
+                let t_code = crate::run_screen(
+                    terminal,
+                    design,
+                    "Export the profile to",
+                    &mut target_picker,
+                )?;
+                if t_code == 1 {
+                    // Escape: step back to main Developer menu
+                    continue;
+                }
+                if t_code != 0 {
+                    return Ok(t_code);
+                }
+
+                if let Some(target_dir) = target_picker.answers().first() {
+                    let _ = crate::menu::spawn_detached(
+                        &[
+                            profile_bin.to_string_lossy().to_string(),
+                            "export".to_string(),
+                            target_dir.to_string(),
+                        ],
+                        &home,
+                    );
+                    return Ok(0);
+                }
+            }
+            "report" => {
+                let (target_rows, target_keys) = collect_targets();
+                let mut target_picker = Picker::new(
+                    "Save the diagnostics bundle to",
+                    vec![Question::choose(
+                        "Save the diagnostics bundle to",
+                        "No keys and no passwords are in it",
+                        target_rows,
+                        target_keys,
+                    )],
+                );
+
+                let t_code = crate::run_screen(
+                    terminal,
+                    design,
+                    "Save the diagnostics bundle to",
+                    &mut target_picker,
+                )?;
+                if t_code == 1 {
+                    // Escape: step back to main Developer menu
+                    continue;
+                }
+                if t_code != 0 {
+                    return Ok(t_code);
+                }
+
+                if let Some(target_dir) = target_picker.answers().first() {
+                    let _ = crate::menu::spawn_detached(
+                        &[
+                            profile_bin.to_string_lossy().to_string(),
+                            "report".to_string(),
+                            target_dir.to_string(),
+                        ],
+                        &home,
+                    );
+                    return Ok(0);
+                }
+            }
+            _ => return Ok(0),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -672,7 +550,6 @@ mod tests {
     use crate::system::dev::DevAction;
     use crate::system::dev::DevEntry;
     use crate::system::dev::DevScreen;
-    use lazyos_ui::Glyph;
 
     #[test]
     fn human_size() {
