@@ -103,19 +103,30 @@ the silent case, because the launcher still opens, just later.
 
 ## Notifications
 
-A notification is a card at the top right, under the bar, drawn by mako over
-whatever is open - a critical one over a full-screen video too. Its border says
-how urgent it is: grey for low, cyan for normal, red for critical. Normal and
-low cards leave on their own after a few seconds; a critical card stays until
-you dismiss it. **To dismiss one, right-click it.** Each card carries a picture
-of what it is about (the LazyOS theme's icon). A card whose picture is missing
-still shows, as text, and `lazyos notify` names the missing picture on stderr.
+A notification is an eye-candy card at the top right, under the bar, rendered by
+`lazyos-notify` over whatever is open — including over fullscreen applications for
+critical alerts. Its anti-aliased border and glowing dot indicate urgency: low
+(muted grey), normal (accent cyan/theme border), or critical (warning red).
+Normal and low notifications expire automatically; critical cards remain until
+dismissed.
 
-mako keeps the last twenty cards it showed, dismissed or expired, so nothing is
-lost to a click: **Alt+Ctrl+N** lists that history (Enter copies a line,
-"Dismiss everything" clears it), and Do Not Disturb is in the same menu. A
-secret is never in a card: a copied password or token goes to the clipboard,
-and the card says only that it is there, so the history cannot keep the value.
+**Interaction:**
+* **Left-click on card body:** invokes the default action (if defined) or dismisses.
+* **Left-click on action pill:** triggers that specific action and signals the sender via D-Bus.
+* **Left-click on top-right '✕':** closes the notification.
+* **Right-click on card:** dismisses the card.
+* **Middle-click on card:** dismisses all notifications from that application.
+
+Each card carries a high-resolution icon from the LazyOS theme or a single-advance Nerd
+Font glyph fallback. Notifications also render level bars for progress hints (`value:0..100`),
+used by volume/brightness keys (`osd`) and slow background tasks.
+
+`lazyos-notify` logs notifications into structured JSONL at
+`$XDG_STATE_HOME/lazyos/notify/history.jsonl`. **Alt+Ctrl+N** opens the history
+viewer (`lazyos menu notify`): Enter copies a notification to the clipboard,
+"Restore the last one" re-issues the most recent toast, and Do Not Disturb toggles
+quiet mode without suppressing critical system alerts. Secrets never appear in
+notification bodies: tokens and passwords go directly to the clipboard.
 
 ## Health and backups
 

@@ -222,12 +222,7 @@ pulseaudio-utils
 # by that name; this port calls `tte` directly, so no shim is involved.
 python3-terminaltexteffects
 
-# notifications
-# Debian's package is mako-notifier: the name `mako` belongs to a Python
-# template library, and the binary it installs is still /usr/bin/mako. sway
-# starts it once per session (etc/sway/config.d/20-notifications.conf) and the
-# solarized theme lives in ~/.config/mako/config.
-mako-notifier
+# notifications: lazyos-notify is built from source in rust/crates/lazyos-notify
 
 # login manager
 greetd

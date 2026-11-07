@@ -1035,7 +1035,7 @@ if have sway; then
 	fi
 fi
 _missing_cmds=""
-for _c in waybar foot rofi swaylock swaynag swaybg brightnessctl grimshot wlsunset wpctl pactl mako; do
+for _c in waybar foot rofi swaylock swaynag swaybg brightnessctl grimshot wlsunset wpctl pactl lazyos-notify; do
 	have "$_c" || _missing_cmds="$_missing_cmds $_c"
 done
 if [ -z "$_missing_cmds" ]; then
@@ -1184,22 +1184,21 @@ for b in bad:
 	fi
 fi
 
-# Notifications: mako owns org.freedesktop.Notifications on the session bus. If
+# Notifications: lazyos-notify owns org.freedesktop.Notifications on the session bus. If
 # the daemon is not running (crashed, or never started) nothing logs it and
 # every application's notifications silently disappear, so ask the bus.
 if have busctl; then
 	_notify_name="$(busctl --user list --no-legend 2>/dev/null | awk '$1 == "org.freedesktop.Notifications" { print $1 }')"
 	if [ -n "$_notify_name" ]; then
-		ok "a notification daemon owns org.freedesktop.Notifications (mako)"
+		ok "a notification daemon owns org.freedesktop.Notifications (lazyos-notify)"
 	else
-		warn "no notification daemon on the session bus: mako is not running, notifications are lost"
+		warn "no notification daemon on the session bus: lazyos-notify is not running, notifications are lost"
 	fi
 else
 	skip "busctl is not installed"
 fi
 
-# A notification icon is a name mako looks up on its icon-path, and one it cannot
-# find draws nothing at all: the card is text-only, with no log line and no error.
+# A notification icon is a name looked up in the theme or rendered as a glyph.
 # The names are lib-rofi.sh's UI_ICON_* constants.
 if [ -r "$HOME/.config/bin/lib-rofi.sh" ] && [ -d /usr/share/icons/LazyOS ]; then
 	_missing_icon=
@@ -1223,10 +1222,9 @@ else
 	warn "notification(s) without -i, so a text-only card: $(printf '%s\n' "$_notify_noicon" | sed 's#.*/bin/##' | tr '\n' ' ')"
 fi
 
-# mako reads icon-path itself (no theme metadata), so both halves have to be there
-# for any picture to appear. The config has no --check, and a name it cannot find
-# is silent, which is why this is asked of the configuration directly.
-if [ -r "$HOME/.config/mako/config" ]; then
+if have lazyos-notify; then
+	ok "notifications can carry a picture (lazyos-notify native rendering)"
+elif [ -r "$HOME/.config/mako/config" ]; then
 	_mako_icons=$(sed -n 's/^icons=//p' "$HOME/.config/mako/config" | head -1)
 	_mako_path=$(sed -n 's/^icon-path=//p' "$HOME/.config/mako/config" | head -1)
 	if [ "$_mako_icons" = 1 ] && [ -n "$_mako_path" ] && [ -d "$_mako_path" ]; then
@@ -1479,7 +1477,9 @@ if [ -z "$_osd" ]; then
 else
 	fail "the volume/brightness overlay is incomplete:$_osd"
 fi
-if [ -r "$HOME/.config/mako/config" ]; then
+if have lazyos-notify; then
+	ok "the overlay can carry its icon and its level bar (lazyos-notify)"
+elif [ -r "$HOME/.config/mako/config" ]; then
 	if grep -qs '^icons=1' "$HOME/.config/mako/config" &&
 		grep -qs '^progress-color=' "$HOME/.config/mako/config"; then
 		ok "the overlay can carry its icon and its level bar (mako icons=1, progress-color)"
@@ -4087,7 +4087,9 @@ if [ -z "$_card_bare" ]; then
 else
 	fail "notify-send without -i (a text-only card that nothing logs): $(tr '\n' ' ' <<<"$_card_bare")"
 fi
-if grep -qsE '^icon-path=([^ ]*:)?/usr/share/icons/LazyOS(:|$)' "$HOME/.config/mako/config"; then
+if have lazyos-notify; then
+	ok "lazyos-notify resolves /usr/share/icons/LazyOS and Nerd Font glyphs natively"
+elif grep -qsE '^icon-path=([^ ]*:)?/usr/share/icons/LazyOS(:|$)' "$HOME/.config/mako/config"; then
 	ok "mako's icon-path names the LazyOS theme root (a notification draws its picture)"
 else
 	fail "~/.config/mako/config icon-path lost /usr/share/icons/LazyOS: every notification picture is blank"

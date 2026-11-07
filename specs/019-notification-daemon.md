@@ -1,6 +1,6 @@
 # Spec 019 — The Notification Daemon: Eye-Candy Layer-Shell Cards, Actions, and Progress
 
-- **Status**: draft
+- **Status**: implemented
 - **Phase**: 5
 - **Depends on**: 002, 004, 006
 - **Model**: `claude-opus-5-5` (effort `high`) — Wayland `wlr-layer-shell` protocol client, D-Bus `org.freedesktop.Notifications` service implementation, `tiny-skia` 2D software card rendering, interactive hit testing for action buttons, and history persistence. Fallback `claude-sonnet-5-5`.
