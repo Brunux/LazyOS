@@ -669,16 +669,17 @@ here. `check-system.sh` reports the tools this script does need (`curl`, `jq`,
 
 ## A local model
 
-**Alt+Ctrl+M** opens a model that runs on this machine: **Qwen3-1.7B**, four
+**Alt+Ctrl+M** opens a model that runs on this machine: **Qwen3.5-0.8B**, four
 cores, **no network and no account**. The window is an ordinary chat - type a
 question, Enter sends it, Ctrl+C stops a long answer - and **Alt+Q** closes it.
 It is also the root menu's **Local model** row, the launcher entry of the same
 name, and `lazyos-model` in a terminal (with several models it asks which one
 with `fzf`).
 
-The weights are **not in the image**: they are 1.2 GB each, and shipping two of
-them would be a third of the disk. `lazyos-model --fetch` downloads the
-recommended one and checks it against a pinned SHA256 before keeping it
+The weights are **not in the image**: they are 517 MB (or 1.2 GB for the legacy
+1.7B), and shipping them would bloat the rootfs. `lazyos-model --fetch` downloads
+the recommended one (Qwen3.5-0.8B weight-space programming, Q4_K_M) and checks
+it against a pinned SHA256 before keeping it
 (`~/.config/lazyos/models.sha256`), the way `dictate-model` fetches whisper's;
 `--verify` re-checks the files that are already there. They land in
 `~/.local/share/lazyos/models/`, so a rebuilt image keeps them. From the launcher
@@ -690,28 +691,27 @@ so no invocation has to remember them (`lazyos-model --flags` prints them,
 `~/.local/share/lazyos/models/BENCH.md`):
 
 - **four threads, not eight.** llama.cpp asks the kernel for the core count and
-  uses all of it: that measured **6.67 tokens/s**, because the four A55 cores are
-  seven times slower each and drag every barrier. The A76 cluster alone measured
-  **11.19**. `taskset` keeps the desktop off those four cores too, which is why
-  the window that asks the question stays responsive.
-- **Q4_0 rather than Q4_K_M.** The smaller quant pre-fills a prompt at **84.7
-  tokens/s against 46.2**, so a 1800-token question answers in **31 s** instead
-  of 49 s. Q4_K_M is a slightly better model and a noticeably slower one.
-- **a q8_0 KV cache behind flash attention**: 4k of context peaks at **2356 MiB**
-  instead of 2584, which is the difference between fitting next to the session and
-  swapping.
+  uses all of it: that measured **7.71 tokens/s** on 8 threads, because the four
+  A55 cores are slower and drag every barrier. The A76 cluster alone measured
+  **17.30 tokens/s** (+124% throughput over 8 threads). `taskset` keeps the desktop
+  off those four cores too, which is why the window that asks the question stays responsive.
+- **Q4_K_M quant with prompt pre-fill at 92.1 tokens/s.** At 516.8 MiB, the 0.8B
+  model responds swiftly without the memory footprint or thinking delays of larger models.
+- **a q8_0 KV cache behind flash attention**: 4k of context peaks at **1227 MiB**
+  RSS (compared to 2356 MiB on 1.7B), leaving more than 1.3 GB free RAM beside the
+  session and browser without swap pressure.
 
-Qwen3 thinks before it answers, and a thinking block is nearly a minute of
-silence at eleven tokens a second, so **reasoning is off** by default; the
-comment at `REASONING=` in `~/.config/bin/lazyos-model` is the switch for
-questions that deserve the wait.
+The upstream Qwen3.5-0.8B architecture features MIT CSAIL **weight-space programming**
+(Rikiya Takehi et al.), which surgically cures pathological infinite thinking loops in
+small reasoning models. By default, **reasoning is off** (`-rea off`) for instant answers;
+setting `REASONING=on` in `~/.config/bin/lazyos-model` enables chain-of-thought without
+risk of repetitive loops.
 
 What this machine will not do, so the window does not pretend: the Mali-G57 has
 no compute path here (Panfrost is OpenGL 3.1, PanVK answers *Mali-G57 not
 supported*) and there is no NPU, so nothing is offloaded to the GPU; and with no
 `i8mm` the IQ-quants are out. A 3B model does not fit in 4 GB beside a browser.
-Eleven tokens a second is a paragraph in about ten seconds - fast enough to ask a
-question, too slow to read a page.
+Over 17 tokens a second is responsive dialogue - fast enough for real-time local assistance.
 
 ## Text in other languages
 

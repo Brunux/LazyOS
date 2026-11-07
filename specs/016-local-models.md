@@ -204,3 +204,16 @@ back to the bare test, because the failure is otherwise a key that does nothing.
 - **The weights come from an unofficial repo** (`bartowski/Qwen_Qwen3-1.7B-GGUF`; upstream ships
   only Q8_0). The pin makes the file the one that was measured; it cannot make the provenance
   better than it is, and `models.sha256` says where they came from in the manual.
+
+## Addendum (2026-11): Migration to Qwen3.5-0.8B Weight-Space Programming
+
+In November 2026, the default local model was updated from `Qwen3-1.7B` to
+`Qwen3.5-0.8B-weight-space-programming` (quantized by mradermacher, Q4_K_M):
+- **RAM Headroom**: Model weight reduced from 1.28 GB to 516.8 MiB. Peak RSS at 4k context drops
+  from 2,356 MiB to 1,227.4 MiB, freeing >1.3 GB RAM and eliminating zram memory contention alongside
+  heavy web browsing.
+- **Generation Speedup**: On 4x A76 cores (`-t 4`), generation throughput increases from 11.2 tok/s
+  to 17.3 tok/s (+55% faster). Prompt prefill reaches 92.1 tok/s (pp512) and 99.4 tok/s (pp128).
+- **Weight-Space Programming**: Upstream MIT CSAIL research (Rikiya Takehi et al.) surgically edits
+  the weights to cure thinking loop pathologies in small reasoning models, enabling safe chain-of-thought
+  if `REASONING=on` is configured.

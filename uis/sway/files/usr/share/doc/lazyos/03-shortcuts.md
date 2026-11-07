@@ -130,7 +130,7 @@ with `Super+Ctrl`:
 | Alt+Escape | the same power menu (Omarchy's Super+Escape) |
 | Alt+Ctrl+L | lock the screen (the Lock key does the same and then suspends) |
 | Alt+Ctrl+X | dictation on/off (the notification stays while it records; press again to stop) |
-| Alt+Ctrl+M | the local model: Qwen3-1.7B on this machine, offline (see `04-software.md` § A local model) |
+| Alt+Ctrl+M | the local model: Qwen3.5-0.8B on this machine, offline (see `04-software.md` § A local model) |
 | Alt+Ctrl+Shift+A | agents (launch, accounts, install) |
 | Alt+Ctrl+O | settings: Wi-Fi and Bluetooth radios, night light, do-not-disturb, touchpad, tablet mode, rotation, display arrangement |
 | Alt+Ctrl+Shift+D | the internal panel back on, with nothing on screen: the way out of a black screen (it runs a sway command, not a menu) |
