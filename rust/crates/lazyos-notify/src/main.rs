@@ -1,4 +1,6 @@
+#![allow(unknown_lints)]
 #![allow(clippy::collapsible_if)]
+#![allow(clippy::chunks_exact_to_as_chunks)]
 
 mod dbus;
 mod font;

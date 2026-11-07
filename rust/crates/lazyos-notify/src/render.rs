@@ -1,3 +1,6 @@
+#![allow(unknown_lints)]
+#![allow(clippy::chunks_exact_to_as_chunks)]
+
 use std::path::{Path, PathBuf};
 
 use tiny_skia::{
@@ -569,7 +572,11 @@ impl Renderer {
 
         let mut pixmap = Pixmap::new(w, h)?;
         // Convert to premultiplied alpha for tiny-skia
-        for (src_pixel, dst_pixel) in img.pixels().zip(pixmap.data_mut().chunks_exact_mut(4)) {
+        let chunk_size = 4;
+        for (src_pixel, dst_pixel) in img
+            .pixels()
+            .zip(pixmap.data_mut().chunks_exact_mut(chunk_size))
+        {
             let [r, g, b, a] = src_pixel.0;
             let alpha = a as f32 / 255.0;
             dst_pixel[0] = (r as f32 * alpha).round() as u8;
@@ -638,7 +645,12 @@ mod tests {
         renderer.render(&mut pixmap.as_mut(), &mut notifications);
 
         // Verify that some non-zero pixels were drawn
-        let non_zero_pixels = pixmap.data().chunks_exact(4).filter(|p| p[3] > 0).count();
+        let chunk_size = 4;
+        let non_zero_pixels = pixmap
+            .data()
+            .chunks_exact(chunk_size)
+            .filter(|p| p[3] > 0)
+            .count();
         assert!(non_zero_pixels > 100, "rendered card has painted pixels");
     }
 
