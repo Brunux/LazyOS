@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180">
+<defs><style>
+.bg{fill:#002b36}.p{fill:#073642;stroke:#2aa198;stroke-width:1.3}.p2{fill:#073642;stroke:#586e75;stroke-width:1}.h{fill:#2aa198;font:bold 16px 'JetBrains Mono','DejaVu Sans Mono',monospace}.y{fill:#b58900;font:bold 12px 'JetBrains Mono','DejaVu Sans Mono',monospace}.t{fill:#eee8d5;font:12px 'JetBrains Mono','DejaVu Sans Mono',monospace}.m{fill:#839496;font:10px 'JetBrains Mono','DejaVu Sans Mono',monospace}.b{fill:#268bd2}.g{fill:#859900}.r{fill:#dc322f}.line{stroke:#586e75;stroke-width:1}
+</style></defs>
+<rect width="1600" height="1180" class="bg"/>
+<text x="40" y="42" class="h">lazyos-bar / panel visual contracts</text>
+<text x="40" y="66" class="m">PROVISIONAL PANEL WIREFRAMES · SOURCE IMAGE STILL REQUIRED FOR FINAL VISUAL MATCH</text>
+<!-- palette -->
+<rect x="40" y="95" width="740" height="420" class="p"/>
+<text x="62" y="128" class="h">z_ / command</text><text x="62" y="152" class="m">Search commands, settings, and system actions...</text>
+<rect x="62" y="166" width="696" height="34" class="p2"/><text x="76" y="188" class="t">⌕  network</text>
+<line x1="62" y1="214" x2="758" y2="214" class="line"/>
+<text x="76" y="240" class="y">CATEGORIES</text><text x="300" y="240" class="y">RESULTS / 04</text>
+<text x="76" y="270" class="t">System</text><text x="76" y="298" class="t">› Connectivity</text><text x="76" y="326" class="t">Personalization</text><text x="76" y="354" class="t">Applications</text><text x="76" y="382" class="t">Files &amp; tools</text><text x="76" y="410" class="t">Session</text>
+<rect x="286" y="250" width="458" height="34" fill="#2aa198"/><text x="302" y="272" fill="#002b36" font-size="12" font-family="monospace">› Wi-Fi networks</text>
+<text x="302" y="308" class="t">Ethernet connections</text><text x="302" y="340" class="t">VPN profiles</text><text x="302" y="372" class="t">Bluetooth devices</text><text x="302" y="404" class="m">Connectivity / Network / Wi-Fi</text>
+<text x="62" y="482" class="m">↑↓ navigate  enter open  backspace back  esc close  ctrl+k search</text>
+<!-- network -->
+<rect x="820" y="95" width="740" height="420" class="p"/>
+<text x="842" y="128" class="h">networkctl</text><text x="1535" y="128" text-anchor="end" class="g">● CONNECTED</text>
+<text x="842" y="154" class="m">Connectivity / Network / Wi-Fi</text><line x1="842" y1="168" x2="1538" y2="168" class="line"/>
+<text x="856" y="198" class="y">CONNECTIONS</text><text x="1200" y="198" class="y">DETAILS</text>
+<rect x="842" y="210" width="330" height="34" fill="#2aa198"/><text x="858" y="232" fill="#002b36" font-size="12" font-family="monospace">› Home-Network   82%</text>
+<text x="858" y="272" class="t">Guest-WiFi       61%</text><text x="858" y="308" class="t">Office            44%</text><text x="858" y="348" class="m">[scan] [saved profiles]</text>
+<text x="1200" y="232" class="t">SSID      Home-Network</text><text x="1200" y="264" class="t">Security  WPA2</text><text x="1200" y="296" class="t">Signal    82%</text><text x="1200" y="328" class="t">IPv4      DHCP</text><text x="1200" y="360" class="t">Gateway   192.168.1.1</text>
+<text x="842" y="482" class="m">Select profile → details → connect / password / progress / result</text>
+<!-- audio -->
+<rect x="40" y="545" width="480" height="285" class="p"/>
+<text x="62" y="578" class="h">audioctl</text><text x="62" y="606" class="m">OUTPUT / SPEAKERS</text><text x="62" y="638" class="t">Volume  42%</text>
+<rect x="62" y="654" width="430" height="10" class="p2"/><rect x="62" y="654" width="180" height="10" fill="#268bd2"/>
+<text x="62" y="698" class="y">OUTPUT DEVICES</text><text x="62" y="728" class="t">› Internal speakers</text><text x="62" y="758" class="t">  HDMI / DisplayPort</text><text x="62" y="798" class="m">[m] mute  [←/→] adjust  [enter] select</text>
+<!-- calendar -->
+<rect x="560" y="545" width="480" height="285" class="p"/>
+<text x="582" y="578" class="h">calendar</text><text x="582" y="610" class="y">‹ NOVEMBER 2026 ›</text>
+<text x="582" y="646" class="m">MO   TU   WE   TH   FR   SA   SU</text>
+<text x="582" y="678" class="t">                         1</text><text x="582" y="708" class="t"> 2    3    4    5   [6]   7    8</text><text x="582" y="738" class="t"> 9   10   11   12   13   14   15</text><text x="582" y="768" class="t">16   17   18   19   20   21   22</text><text x="582" y="808" class="m">[←/→] month  [t] today  [enter] select</text>
+<!-- task -->
+<rect x="1080" y="545" width="480" height="285" class="p"/>
+<text x="1102" y="578" class="h">taskctl</text><text x="1102" y="606" class="y">● RUNNING / PACKAGE UPDATE</text>
+<text x="1102" y="642" class="t">Installing 12 of 18 packages</text><rect x="1102" y="660" width="430" height="10" class="p2"/><rect x="1102" y="660" width="287" height="10" class="g"/>
+<text x="1102" y="704" class="m">LOG / LAST OUTPUT</text><text x="1102" y="730" class="t">[12:42:01] unpacking package...</text><text x="1102" y="756" class="t">[12:42:03] configuring files...</text><text x="1102" y="798" class="m">[view log] [cancel only if safe]</text>
+<!-- confirmation -->
+<rect x="40" y="860" width="740" height="250" class="p"/>
+<text x="62" y="894" class="h">sessionctl / confirm shutdown</text><text x="62" y="930" class="y">ACTION REQUIRES CONFIRMATION</text>
+<text x="62" y="966" class="t">The system will power off. Unsaved work may be lost.</text>
+<rect x="62" y="1000" width="150" height="38" fill="#2aa198"/><text x="137" y="1024" text-anchor="middle" fill="#002b36" font-size="12" font-family="monospace">Cancel</text>
+<rect x="226" y="1000" width="150" height="38" class="p2"/><text x="301" y="1024" text-anchor="middle" class="t">Confirm</text>
+<text x="62" y="1080" class="m">Cancel is the default focused action; explicit second activation required.</text>
+<!-- shared frame -->
+<rect x="820" y="860" width="740" height="250" class="p"/>
+<text x="842" y="894" class="h">shared panel frame</text>
+<text x="842" y="932" class="y">HEADER</text><text x="950" y="932" class="t">glyph + command title + live state</text>
+<line x1="842" y1="946" x2="1538" y2="946" class="line"/>
+<text x="842" y="978" class="y">BREADCRUMB</text><text x="980" y="978" class="t">parent / child route</text>
+<text x="842" y="1014" class="y">BODY</text><text x="930" y="1014" class="t">list / controls / details / progress / logs</text>
+<line x1="842" y1="1032" x2="1538" y2="1032" class="line"/>
+<text x="842" y="1062" class="y">FOOTER</text><text x="930" y="1062" class="t">contextual keyboard hints + status line</text>
+</svg>
