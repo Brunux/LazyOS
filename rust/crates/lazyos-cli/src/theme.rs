@@ -307,6 +307,7 @@ pub fn apply_theme(
     }
     if !headless {
         reload();
+        reload_terminals(&theme);
     }
     Ok((theme, written, unchanged))
 }
@@ -364,6 +365,100 @@ pub fn reload() {
             Err(error) => eprintln!("lazyos theme: cannot run {program}: {error}"),
         }
     }
+}
+
+/// Broadcasts the theme's colors to all active foot terminal windows via PTY OSC sequences.
+pub fn reload_terminals(theme: &Theme) {
+    let osc = theme.osc_sequences();
+    let ptys = discover_foot_ptys();
+    for pty in ptys {
+        if let Ok(mut file) = std::fs::OpenOptions::new().write(true).open(&pty) {
+            use std::io::Write as _;
+            let _ = file.write_all(osc.as_bytes());
+            let _ = file.flush();
+        }
+    }
+}
+
+/// Discovers the PTY paths of all currently active foot terminal emulator windows.
+fn discover_foot_ptys() -> std::collections::BTreeSet<PathBuf> {
+    let mut ptys = std::collections::BTreeSet::new();
+    let Ok(proc_dir) = std::fs::read_dir("/proc") else {
+        return ptys;
+    };
+
+    let mut foot_pids = std::collections::HashSet::new();
+    for entry in proc_dir.flatten() {
+        let name = entry.file_name();
+        let Some(name_str) = name.to_str() else {
+            continue;
+        };
+        let Ok(pid) = name_str.parse::<u32>() else {
+            continue;
+        };
+
+        let comm_path = entry.path().join("comm");
+        if let Ok(comm) = std::fs::read_to_string(&comm_path) {
+            let comm = comm.trim();
+            if comm == "foot" || comm == "footclient" || comm == "foot-server" {
+                foot_pids.insert(pid);
+            }
+        }
+    }
+
+    if foot_pids.is_empty() {
+        return ptys;
+    }
+
+    let Ok(proc_dir) = std::fs::read_dir("/proc") else {
+        return ptys;
+    };
+
+    for entry in proc_dir.flatten() {
+        let name = entry.file_name();
+        let Some(name_str) = name.to_str() else {
+            continue;
+        };
+        let Ok(pid) = name_str.parse::<u32>() else {
+            continue;
+        };
+
+        let stat_path = entry.path().join("stat");
+        let is_foot_child = if let Ok(stat) = std::fs::read_to_string(&stat_path) {
+            if let Some(idx) = stat.rfind(')') {
+                let rest = &stat[idx + 1..];
+                let mut parts = rest.split_whitespace();
+                let _state = parts.next();
+                let ppid = parts.next().and_then(|p| p.parse::<u32>().ok());
+                ppid.is_some_and(|p| foot_pids.contains(&p))
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if is_foot_child || foot_pids.contains(&pid) {
+            let fd_dir = entry.path().join("fd");
+            if let Ok(fds) = std::fs::read_dir(fd_dir) {
+                for fd in fds.flatten() {
+                    if let Ok(target) = std::fs::read_link(fd.path()) {
+                        let target_str = target.to_string_lossy();
+                        if target_str.starts_with("/dev/pts/")
+                            && target_str
+                                .trim_start_matches("/dev/pts/")
+                                .chars()
+                                .all(|c| c.is_ascii_digit())
+                        {
+                            ptys.insert(target);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ptys
 }
 
 /// The idempotence witness: render every surface again and compare it with what
