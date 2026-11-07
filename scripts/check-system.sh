@@ -1224,6 +1224,8 @@ fi
 
 if have lazyos-notify; then
 	ok "notifications can carry a picture (lazyos-notify native rendering)"
+	[ -f /usr/share/dbus-1/services/org.freedesktop.Notifications.service ] &&
+		ok "D-Bus service auto-activation is configured for lazyos-notify"
 elif [ -r "$HOME/.config/mako/config" ]; then
 	_mako_icons=$(sed -n 's/^icons=//p' "$HOME/.config/mako/config" | head -1)
 	_mako_path=$(sed -n 's/^icon-path=//p' "$HOME/.config/mako/config" | head -1)
@@ -3666,7 +3668,7 @@ fi
 # package the comments and docs/omarchy-gap.md already answered "no" to, and a
 # running one means the rule was broken without anything saying so.
 _declined=""
-for _p in udiskie swaync dunst picom blueman-applet packagekitd localsearch-3; do
+for _p in mako udiskie swaync dunst picom blueman-applet packagekitd localsearch-3; do
 	pgrep -x "$_p" >/dev/null 2>&1 && _declined="$_declined $_p"
 done
 # `pgrep -x` compares the 15-character comm, and this one's name is longer:
@@ -3675,7 +3677,7 @@ done
 pgrep -f "[t]racker-miner-fs-3" >/dev/null 2>&1 &&
 	_declined="$_declined tracker-miner-fs-3"
 if [ -z "$_declined" ]; then
-	ok "no declined daemon is running (udiskie, swaync, dunst, picom, blueman, packagekit, indexers)"
+	ok "no declined daemon is running (mako, udiskie, swaync, dunst, picom, blueman, packagekit, indexers)"
 else
 	fail "declined daemon(s) running:$_declined (each is a package this port answered no to; it spends battery and nothing says why)"
 fi

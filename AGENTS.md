@@ -49,7 +49,7 @@ yet present in `scripts/` as not implemented.
   **and** a bar spinner, says whether it can be stopped, and **ends by showing its own result in
   the task window** instead of a toast that expires.
   The rule is a test, not only a paragraph: `check-system.sh` FAILs when a **declined daemon** is
-  running (`udiskie`, `swaync`, `dunst`, `picom`, `blueman-applet`, `packagekitd`,
+  running (`mako`, `udiskie`, `swaync`, `dunst`, `picom`, `blueman-applet`, `packagekitd`,
   `localsearch-3`, `tracker-miner-fs-3` - each is a package the comments and `docs/omarchy-gap.md`
   already answered "no" to) and WARNs when a user unit outside the session's own set (PipeWire,
   WirePlumber, the portals, gvfs, dconf, mpris) appears. The two agreed exceptions are `exec`'d by

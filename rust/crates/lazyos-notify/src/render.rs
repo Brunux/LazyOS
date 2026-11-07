@@ -86,6 +86,14 @@ impl Renderer {
         let text_max_width = CARD_WIDTH - PADDING_X * 2.0 - 44.0; // 44px for icon
 
         for notif in notifications.iter_mut() {
+            if notif.is_osd() {
+                let height = 66.0f32;
+                notif.card_y = cur_y;
+                notif.card_height = height;
+                cur_y += height + CARD_SPACING;
+                continue;
+            }
+
             let body_lines = if notif.body.is_empty() {
                 Vec::new()
             } else {
@@ -136,7 +144,204 @@ impl Renderer {
         }
     }
 
+    fn render_osd_card(&self, pixmap: &mut PixmapMut, notif: &mut Notification) {
+        let card_x = 12.0f32;
+        let card_y = notif.card_y;
+        let card_w = CARD_WIDTH;
+        let card_h = notif.card_height;
+
+        notif.card_bounds = Rect::new(card_x, card_y, card_w, card_h);
+        notif.close_rect = None;
+
+        let radius = 16.0f32;
+
+        // 1. Soft drop shadow
+        self.draw_shadow(pixmap, card_x, card_y, card_w, card_h, radius);
+
+        // 2. Card background (elevated sleek HUD)
+        let mut bg_builder = PathBuilder::new();
+        Self::add_rounded_rect(&mut bg_builder, card_x, card_y, card_w, card_h, radius);
+        if let Some(bg_path) = bg_builder.finish() {
+            let mut paint = Paint::default();
+            paint.set_color(self.theme.bg_elevated);
+            paint.anti_alias = true;
+            pixmap.fill_path(
+                &bg_path,
+                &paint,
+                FillRule::Winding,
+                Transform::identity(),
+                None,
+            );
+        }
+
+        // 3. Top subtle glass highlight
+        let mut hl_builder = PathBuilder::new();
+        hl_builder.move_to(card_x + radius, card_y + 1.0);
+        hl_builder.line_to(card_x + card_w - radius, card_y + 1.0);
+        if let Some(hl_path) = hl_builder.finish() {
+            let stroke = Stroke {
+                width: 1.0,
+                ..Default::default()
+            };
+            let mut paint = Paint::default();
+            paint.set_color(Color::from_rgba8(255, 255, 255, 30));
+            paint.anti_alias = true;
+            pixmap.stroke_path(&hl_path, &paint, &stroke, Transform::identity(), None);
+        }
+
+        // 4. Accent border
+        let is_muted = notif.body.to_lowercase().contains("mute")
+            || notif.app_icon.contains("muted")
+            || notif.summary.to_lowercase().contains("mute");
+
+        let accent_color = if is_muted {
+            self.theme.border_critical
+        } else {
+            self.theme.border_normal
+        };
+
+        let mut border_builder = PathBuilder::new();
+        Self::add_rounded_rect(&mut border_builder, card_x, card_y, card_w, card_h, radius);
+        if let Some(border_path) = border_builder.finish() {
+            let stroke = Stroke {
+                width: 1.5,
+                ..Default::default()
+            };
+            let mut paint = Paint::default();
+            paint.set_color(accent_color);
+            paint.anti_alias = true;
+            pixmap.stroke_path(&border_path, &paint, &stroke, Transform::identity(), None);
+        }
+
+        // 5. Icon on the left
+        let icon_box_size = 36.0f32;
+        let icon_x = card_x + 16.0;
+        let icon_y = card_y + (card_h - icon_box_size) * 0.5;
+        self.draw_icon(pixmap, notif, icon_x, icon_y);
+
+        // 6. Label & Percentage
+        let content_x = icon_x + icon_box_size + 14.0;
+        let right_margin = card_x + card_w - 18.0;
+
+        // Title
+        self.font.draw_text(
+            pixmap,
+            &notif.summary,
+            content_x,
+            card_y + 24.0,
+            13.0,
+            self.theme.text_bright,
+            true,
+        );
+
+        // Value string
+        let val_str = if is_muted {
+            "MUTED".to_string()
+        } else if let Some(pct) = notif.progress {
+            format!("{pct}%")
+        } else if !notif.body.is_empty() {
+            notif.body.clone()
+        } else {
+            "0%".to_string()
+        };
+
+        let val_w = self.font.measure_width(&val_str, 12.0, true);
+        let val_color = if is_muted {
+            self.theme.border_critical
+        } else {
+            self.theme.text_bright
+        };
+
+        self.font.draw_text(
+            pixmap,
+            &val_str,
+            right_margin - val_w,
+            card_y + 24.0,
+            12.0,
+            val_color,
+            true,
+        );
+
+        // 7. Sleek modern progress bar
+        let bar_x = content_x;
+        let bar_y = card_y + 36.0;
+        let bar_w = right_margin - content_x;
+        let bar_h = 8.0f32;
+
+        // Background track
+        let mut track_builder = PathBuilder::new();
+        Self::add_rounded_rect(&mut track_builder, bar_x, bar_y, bar_w, bar_h, 4.0);
+        if let Some(track_path) = track_builder.finish() {
+            let mut paint = Paint::default();
+            paint.set_color(Color::from_rgba8(255, 255, 255, 25));
+            paint.anti_alias = true;
+            pixmap.fill_path(
+                &track_path,
+                &paint,
+                FillRule::Winding,
+                Transform::identity(),
+                None,
+            );
+        }
+
+        // Fill bar
+        let pct = notif.progress.unwrap_or(0);
+        let fill_pct = if is_muted {
+            0.0
+        } else {
+            (pct as f32 / 100.0).clamp(0.0, 1.0)
+        };
+        let fill_w = if is_muted {
+            0.0
+        } else {
+            (bar_w * fill_pct).max(4.0)
+        };
+
+        if fill_w > 0.0 {
+            let mut fill_builder = PathBuilder::new();
+            Self::add_rounded_rect(&mut fill_builder, bar_x, bar_y, fill_w, bar_h, 4.0);
+            if let Some(fill_path) = fill_builder.finish() {
+                let mut paint = Paint::default();
+                paint.set_color(accent_color);
+                paint.anti_alias = true;
+                pixmap.fill_path(
+                    &fill_path,
+                    &paint,
+                    FillRule::Winding,
+                    Transform::identity(),
+                    None,
+                );
+
+                // Subtle top highlight inside the fill for a glossy pill look
+                let mut hl_fill = PathBuilder::new();
+                hl_fill.move_to(bar_x + 2.0, bar_y + 1.0);
+                hl_fill.line_to(bar_x + fill_w - 2.0, bar_y + 1.0);
+                if let Some(hl_fill_path) = hl_fill.finish() {
+                    let stroke = Stroke {
+                        width: 1.0,
+                        ..Default::default()
+                    };
+                    let mut bpaint = Paint::default();
+                    bpaint.set_color(Color::from_rgba8(255, 255, 255, 60));
+                    bpaint.anti_alias = true;
+                    pixmap.stroke_path(
+                        &hl_fill_path,
+                        &bpaint,
+                        &stroke,
+                        Transform::identity(),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
     fn render_card(&self, pixmap: &mut PixmapMut, notif: &mut Notification) {
+        if notif.is_osd() {
+            self.render_osd_card(pixmap, notif);
+            return;
+        }
+
         let card_x = 12.0f32;
         let card_y = notif.card_y;
         let card_w = CARD_WIDTH;
@@ -172,6 +377,21 @@ impl Renderer {
                 Transform::identity(),
                 None,
             );
+        }
+
+        // Top glass highlight line
+        let mut hl_builder = PathBuilder::new();
+        hl_builder.move_to(card_x + CORNER_RADIUS, card_y + 1.0);
+        hl_builder.line_to(card_x + card_w - CORNER_RADIUS, card_y + 1.0);
+        if let Some(hl_path) = hl_builder.finish() {
+            let stroke = Stroke {
+                width: 1.0,
+                ..Default::default()
+            };
+            let mut paint = Paint::default();
+            paint.set_color(Color::from_rgba8(255, 255, 255, 25));
+            paint.anti_alias = true;
+            pixmap.stroke_path(&hl_path, &paint, &stroke, Transform::identity(), None);
         }
 
         // 3. Draw border stroke based on urgency
@@ -211,6 +431,23 @@ impl Renderer {
         let close_y = card_y + 12.0;
         let close_rect = Rect::new(close_x - 4.0, close_y - 4.0, 20.0, 20.0);
         notif.close_rect = Some(close_rect);
+
+        if notif.is_hovered {
+            let mut cbg = PathBuilder::new();
+            Self::add_circle(&mut cbg, close_x + 6.0, close_y + 6.0, 10.0);
+            if let Some(cbg_path) = cbg.finish() {
+                let mut paint = Paint::default();
+                paint.set_color(Color::from_rgba8(255, 255, 255, 25));
+                paint.anti_alias = true;
+                pixmap.fill_path(
+                    &cbg_path,
+                    &paint,
+                    FillRule::Winding,
+                    Transform::identity(),
+                    None,
+                );
+            }
+        }
 
         let close_color = if notif.is_hovered {
             Color::from_rgba8(255, 255, 255, 220)
@@ -504,19 +741,44 @@ impl Renderer {
             );
         } else {
             // Draw fallback glyph
-            let glyph_str = match notif.app_name.to_lowercase().as_str() {
-                "download" => "󰇚",
-                "media" | "music" => "󰎈",
-                "wifi" | "network" => "󰖩",
-                "bluetooth" => "󰂯",
-                "battery" => "󰁹",
-                "volume" => "󰕾",
-                "brightness" => "󰃠",
-                "clipboard" => "󰅌",
-                _ => match notif.urgency {
-                    Urgency::Critical => "󰀪",
-                    _ => "󰋼",
-                },
+            let icon_lower = notif.app_icon.to_lowercase();
+            let app_lower = notif.app_name.to_lowercase();
+            let summary_lower = notif.summary.to_lowercase();
+
+            let glyph_str = if icon_lower.contains("muted") || summary_lower.contains("muted") {
+                "󰝟"
+            } else if icon_lower.contains("volume")
+                || app_lower.contains("volume")
+                || summary_lower.contains("volume")
+            {
+                "󰕾"
+            } else if icon_lower.contains("brightness")
+                || app_lower.contains("brightness")
+                || summary_lower.contains("brightness")
+            {
+                "󰃠"
+            } else if icon_lower.contains("camera")
+                || app_lower.contains("camera")
+                || summary_lower.contains("capture")
+            {
+                "󰄀"
+            } else if icon_lower.contains("qr") || summary_lower.contains("qr") {
+                "󰀹"
+            } else if icon_lower.contains("color") || summary_lower.contains("colour") {
+                "󰏘"
+            } else {
+                match app_lower.as_str() {
+                    "download" => "󰇚",
+                    "media" | "music" => "󰎈",
+                    "wifi" | "network" => "󰖩",
+                    "bluetooth" => "󰂯",
+                    "battery" => "󰁹",
+                    "clipboard" => "󰅌",
+                    _ => match notif.urgency {
+                        Urgency::Critical => "󰀪",
+                        _ => "󰋼",
+                    },
+                }
             };
 
             let glyph_color = match notif.urgency {
@@ -663,5 +925,55 @@ mod tests {
         assert_eq!(Urgency::Low.to_str(), "low");
         assert_eq!(Urgency::Normal.to_str(), "normal");
         assert_eq!(Urgency::Critical.to_str(), "critical");
+    }
+
+    #[test]
+    fn test_compute_layout_and_render_osd() {
+        let renderer = Renderer::new();
+        let mut notifications = vec![Notification {
+            id: 2,
+            app_name: "LazyOS".to_string(),
+            summary: "Volume".to_string(),
+            body: "50%".to_string(),
+            app_icon: "audio-volume-high".to_string(),
+            actions: Vec::new(),
+            urgency: Urgency::Low,
+            category: None,
+            progress: Some(50),
+            sync_tag: Some("lazyos-osd".to_string()),
+            created_at: Instant::now(),
+            timeout: Duration::from_millis(1200),
+            card_y: 0.0,
+            card_height: 0.0,
+            card_bounds: Rect::new(0.0, 0.0, 0.0, 0.0),
+            action_rects: Vec::new(),
+            close_rect: None,
+            is_hovered: false,
+            hovered_action: None,
+            dismissing: false,
+            progress_color_override: None,
+        }];
+
+        let metrics = renderer.compute_layout(&mut notifications);
+        assert_eq!(notifications[0].card_height, 66.0);
+        assert!(notifications[0].is_osd());
+
+        let mut pixmap = Pixmap::new(
+            metrics.total_width.ceil() as u32,
+            metrics.total_height.ceil() as u32,
+        )
+        .expect("pixmap allocation");
+
+        renderer.render(&mut pixmap.as_mut(), &mut notifications);
+        let chunk_size = 4;
+        let non_zero_pixels = pixmap
+            .data()
+            .chunks_exact(chunk_size)
+            .filter(|p| p[3] > 0)
+            .count();
+        assert!(
+            non_zero_pixels > 100,
+            "rendered OSD card has painted pixels"
+        );
     }
 }

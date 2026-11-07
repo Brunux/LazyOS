@@ -86,4 +86,10 @@ impl Notification {
         }
         self.created_at.elapsed() >= self.timeout
     }
+
+    pub fn is_osd(&self) -> bool {
+        self.sync_tag.as_deref() == Some("lazyos-osd")
+            || self.category.as_deref() == Some("osd")
+            || self.app_name.to_lowercase() == "osd"
+    }
 }
