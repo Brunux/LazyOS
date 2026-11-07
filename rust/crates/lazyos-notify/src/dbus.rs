@@ -16,13 +16,28 @@ pub enum DbusCommand {
 pub struct NotificationServer {
     next_id: AtomicU32,
     tx: Sender<DbusCommand>,
+    wake_fd: i32,
 }
 
 impl NotificationServer {
-    pub fn new(tx: Sender<DbusCommand>) -> Self {
+    pub fn new(tx: Sender<DbusCommand>, wake_fd: i32) -> Self {
         Self {
             next_id: AtomicU32::new(1),
             tx,
+            wake_fd,
+        }
+    }
+
+    fn notify_wake(&self) {
+        if self.wake_fd >= 0 {
+            let val: u64 = 1;
+            unsafe {
+                libc::write(
+                    self.wake_fd,
+                    &val as *const _ as *const libc::c_void,
+                    std::mem::size_of::<u64>(),
+                );
+            }
         }
     }
 }
@@ -125,11 +140,13 @@ impl NotificationServer {
         };
 
         let _ = self.tx.send(DbusCommand::New(Box::new(notification)));
+        self.notify_wake();
         id
     }
 
     fn close_notification(&self, id: u32) {
         let _ = self.tx.send(DbusCommand::Close(id));
+        self.notify_wake();
     }
 
     fn get_capabilities(&self) -> Vec<&'static str> {

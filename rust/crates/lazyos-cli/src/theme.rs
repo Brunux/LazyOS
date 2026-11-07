@@ -364,6 +364,7 @@ pub fn reload() {
         ("swaymsg", vec!["reload"]),
         ("makoctl", vec!["reload"]),
         ("pkill", vec!["-USR2", "-x", "waybar"]),
+        ("pkill", vec!["-USR1", "-x", "lazyos-notify"]),
     ] {
         match std::process::Command::new(program).args(&args).output() {
             Ok(output) if output.status.success() => {}

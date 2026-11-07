@@ -10,6 +10,8 @@ pub struct FontRenderer {
 impl FontRenderer {
     pub fn new() -> Self {
         let regular = Self::load_font(&[
+            "/usr/share/fonts/truetype/jetbrains-mono/JetBrainsMono-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/adwaita/AdwaitaSans-Regular.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
@@ -17,6 +19,8 @@ impl FontRenderer {
         ]);
 
         let bold = Self::load_font(&[
+            "/usr/share/fonts/truetype/jetbrains-mono/JetBrainsMono-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/adwaita/AdwaitaSans-Regular.ttf",
             "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",

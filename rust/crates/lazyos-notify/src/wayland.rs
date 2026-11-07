@@ -59,7 +59,7 @@ impl WaylandState {
         }
     }
 
-    pub fn setup_layer_surface(&mut self, qh: &QueueHandle<Self>) {
+    pub fn setup_layer_surface(&mut self, qh: &QueueHandle<Self>, w: u32, h: u32) {
         if self.surface.is_some() {
             return;
         }
@@ -83,26 +83,38 @@ impl WaylandState {
 
         layer_surface
             .set_anchor(zwlr_layer_surface_v1::Anchor::Top | zwlr_layer_surface_v1::Anchor::Right);
-        layer_surface.set_margin(36, 12, 0, 0);
+        layer_surface.set_margin(46, 12, 0, 0);
         layer_surface
             .set_keyboard_interactivity(zwlr_layer_surface_v1::KeyboardInteractivity::None);
-        layer_surface.set_size(1, 1);
+        layer_surface.set_size(w, h);
 
         surface.commit();
 
         self.surface = Some(surface);
         self.layer_surface = Some(layer_surface);
+        self.width = w;
+        self.height = h;
+        self.configured = false;
     }
 
-    pub fn update_surface(&mut self, qh: &QueueHandle<Self>) {
-        if !self.configured {
+    pub fn destroy_surface(&mut self) {
+        if let Some(ls) = self.layer_surface.take() {
+            ls.destroy();
+        }
+        if let Some(s) = self.surface.take() {
+            s.destroy();
+        }
+        self.width = 0;
+        self.height = 0;
+        self.configured = false;
+    }
+
+    pub fn paint_surface(&mut self, qh: &QueueHandle<Self>) {
+        if !self.configured || self.notifications.is_empty() {
             return;
         }
 
         let Some(ref surface) = self.surface else {
-            return;
-        };
-        let Some(ref layer_surface) = self.layer_surface else {
             return;
         };
         let Some(ref shm) = self.shm else {
@@ -112,26 +124,10 @@ impl WaylandState {
             return;
         };
 
-        if self.notifications.is_empty() {
-            layer_surface.set_size(1, 1);
-            let empty_region = compositor.create_region(qh, ());
-            surface.set_input_region(Some(&empty_region));
-            surface.attach(None, 0, 0);
-            surface.commit();
-            self.width = 0;
-            self.height = 0;
+        let target_w = self.width;
+        let target_h = self.height;
+        if target_w == 0 || target_h == 0 {
             return;
-        }
-
-        let metrics = self.renderer.compute_layout(&mut self.notifications);
-        let target_w = metrics.total_width.ceil() as u32;
-        let target_h = metrics.total_height.ceil() as u32;
-
-        if target_w != self.width || target_h != self.height {
-            self.width = target_w;
-            self.height = target_h;
-            layer_surface.set_size(target_w, target_h);
-            surface.commit();
         }
 
         // Allocate buffer and paint
@@ -231,13 +227,27 @@ impl WaylandState {
                     let id = self.notifications[idx].id;
                     self.notifications.remove(idx);
                     let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                    self.update_surface(qh);
+                    if self.notifications.is_empty() {
+                        self.destroy_surface();
+                    } else {
+                        let metrics = self.renderer.compute_layout(&mut self.notifications);
+                        self.width = metrics.total_width.ceil() as u32;
+                        self.height = metrics.total_height.ceil() as u32;
+                        self.paint_surface(qh);
+                    }
                 } else if let Some(action_key) = clicked_action {
                     let id = self.notifications[idx].id;
-                    let _ = self.event_tx.send(UiEvent::ActionInvoked(id, action_key));
                     self.notifications.remove(idx);
+                    let _ = self.event_tx.send(UiEvent::ActionInvoked(id, action_key));
                     let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                    self.update_surface(qh);
+                    if self.notifications.is_empty() {
+                        self.destroy_surface();
+                    } else {
+                        let metrics = self.renderer.compute_layout(&mut self.notifications);
+                        self.width = metrics.total_width.ceil() as u32;
+                        self.height = metrics.total_height.ceil() as u32;
+                        self.paint_surface(qh);
+                    }
                 } else {
                     // Click on card body: invoke "default" action if present, or dismiss
                     let id = self.notifications[idx].id;
@@ -252,7 +262,14 @@ impl WaylandState {
                     }
                     self.notifications.remove(idx);
                     let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                    self.update_surface(qh);
+                    if self.notifications.is_empty() {
+                        self.destroy_surface();
+                    } else {
+                        let metrics = self.renderer.compute_layout(&mut self.notifications);
+                        self.width = metrics.total_width.ceil() as u32;
+                        self.height = metrics.total_height.ceil() as u32;
+                        self.paint_surface(qh);
+                    }
                 }
             }
             0x111 => {
@@ -260,7 +277,14 @@ impl WaylandState {
                 let id = self.notifications[idx].id;
                 self.notifications.remove(idx);
                 let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                self.update_surface(qh);
+                if self.notifications.is_empty() {
+                    self.destroy_surface();
+                } else {
+                    let metrics = self.renderer.compute_layout(&mut self.notifications);
+                    self.width = metrics.total_width.ceil() as u32;
+                    self.height = metrics.total_height.ceil() as u32;
+                    self.paint_surface(qh);
+                }
             }
             0x112 => {
                 // Middle click: dismiss all from this app
@@ -274,7 +298,14 @@ impl WaylandState {
                     }
                 }
                 self.notifications = remaining;
-                self.update_surface(qh);
+                if self.notifications.is_empty() {
+                    self.destroy_surface();
+                } else {
+                    let metrics = self.renderer.compute_layout(&mut self.notifications);
+                    self.width = metrics.total_width.ceil() as u32;
+                    self.height = metrics.total_height.ceil() as u32;
+                    self.paint_surface(qh);
+                }
             }
             _ => {}
         }
@@ -311,7 +342,7 @@ impl WaylandState {
         }
 
         if needs_repaint {
-            self.update_surface(qh);
+            self.paint_surface(qh);
         }
     }
 }
@@ -503,7 +534,7 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for WaylandState {
             zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
                 layer_surface.ack_configure(serial);
                 state.configured = true;
-                state.update_surface(qh);
+                state.paint_surface(qh);
             }
             zwlr_layer_surface_v1::Event::Closed => {
                 state.configured = false;
