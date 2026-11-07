@@ -125,6 +125,8 @@ pub fn status_json() -> String {
         "device",
         "wifi",
         "list",
+        "--rescan",
+        "no",
     ])
     .unwrap_or_default();
 
@@ -226,7 +228,7 @@ pub fn menu(
         "wifi",
         "list",
         "--rescan",
-        "yes",
+        "no",
     ])
     .unwrap_or_default();
 
@@ -253,6 +255,12 @@ pub fn menu(
     }
 
     // Utility actions
+    rows.push(row(
+        "Rescan networks",
+        "scan all Wi-Fi channels now",
+        Glyph::Sync,
+    ));
+    keys.push("rescan".to_string());
     rows.push(row(
         "Show the password as a QR",
         "Wi-Fi credentials QR",
@@ -292,6 +300,13 @@ pub fn menu(
                 .args(["radio", "wifi", "off"])
                 .status();
             say("Wi-Fi", "Wi-Fi turned off", Urgency::Normal, Glyph::Wifi);
+            Ok(0)
+        }
+        "rescan" => {
+            let _ = Command::new("nmcli")
+                .args(["device", "wifi", "list", "--rescan", "yes"])
+                .status();
+            say("Wi-Fi", "Wi-Fi scan complete", Urgency::Normal, Glyph::Wifi);
             Ok(0)
         }
         "qr" => {

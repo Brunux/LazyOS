@@ -251,19 +251,19 @@ fn format_status(powered: bool, connected_names: &[String]) -> String {
     const ICON: &str = "\u{f294}"; // Font Awesome bluetooth-b
     if !powered {
         return format!(
-            "{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span>\",\"class\":\"off\",\"tooltip\":\"Bluetooth off (click to turn on)\"}}",
+            "{{\"text\":\"<span font_desc='JetBrains Mono 13'>{}</span>\",\"class\":\"off\",\"tooltip\":\"Bluetooth off (click to turn on)\"}}",
             ICON
         );
     }
     if connected_names.is_empty() {
         format!(
-            "{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span>\",\"class\":\"on\",\"tooltip\":\"Bluetooth on · nothing connected\"}}",
+            "{{\"text\":\"<span font_desc='JetBrains Mono 13'>{}</span>\",\"class\":\"on\",\"tooltip\":\"Bluetooth on · nothing connected\"}}",
             ICON
         )
     } else {
         let tooltip = connected_names.join("\\n").replace('"', "'");
         format!(
-            "{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span> {}\",\"class\":\"on\",\"tooltip\":\"{}\"}}",
+            "{{\"text\":\"<span font_desc='JetBrains Mono 13'>{}</span> {}\",\"class\":\"on\",\"tooltip\":\"{}\"}}",
             ICON,
             connected_names.len(),
             tooltip
