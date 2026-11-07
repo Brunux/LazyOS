@@ -365,6 +365,35 @@ fc-list :lang=ja               # empty = install fonts-noto-cjk
 
 `check-system.sh` reports `fc-list :lang=ar` in one line.
 
+## Code blocks in Firefox render as boxes or blank spaces
+
+Firefox uses fontconfig to select fonts for code blocks and web pages. When the
+`fonts-nerd-symbols` package is installed, Debian includes a fontconfig rule
+(`/etc/fonts/conf.d/10-nerd-font-symbols.conf`) that aggressively binds over 50
+monospace families (such as `Liberation Mono`, `Roboto Mono`, `Fira Code`) to
+`Symbols Nerd Font` with `binding="same"`. Because `Symbols Nerd Font` is a
+symbols-only font with zero Latin alphanumeric characters, web pages specifying
+those monospace stacks resolve to a font that cannot render letters or numbers,
+producing tofu boxes or blank lines unless "Allow pages to choose their own fonts"
+is disabled in Firefox settings.
+
+LazyOS fixes this in three ways:
+1. Disables `/etc/fonts/conf.d/10-nerd-font-symbols.conf`. Terminals (`foot`, `kitty`)
+   already specify `Symbols Nerd Font Mono` explicitly in their fallback chains, so
+   removing this global fontconfig override does not affect terminal symbols.
+2. Ships `fonts-liberation`, providing the standard `Liberation Mono`, `Liberation Sans`,
+   and `Liberation Serif` metric-compatible fonts expected by web pages.
+3. Installs `/etc/fonts/conf.d/46-monospace-aliases.conf` to ensure uninstalled modern
+   coding fonts (such as `Fira Code` and `Roboto Mono`) fall back cleanly to `monospace`
+   (`DejaVu Sans Mono`) instead of proportional sans fonts.
+
+If an apt upgrade re-creates `10-nerd-font-symbols.conf`, remove it and rebuild the cache:
+
+```sh
+sudo rm -f /etc/fonts/conf.d/10-nerd-font-symbols.conf
+fc-cache -f
+```
+
 ## The clipboard history is empty
 
 The list is only as full as the watcher has made it:

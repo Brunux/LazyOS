@@ -276,6 +276,11 @@ xdg-user-dirs
 
 # fonts / input
 fonts-dejavu-core
+# Metric-compatible Arial, Times New Roman, and Courier New alternatives
+# (Liberation Sans, Liberation Serif, Liberation Mono). Standard web and document
+# font metrics; ensures code blocks specifying "Liberation Mono" or "Courier New"
+# have an authentic monospace face installed.
+fonts-liberation
 # The theme is written for "AdwaitaMono Nerd Font" / "JetBrainsMono Nerd Font",
 # which Debian does not ship (fonts-adwaita has no Mono variant). JetBrains Mono
 # draws the text; the icon glyphs come from fontconfig fallback:

@@ -388,6 +388,14 @@ if [ -d /tmp/ui-files ]; then
 			install -d -o "$USERNAME" -g "$USERNAME" "/home/$USERNAME/$_d"
 		done
 	fi
+	# Debian's fonts-nerd-symbols package ships /etc/fonts/conf.d/10-nerd-font-symbols.conf,
+	# which uses <alias binding="same"> for 50+ monospace families to Symbols Nerd Font.
+	# Because Symbols Nerd Font has zero Latin alphanumeric glyphs, web browsers (Firefox)
+	# and editors resolve code blocks to a symbols-only font and fail to render text.
+	# Foot and kitty configure Symbols Nerd Font Mono explicitly in their own fallback
+	# chains, so disabling this fontconfig symlink restores proper monospace resolution.
+	rm -f /etc/fonts/conf.d/10-nerd-font-symbols.conf
+
 	# The two caches the first session would otherwise build, built here once:
 	# fontconfig's system cache (`fc-cache -s`) and the icon theme's index.  Both
 	# are the kind of cost nobody attributes to a cold cache - the first
