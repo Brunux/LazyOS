@@ -3,7 +3,7 @@ name = "Nord"
 author = "Arctic Ice Studio"
 source = "https://www.nordtheme.com"
 
-wallpapers = ["lazyos.png"]
+wallpapers = ["nord-city-view.jpg", "nord-night-hawks.jpg", "nord-black-moon.jpg"]
 motion = "full"
 
 [colors]

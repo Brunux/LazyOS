@@ -126,3 +126,39 @@ fn theme_picker_cli_query_modes() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("solarized\tSolarized Dark"));
 }
+
+#[test]
+fn theme_picker_wallpaper_preview_and_cycle() {
+    use ratatui::crossterm::event::Event;
+
+    let mut screen = ThemePickerScreen::new();
+    let design = Design::solarized().with_reduced_motion(true);
+
+    let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let mut app = App::new(Header::new("LazyOS"))
+        .design(design)
+        .screen(&mut screen);
+
+    // Initial draw renders wallpaper preview section
+    terminal.draw(|frame| app.render(frame)).unwrap();
+    let buffer = terminal.backend().buffer();
+    let content = (0..buffer.area.height)
+        .map(|y| {
+            (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(content.contains("Desktop & Wallpaper Simulation"));
+    assert!(content.contains("Wallpaper:"));
+
+    // Cycle wallpaper with 'w'
+    let key_w = press(KeyCode::Char('w'));
+    let out = app.handle(Event::Key(key_w));
+    assert_eq!(out, Outcome::Continue);
+
+    // Redraw after cycle
+    terminal.draw(|frame| app.render(frame)).unwrap();
+}

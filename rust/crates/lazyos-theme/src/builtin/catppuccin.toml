@@ -8,7 +8,7 @@ name = "Catppuccin Mocha"
 author = "Catppuccin"
 source = "https://github.com/catppuccin/catppuccin"
 
-wallpapers = ["lazyos.png"]
+wallpapers = ["catppuccin-totoro.jpg", "catppuccin-waves.jpg", "catppuccin-blue-eye.jpg"]
 motion = "full"
 
 [colors]

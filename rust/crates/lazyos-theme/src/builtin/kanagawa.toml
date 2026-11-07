@@ -6,7 +6,7 @@ name = "Kanagawa"
 author = "rebelot"
 source = "https://github.com/rebelot/kanagawa.nvim"
 
-wallpapers = ["lazyos.png"]
+wallpapers = ["kanagawa-wave.jpg"]
 motion = "full"
 
 [colors]

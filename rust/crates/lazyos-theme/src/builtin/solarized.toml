@@ -9,7 +9,7 @@ name = "Solarized Dark"
 author = "Ethan Schoonover"
 source = "https://ethanschoonover.com/solarized"
 
-wallpapers = ["lazyos.png"]
+wallpapers = ["lazyos.png", "mountains.jpg"]
 motion = "full"
 
 [colors]

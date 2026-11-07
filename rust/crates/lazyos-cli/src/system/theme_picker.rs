@@ -6,10 +6,12 @@
 //! truecolor palette swatches, mini desktop UI mockups, WCAG contrast verification,
 //! wallpaper cycling, and live desktop peeking with safe rollback.
 
-use std::cell::Cell;
-use std::collections::BTreeMap;
+use std::cell::{Cell, RefCell};
+use std::collections::{BTreeMap, HashMap};
 use std::io;
+use std::path::PathBuf;
 
+use image::RgbImage;
 use lazyos_theme::{Theme, builtin, contrast, store};
 use lazyos_ui::app::{BodyCtx, Outcome, Screen};
 use lazyos_ui::design::{Border, ColorRole, Density, Design, TextStyle};
@@ -31,6 +33,137 @@ fn fill_rect(buf: &mut ratatui::buffer::Buffer, area: Rect, style: Style) {
         for x in area.left()..area.right() {
             if let Some(cell) = buf.cell_mut((x, y)) {
                 cell.set_style(style);
+            }
+        }
+    }
+}
+
+/// Discovers and loads a 40x16 PNG wallpaper thumbnail from standard system and user cache locations.
+fn load_wallpaper_thumbnail(filename: &str) -> Option<RgbImage> {
+    let mut dirs_to_search = Vec::new();
+
+    if let Ok(home) = std::env::var("HOME") {
+        let h = PathBuf::from(&home);
+        dirs_to_search.push(h.join(".cache/lazyos/wallpapers/thumbnails"));
+        dirs_to_search.push(h.join("Pictures/Wallpapers/thumbnails"));
+        dirs_to_search.push(h.join("Pictures/Wallpapers"));
+    }
+    dirs_to_search.push(PathBuf::from("/usr/share/backgrounds/lazyos/thumbnails"));
+    dirs_to_search.push(PathBuf::from("/usr/share/lazyos/wallpapers/thumbnails"));
+    dirs_to_search.push(PathBuf::from(
+        "uis/sway/files/home/Pictures/Wallpapers/thumbnails",
+    ));
+    dirs_to_search.push(PathBuf::from("uis/sway/files/home/Pictures/Wallpapers"));
+
+    let bare = filename
+        .strip_suffix(".jpg")
+        .or_else(|| filename.strip_suffix(".png"))
+        .unwrap_or(filename);
+
+    let candidates = [
+        format!("{filename}.png"),
+        filename.to_string(),
+        format!("{bare}.png"),
+    ];
+
+    for dir in &dirs_to_search {
+        for candidate in &candidates {
+            let path = dir.join(candidate);
+            if path.is_file() {
+                if let Ok(bytes) = std::fs::read(&path) {
+                    if let Ok(img) = image::load_from_memory(&bytes) {
+                        return Some(img.to_rgb8());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Three-stop linear interpolation for smooth wallpaper gradient fallbacks.
+fn interpolate_rgb(
+    c1: lazyos_theme::Rgb,
+    c2: lazyos_theme::Rgb,
+    c3: lazyos_theme::Rgb,
+    t: f32,
+) -> lazyos_theme::Rgb {
+    let t = t.clamp(0.0, 1.0);
+    if t < 0.5 {
+        let f = t * 2.0;
+        let r = (c1.r as f32 * (1.0 - f) + c2.r as f32 * f).round() as u8;
+        let g = (c1.g as f32 * (1.0 - f) + c2.g as f32 * f).round() as u8;
+        let b = (c1.b as f32 * (1.0 - f) + c2.b as f32 * f).round() as u8;
+        lazyos_theme::Rgb::new(r, g, b)
+    } else {
+        let f = (t - 0.5) * 2.0;
+        let r = (c2.r as f32 * (1.0 - f) + c3.r as f32 * f).round() as u8;
+        let g = (c2.g as f32 * (1.0 - f) + c3.g as f32 * f).round() as u8;
+        let b = (c2.b as f32 * (1.0 - f) + c3.b as f32 * f).round() as u8;
+        lazyos_theme::Rgb::new(r, g, b)
+    }
+}
+
+/// Renders a truecolor half-block (`▀`) graphical matrix directly into the Ratatui cell buffer.
+fn render_wallpaper_preview(
+    buf: &mut ratatui::buffer::Buffer,
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    thumb: Option<&RgbImage>,
+    theme: &Theme,
+) {
+    if width == 0 || height == 0 {
+        return;
+    }
+
+    let roles = theme.roles();
+    let bg_rgb = theme.colors.background.0;
+    let surface_rgb = roles.surface.0;
+    let accent_rgb = roles.accent.0;
+
+    for row in 0..height {
+        let py = y + row;
+        for col in 0..width {
+            let px = x + col;
+
+            let (top_rgb, bot_rgb) = match thumb {
+                Some(img) => {
+                    let img_w = img.width();
+                    let img_h = img.height();
+                    if img_w > 0 && img_h > 0 {
+                        let ix = (col as u32 * img_w) / width as u32;
+                        let iy_top = (row as u32 * 2 * img_h) / (height as u32 * 2);
+                        let iy_bot = ((row as u32 * 2 + 1) * img_h) / (height as u32 * 2);
+
+                        let p_top = img.get_pixel(ix.min(img_w - 1), iy_top.min(img_h - 1));
+                        let p_bot = img.get_pixel(ix.min(img_w - 1), iy_bot.min(img_h - 1));
+
+                        (
+                            lazyos_theme::Rgb::new(p_top[0], p_top[1], p_top[2]),
+                            lazyos_theme::Rgb::new(p_bot[0], p_bot[1], p_bot[2]),
+                        )
+                    } else {
+                        (bg_rgb, surface_rgb)
+                    }
+                }
+                None => {
+                    let t_top = (col + row * 2) as f32 / (width + height * 2) as f32;
+                    let t_bot = (col + row * 2 + 1) as f32 / (width + height * 2) as f32;
+
+                    let c_top = interpolate_rgb(bg_rgb, surface_rgb, accent_rgb, t_top);
+                    let c_bot = interpolate_rgb(bg_rgb, surface_rgb, accent_rgb, t_bot);
+                    (c_top, c_bot)
+                }
+            };
+
+            let fg = lazyos_ui::design::color(top_rgb);
+            let bg = lazyos_ui::design::color(bot_rgb);
+            let style = Style::default().fg(fg).bg(bg);
+
+            if let Some(cell) = buf.cell_mut((px, py)) {
+                cell.set_char('\u{2580}').set_style(style);
             }
         }
     }
@@ -59,6 +192,7 @@ pub struct ThemePickerScreen {
     pub keybar: Vec<KeyHint>,
     pub rows_height: Cell<u16>,
     pub status_msg: Option<String>,
+    wallpaper_cache: RefCell<HashMap<String, Option<RgbImage>>>,
 }
 
 impl ThemePickerScreen {
@@ -67,11 +201,22 @@ impl ThemePickerScreen {
         let active = store::active(&p).unwrap_or_else(|| "solarized".to_string());
         let original_slug = active.clone();
 
+        let state_wp = std::fs::read_to_string(p.state.join("wallpaper"))
+            .ok()
+            .map(|s| s.trim().to_string());
+
         let mut entries = Vec::new();
         let mut rows = Vec::new();
 
         for (slug, toml) in builtin::ALL {
-            if let Ok(theme) = Theme::parse(toml) {
+            if let Ok(mut theme) = Theme::parse(toml) {
+                // If there is an active wallpaper matching this theme, rotate it to the front
+                if let Some(current_wp) = &state_wp {
+                    if let Some(pos) = theme.wallpapers.iter().position(|w| w == current_wp) {
+                        theme.wallpapers.rotate_left(pos);
+                    }
+                }
+
                 let roles = theme.roles();
                 let bg = theme.colors.background.0;
                 let c_text = contrast::ratio(roles.text.0, bg);
@@ -126,12 +271,29 @@ impl ThemePickerScreen {
             ],
             rows_height: Cell::new(20),
             status_msg: None,
+            wallpaper_cache: RefCell::new(HashMap::new()),
         }
     }
 
     fn selected_entry(&self) -> Option<&ThemeEntry> {
         let idx = self.list.selected_index().unwrap_or(0);
         self.entries.get(idx)
+    }
+
+    fn selected_entry_mut(&mut self) -> Option<&mut ThemeEntry> {
+        let idx = self.list.selected_index().unwrap_or(0);
+        self.entries.get_mut(idx)
+    }
+
+    fn get_wallpaper_thumbnail(&self, filename: &str) -> Option<RgbImage> {
+        if let Some(cached) = self.wallpaper_cache.borrow().get(filename) {
+            return cached.clone();
+        }
+        let loaded = load_wallpaper_thumbnail(filename);
+        self.wallpaper_cache
+            .borrow_mut()
+            .insert(filename.to_string(), loaded.clone());
+        loaded
     }
 }
 
@@ -261,7 +423,77 @@ impl Screen for ThemePickerScreen {
         put(ctx.buf, px, py, &meta, pw, ctx.design.style(TextStyle::Dim));
         py += 2;
 
-        // 2. ANSI 16-Color Terminal Matrix
+        // 2. Desktop & Wallpaper Simulation (The Eye Candy!)
+        put(
+            ctx.buf,
+            px,
+            py,
+            "Desktop & Wallpaper Simulation",
+            pw,
+            ctx.design.style(TextStyle::Title),
+        );
+        py += 1;
+
+        let sim_w = pw.min(48);
+
+        // Mini Waybar Strip on top of the desktop
+        let bar_area = Rect::new(px, py, sim_w, 1);
+        fill_rect(ctx.buf, bar_area, Style::default().bg(surface_color));
+        let mark_style = Style::default()
+            .fg(accent_color)
+            .bg(surface_color)
+            .add_modifier(Modifier::BOLD);
+        put(ctx.buf, px + 1, py, "\u{f013} LazyOS", 10, mark_style);
+
+        let chip_style = Style::default().fg(text_color).bg(surface_color);
+        put(
+            ctx.buf,
+            px + 14,
+            py,
+            "\u{f126} main  \u{2502}  \u{f1eb} LazyNet  \u{f028} 80%  \u{f240} 95%  \u{f017} 10:14",
+            sim_w.saturating_sub(15),
+            chip_style,
+        );
+        py += 1;
+
+        // Truecolor Halfblock Wallpaper Preview Matrix
+        let current_wp = selected
+            .theme
+            .wallpapers
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "lazyos.png".to_string());
+        let thumb = self.get_wallpaper_thumbnail(&current_wp);
+        let wp_h = 5;
+        render_wallpaper_preview(
+            ctx.buf,
+            px,
+            py,
+            sim_w,
+            wp_h,
+            thumb.as_ref(),
+            &selected.theme,
+        );
+        py += wp_h;
+
+        // Wallpaper metadata and cycle hint
+        let wp_count = selected.theme.wallpapers.len();
+        let wp_info = if wp_count > 1 {
+            format!("Wallpaper: {current_wp} ({wp_count} bundled) \u{2014} Press [w] to cycle")
+        } else {
+            format!("Wallpaper: {current_wp} (standard theme background)")
+        };
+        put(
+            ctx.buf,
+            px,
+            py,
+            &wp_info,
+            pw,
+            ctx.design.style(TextStyle::Dim),
+        );
+        py += 2;
+
+        // 3. ANSI 16-Color Terminal Matrix
         put(
             ctx.buf,
             px,
@@ -312,7 +544,7 @@ impl Screen for ThemePickerScreen {
         }
         py += 2;
 
-        // 3. Key Semantic UI Roles
+        // 4. Key Semantic UI Roles
         put(
             ctx.buf,
             px,
@@ -349,76 +581,6 @@ impl Screen for ThemePickerScreen {
             }
         }
         py += 2;
-
-        // 4. Simulated Desktop UI Elements (The Eye Candy!)
-        put(
-            ctx.buf,
-            px,
-            py,
-            "Live Desktop Simulation",
-            pw,
-            ctx.design.style(TextStyle::Title),
-        );
-        py += 1;
-
-        // Mini Waybar Strip
-        let bar_area = Rect::new(px, py, pw, 1);
-        fill_rect(ctx.buf, bar_area, Style::default().bg(surface_color));
-        let mark_style = Style::default()
-            .fg(accent_color)
-            .bg(surface_color)
-            .add_modifier(Modifier::BOLD);
-        put(ctx.buf, px + 1, py, "\u{f013} LazyOS", 10, mark_style);
-
-        let chip_style = Style::default().fg(text_color).bg(surface_color);
-        put(
-            ctx.buf,
-            px + 14,
-            py,
-            "\u{f126} main  \u{2502}  \u{f1eb} LazyNet  \u{f028} 80%  \u{f240} 95%  \u{f017} 10:14",
-            pw.saturating_sub(15),
-            chip_style,
-        );
-        py += 2;
-
-        // Mini Notification Card
-        let notif_w = pw.min(54);
-        let notif_rect = Rect::new(px, py, notif_w, 3);
-        fill_rect(ctx.buf, notif_rect, Style::default().bg(surface_color));
-
-        let border_style = Style::default().fg(accent_color);
-        let top_border = format!(
-            "\u{256d}\u{2500} \u{f0f3} System Notice {}\u{256e}",
-            "\u{2500}".repeat(notif_w.saturating_sub(20) as usize)
-        );
-        let mid_border = format!(
-            "\u{2502} Palette updated to {}.{}\u{2502}",
-            selected.theme.name,
-            " ".repeat(notif_w.saturating_sub(selected.theme.name.len() as u16 + 25) as usize)
-        );
-        let bot_border = format!(
-            "\u{2570}{}\u{256f}",
-            "\u{2500}".repeat(notif_w.saturating_sub(2) as usize)
-        );
-
-        put(
-            ctx.buf,
-            px,
-            py,
-            &top_border,
-            notif_w,
-            border_style.add_modifier(Modifier::BOLD),
-        );
-        put(
-            ctx.buf,
-            px,
-            py + 1,
-            &mid_border,
-            notif_w,
-            Style::default().fg(text_color).bg(surface_color),
-        );
-        put(ctx.buf, px, py + 2, &bot_border, notif_w, border_style);
-        py += 4;
 
         // 5. Contrast & Accessibility Scorecard
         put(
@@ -464,30 +626,45 @@ impl Screen for ThemePickerScreen {
         put(ctx.buf, px, py, &card_text, pw, score_style);
         py += 2;
 
-        // 6. Wallpapers
-        let wp_count = selected.theme.wallpapers.len();
-        let wp_info = if wp_count > 0 {
-            format!(
-                "Wallpapers: {} bundled ({}) \u{2014} Press [w] to cycle",
-                wp_count,
-                selected
-                    .theme
-                    .wallpapers
-                    .first()
-                    .cloned()
-                    .unwrap_or_default()
-            )
-        } else {
-            "Wallpapers: using standard gradient composition".to_string()
-        };
-        put(
-            ctx.buf,
-            px,
-            py,
-            &wp_info,
-            pw,
-            ctx.design.style(TextStyle::Dim),
-        );
+        // 6. Mini Notification Card (if space allows)
+        if py + 4 <= right_card.bottom() {
+            let notif_w = pw.min(48);
+            let notif_rect = Rect::new(px, py, notif_w, 3);
+            fill_rect(ctx.buf, notif_rect, Style::default().bg(surface_color));
+
+            let border_style = Style::default().fg(accent_color);
+            let top_border = format!(
+                "\u{256d}\u{2500} \u{f0f3} System Notice {}\u{256e}",
+                "\u{2500}".repeat(notif_w.saturating_sub(20) as usize)
+            );
+            let mid_border = format!(
+                "\u{2502} Palette updated to {}.{}\u{2502}",
+                selected.theme.name,
+                " ".repeat(notif_w.saturating_sub(selected.theme.name.len() as u16 + 25) as usize)
+            );
+            let bot_border = format!(
+                "\u{2570}{}\u{256f}",
+                "\u{2500}".repeat(notif_w.saturating_sub(2) as usize)
+            );
+
+            put(
+                ctx.buf,
+                px,
+                py,
+                &top_border,
+                notif_w,
+                border_style.add_modifier(Modifier::BOLD),
+            );
+            put(
+                ctx.buf,
+                px,
+                py + 1,
+                &mid_border,
+                notif_w,
+                Style::default().fg(text_color).bg(surface_color),
+            );
+            put(ctx.buf, px, py + 2, &bot_border, notif_w, border_style);
+        }
 
         // 7. Interactive Toast / Notification Message Banner
         if let Some(msg) = &self.status_msg {
@@ -552,6 +729,13 @@ impl Screen for ThemePickerScreen {
                     let slug = selected.slug.clone();
                     match cycle_wallpaper_for(&p, Some(&slug)) {
                         Ok((wp, _)) => {
+                            if let Some(entry) = self.selected_entry_mut() {
+                                if let Some(pos) =
+                                    entry.theme.wallpapers.iter().position(|w| *w == wp)
+                                {
+                                    entry.theme.wallpapers.rotate_left(pos);
+                                }
+                            }
                             self.status_msg = Some(format!("Cycled wallpaper for {slug}: {wp}"));
                         }
                         Err(err) => {

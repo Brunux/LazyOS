@@ -3,7 +3,7 @@ name = "Tokyo Night"
 author = "enkia / Folke"
 source = "https://github.com/folke/tokyonight.nvim"
 
-wallpapers = ["lazyos.png"]
+wallpapers = ["tokyo-night-cityscape.jpg", "tokyo-night-winding-road.jpg", "tokyo-night-sunset-lake.jpg", "tokyo-night-liftoff.jpg"]
 motion = "full"
 
 [colors]

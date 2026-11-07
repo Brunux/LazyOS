@@ -7,7 +7,7 @@ name = "Rose Pine"
 author = "Rose Pine"
 source = "https://rosepinetheme.com"
 
-wallpapers = ["lazyos.png"]
+wallpapers = ["rose-pine-plants.jpg", "rose-pine-funky-shapes.jpg", "rose-pine-dot-map.jpg"]
 motion = "full"
 
 [colors]

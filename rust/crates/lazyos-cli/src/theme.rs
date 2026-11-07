@@ -254,7 +254,17 @@ pub fn apply_theme(
     force: bool,
     headless: bool,
 ) -> Result<(Theme, usize, usize), String> {
-    let theme = theme(slug)?;
+    let mut theme = theme(slug)?;
+
+    // Keep active wallpaper if it belongs to this theme, or record the theme's default.
+    let state = paths.state.join("wallpaper");
+    let current_wp = std::fs::read_to_string(&state).unwrap_or_default();
+    let current_wp = current_wp.trim();
+    if let Some(pos) = theme.wallpapers.iter().position(|w| w == current_wp) {
+        theme.wallpapers.rotate_left(pos);
+    } else if let Some(wp) = theme.wallpapers.first() {
+        let _ = std::fs::write(&state, wp);
+    }
 
     // Generate the wallpaper and thumbnail for the theme (spec 013).
     let _ = wallpaper::get_or_generate(
@@ -475,6 +485,13 @@ fn diff(paths: &Paths, args: &[&str]) -> i32 {
         eprintln!("lazyos theme: the active theme `{slug}` is not built in");
         return EXIT_FAILED;
     };
+    let mut theme = theme;
+    let state = paths.state.join("wallpaper");
+    let current_wp = std::fs::read_to_string(&state).unwrap_or_default();
+    let current_wp = current_wp.trim();
+    if let Some(pos) = theme.wallpapers.iter().position(|w| w == current_wp) {
+        theme.wallpapers.rotate_left(pos);
+    }
     let home = paths.home.to_string_lossy().to_string();
     let mut differing = Vec::new();
     for surface in &SURFACES {
