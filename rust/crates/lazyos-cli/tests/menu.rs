@@ -49,6 +49,10 @@ struct Home {
 
 impl Home {
     fn new(name: &str) -> Self {
+        // Suppress desktop notification toasts from in-process MenuScreen drives
+        unsafe {
+            std::env::set_var("LAZYOS_NOTIFY_STUB", "suppress");
+        }
         let root = scratch(name);
         for dir in ["state", "run", ".opencode/bin", ".local/bin"] {
             fs::create_dir_all(root.join(dir)).unwrap();

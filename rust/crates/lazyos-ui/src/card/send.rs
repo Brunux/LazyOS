@@ -22,6 +22,15 @@ const PROGRAM: &str = "notify-send";
 /// Post the message through `notify-send` on the session bus and return the id
 /// mako assigned.
 pub fn notify(message: &Message) -> Result<u32, String> {
+    if let Ok(stub) = std::env::var("LAZYOS_NOTIFY_STUB") {
+        if stub == "suppress" || stub == "ignore" {
+            return Ok(1);
+        }
+        return notify_with(Path::new(&stub), message);
+    }
+    if std::env::var_os("LAZYOS_NO_NOTIFY").is_some() {
+        return Ok(1);
+    }
     notify_with(Path::new(PROGRAM), message)
 }
 
@@ -222,5 +231,17 @@ mod tests {
             reason.starts_with("cannot run /nonexistent/notify-send"),
             "{reason}"
         );
+    }
+
+    #[test]
+    fn notify_stub_suppress_returns_ok_without_calling_notify_send() {
+        unsafe {
+            std::env::set_var("LAZYOS_NOTIFY_STUB", "suppress");
+        }
+        let result = notify(&message());
+        unsafe {
+            std::env::remove_var("LAZYOS_NOTIFY_STUB");
+        }
+        assert_eq!(result, Ok(1));
     }
 }
