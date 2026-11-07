@@ -19,6 +19,11 @@ yet present in `scripts/` as not implemented.
 
 ## Feature rules
 
+- **Compilation and test execution use only the 4 power cores.** When compiling
+  Rust or running tests/clippy (`cargo build`, `cargo test`, `cargo clippy`),
+  pin execution to the MT8192's Cortex-A76 performance cores (CPUs 4-7) with
+  `taskset -c 4-7` (and `-j 4`), leaving the Cortex-A55 efficiency cores (CPUs
+  0-3) free and responsive for the desktop session.
 - **Icons first, never forced.** Icons and readable TUI tools are the house taste, not a garnish:
   a menu row gets its `UI_I_*` glyph from `~/.config/bin/lib-rofi.sh`, a notification its name from
   the same constants, a `rofi-files` row a `thumbnail://` or a name from the file-browser table, a

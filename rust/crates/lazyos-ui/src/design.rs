@@ -142,14 +142,21 @@ impl Design {
         Self::new(Palette::solarized_dark(), Density::Normal, false)
     }
 
-    /// The session's design: solarized, the density the tablet state asks for,
+    /// The session's design: the active theme's palette, the density the tablet state asks for,
     /// and `LAZYOS_REDUCED_MOTION=1` honoured.
     pub fn for_session(runtime_dir: Option<&str>) -> Self {
+        let paths = lazyos_theme::Paths::from_env();
+        let palette = Palette::for_session(&paths);
         Self::new(
-            Palette::solarized_dark(),
+            palette,
             Self::detect_density(runtime_dir),
             matches!(std::env::var("LAZYOS_REDUCED_MOTION"), Ok(v) if v == "1"),
         )
+    }
+
+    pub fn with_palette(mut self, palette: Palette) -> Self {
+        self.palette = palette;
+        self
     }
 
     /// Tablet mode keeps its state directory while it is on, so its presence is

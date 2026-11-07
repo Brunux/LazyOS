@@ -35,12 +35,7 @@ const EXIT_FAILED: i32 = 3;
 /// The paths this command owns: `$HOME`, and the state directory the XDG spec
 /// names (`$XDG_STATE_HOME/lazyos/theme`).
 pub fn paths() -> Paths {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let state = match std::env::var("XDG_STATE_HOME") {
-        Ok(dir) if !dir.is_empty() => PathBuf::from(dir).join("lazyos/theme"),
-        _ => PathBuf::from(&home).join(".local/state/lazyos/theme"),
-    };
-    Paths::new(home, state)
+    Paths::from_env()
 }
 
 pub fn run(resolved: &Resolved) -> i32 {

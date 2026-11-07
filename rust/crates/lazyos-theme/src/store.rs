@@ -119,6 +119,15 @@ impl Paths {
         }
     }
 
+    pub fn from_env() -> Self {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let state = match std::env::var("XDG_STATE_HOME") {
+            Ok(dir) if !dir.is_empty() => PathBuf::from(dir).join("lazyos/theme"),
+            _ => PathBuf::from(&home).join(".local/state/lazyos/theme"),
+        };
+        Self::new(home, state)
+    }
+
     pub fn target(&self, surface: &Surface) -> PathBuf {
         self.home.join(surface.target)
     }

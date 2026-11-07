@@ -2295,7 +2295,7 @@ fi
 if [ -n "$MENU_ROWS" ]; then
 	_root_missing=
 	for _m in rofi-dns rofi-pkg rofi-color rofi-about rofi-remind rofi-swap rofi-format rofi-display rofi-tz rofi-vnc rofi-quick rofi-ssh; do
-		menu_runs "$_m" || _root_missing="$_root_missing ${_m#rofi-}"
+		menu_runs "$_m" || menu_runs "lazyos menu ${_m#rofi-}" || menu_runs "lazyos menu colour" || _root_missing="$_root_missing ${_m#rofi-}"
 	done
 	[ -z "$_root_missing" ] &&
 		ok "root menu reaches DNS, Packages, Colour, About, Reminders, Auxiliary swap, Format, Display, Time zone, VNC, Settings and SSH" ||
