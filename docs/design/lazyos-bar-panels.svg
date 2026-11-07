@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="760" viewBox="0 0 1440 760">
+<defs><style>.bg{fill:#002b36}.p{fill:#073642;stroke:#0b5663;stroke-width:1.5}.t{fill:#eee8d5}.m{fill:#839496}.c{fill:#2aa198}.y{fill:#b58900}.b{fill:#268bd2}.g{fill:#859900}.r{fill:#dc322f}.mono{font-family:'JetBrains Mono','DejaVu Sans Mono',monospace}.h{font-size:17px;font-weight:bold}.s{font-size:13px}.xs{font-size:11px}.line{stroke:#586e75;stroke-width:1}</style></defs>
+<rect width="1440" height="760" rx="12" class="bg"/>
+<text x="32" y="38" class="mono c" font-size="14">LAZYOS / PANEL &amp; MENU INVENTORY</text>
+<text x="32" y="62" class="mono m s">Panels are compact, keyboard-first, anchored to their indicator where practical.</text>
+<!-- Network -->
+<rect x="32" y="92" width="430" height="286" rx="6" class="p"/>
+<text x="54" y="124" class="mono c h">networkctl</text><text x="54" y="150" class="mono m xs">$ network status</text>
+<text x="54" y="180" class="mono g s">● Connected · Wi-Fi</text>
+<text x="54" y="208" class="mono t s">SSID       Home-Network</text><text x="54" y="232" class="mono t s">Signal     82%</text><text x="54" y="256" class="mono t s">Address    DHCP / IPv4</text>
+<line x1="54" y1="274" x2="438" y2="274" class="line"/><text x="54" y="300" class="mono m xs">$ available networks</text>
+<text x="54" y="326" class="mono c s">&gt; Home-Network</text><text x="54" y="350" class="mono m s">  Guest · Office</text>
+<!-- Audio -->
+<rect x="490" y="92" width="430" height="286" rx="6" class="p"/>
+<text x="512" y="124" class="mono b h">audioctl</text><text x="512" y="150" class="mono m xs">$ audio status</text>
+<text x="512" y="180" class="mono t s">Output   Speakers · 42%</text><text x="512" y="204" class="mono t s">Input    Internal microphone</text>
+<rect x="512" y="222" width="360" height="9" rx="2" fill="#586e75"/><rect x="512" y="222" width="151" height="9" rx="2" class="b"/>
+<text x="512" y="260" class="mono m xs">OUTPUT DEVICES</text><text x="512" y="286" class="mono c s">&gt; Internal speakers</text><text x="512" y="312" class="mono t s">  HDMI / DisplayPort</text><text x="512" y="350" class="mono m xs">[m] mute  [↑/↓] volume  [enter] select</text>
+<!-- calendar -->
+<rect x="948" y="92" width="460" height="286" rx="6" class="p"/>
+<text x="970" y="124" class="mono y h">calendar</text><text x="970" y="150" class="mono m xs">$ date --calendar</text>
+<text x="970" y="184" class="mono t s">November 2026</text>
+<text x="970" y="214" class="mono m s">Mo Tu We Th Fr Sa Su</text>
+<text x="970" y="244" class="mono t s">                   1</text><text x="970" y="270" class="mono t s"> 2  3  4  5 [6] 7  8</text>
+<text x="970" y="296" class="mono t s"> 9 10 11 12 13 14 15</text><text x="970" y="322" class="mono t s">16 17 18 19 20 21 22</text>
+<text x="970" y="350" class="mono m xs">[←/→] month  [t] today  [esc] close</text>
+<!-- menu tree -->
+<rect x="32" y="410" width="1376" height="310" rx="6" class="p"/>
+<text x="54" y="444" class="mono c h">LazyOS command palette / root menu</text>
+<text x="54" y="474" class="mono m xs">Type to filter · arrows to navigate · Enter to open · Esc to return · every slow action owns its task view</text>
+<line x1="54" y1="494" x2="1386" y2="494" class="line"/>
+<text x="64" y="530" class="mono y s">SYSTEM</text><text x="64" y="560" class="mono t s">Overview · Processes · Resources · Disks &amp; mounts · Power · Updates</text><text x="64" y="586" class="mono t s">Services · Logs · About · Session / Lock / Logout / Reboot / Shutdown</text>
+<text x="64" y="628" class="mono y s">CONNECTIVITY</text><text x="64" y="658" class="mono t s">Wi-Fi · Ethernet · VPN · Bluetooth · Screen sharing · Network diagnostics</text>
+<text x="750" y="530" class="mono y s">PERSONALIZATION</text><text x="750" y="560" class="mono t s">Themes · Wallpapers · Bar layout · Workspaces · Keyboard layouts · Night light</text><text x="750" y="586" class="mono t s">Display / brightness · Idle inhibitor · Notifications · Sound &amp; devices</text>
+<text x="750" y="628" class="mono y s">TOOLS &amp; APPS</text><text x="750" y="658" class="mono t s">Applications · Run command · Search files · Terminal · Help / keybindings</text>
+<text x="54" y="696" class="mono m xs">Illustrative states only; live values, device names and available actions come from the host system.</text>
+</svg>
