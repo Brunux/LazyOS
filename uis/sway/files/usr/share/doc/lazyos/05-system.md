@@ -325,54 +325,56 @@ stock firmware's developer-mode menu picks **internal disk** (the eMMC) or
 **external disk** (the card), so a broken install on the eMMC is recoverable by
 booting the card and running the installer again.
 
-## Install LazyOS
+## Install LazyOS (The Full TUI Installer)
 
-There is no separate installer program: `scripts/install-emmc.sh` copies **the
-system that is running** onto the internal disk, which is why the card is what
-you install from. The menu (*Install LazyOS* in the root menu and in the
-launcher) is its front end, so what lands on the eMMC is the system that was
-tested, not a second implementation of it.
+Installing LazyOS to the internal eMMC (`/dev/mmcblk0`) is driven by the native full-screen
+TUI installer wizard:
 
-Open it from the microSD. When the machine is running from the disk it would
-erase, it says so and offers nothing to press: that is the one mistake nothing
-can undo.
+```sh
+lazyos installer              # interactive full-screen wizard in foot
+lazyos installer --check      # headless verification of hardware and disk safety
+lazyos installer --dry-run    # non-destructive simulation of the full wizard
+```
 
-The menu is a report before it is a button. It checks the target and the room
-the copy needs, the charger and the battery (below half it says so, below 20% on
-battery it refuses), the running kernel's own files - the kernel partition is
-rebuilt from them *after* the copy, and without them the install would fail with
-the disk already formatted - the installer's tools, and that `sudo` does not ask
-for a password, because the copy runs detached and nothing can answer a prompt.
+`rofi-install` is a symlink to `/usr/bin/lazyos`, preserving existing key bindings, the root menu
+entry (*Install LazyOS*), and the launcher desktop shortcut (`org.lazyos.install.desktop`).
 
-**Cancel is the first row**, and it is selected, so a stray Enter writes
-nothing. Choosing *Install LazyOS* then asks for the disk's name typed in full
-(`mmcblk0` for the eMMC): a list cannot ask that, because Enter on a row is
-exactly the gesture that must not erase a disk.
+### The 6 Wizard Steps
 
-After that it runs the documented install unchanged - `install-emmc.sh` with
-`CONFIRM=yes` - and does not partition or format anything itself. Around that
-call it does the two things the installer refuses to start with: it stops
-**udisks2** and masks it for the length of the run, so nothing can auto-mount
-the new partitions mid-write, and it unmounts any partition of the target. Both
-are put back afterwards on every exit path, and a failure there stops before a
-byte is written. `systemd-inhibit` holds a sleep lock for the length of the copy.
-
-The copy takes minutes, so it is **not stoppable**: a killed `rsync` or `mkfs`
-leaves a disk that is neither the old system nor the new one. A notification
-card that does not expire and the bar's spinner follow the installer's own
-steps, and the card says why it cannot be stopped when it is clicked.
-
-The end is read from the disk and not from the exit code: the three partitions
-must carry `pmOS_kernel`, `pmOS_boot` and `pmOS_root`, and the kernel partition
-must verify with `futility show`. Only then does the card say to reboot and pick
-**internal disk** in the firmware menu.
-
-Every run writes `~/.local/state/lazyos/install-<date>.log`. **Show the install
-log** opens it in a window with `less`, following it live while the copy runs
-and at the end afterwards; the menu also keeps the last run's outcome under
-*last time*, and a `running` line with no process behind it means the run was
-killed. When something fails, the card carries the installer's own last `ERROR:`
-line and the path of the log.
+1. **Welcome & Pre-Flight**:
+   Inspects hardware facts (MediaTek MT8192 on Google Hayato, RAM, power supply, active root source,
+   and internal eMMC target `/dev/mmcblk0`). Evaluates the **strict safety invariant**: if the system
+   is already running from internal eMMC (`findmnt /` on `/dev/mmcblk0*`), the wizard displays a
+   prominent red danger card, refuses to advance, and permits only exit.
+2. **Localization, Timezone & Keyboard**:
+   Searchable timezone picker filtering IANA zones as you type with case folding, system locale
+   picker (`en_US.UTF-8`, `es_ES.UTF-8`, etc.), and keyboard layout selector (`us`, `es`, `latam`, etc.)
+   featuring an interactive live keypress test field to verify symbols (`@`, `#`, `~`, `|`).
+3. **User Account & Host Identity**:
+   Full name, POSIX-validated username (`^[a-z_][a-z0-9_-]{0,31}$`, rejecting `root` or invalid chars),
+   password entry with masked asterisks (`*`) and mismatch validation, network hostname, and a toggle
+   to regenerate fresh SSH host keys on first boot.
+4. **Target Storage & Partition Review (Gated Confirmation)**:
+   Visual ASCII diagram of the ChromeOS GPT layout:
+   * `p1` (128 MiB): ChromeOS signed FIT kernel partition (`pmOS_kernel`)
+   * `p2` (512 MiB): Boot partition (`pmOS_boot`, ext2 mounted on `/boot`)
+   * `p3` (Remaining ~57.6 GiB): Root partition (`pmOS_root`, ext4 mounted on `/`)
+   Carries a prominent danger warning banner. **Confirmation Gate**: Cursor focus starts by default
+   on `[ Cancel / Back ]` so a stray Enter never formats storage; the `[ Erase Disk & Install ]` action
+   is strictly disabled until `"mmcblk0"` or `"DESTROY"` is typed into the confirmation box.
+5. **TaskView Installation Progress**:
+   Displays an overall progress gauge (`0%` to `100%`), sequential phase checklist with live spinner
+   indicators, and a streaming real-time log pane:
+   * Phase 1: Partitioning storage (`cgpt` ChromeOS GPT)
+   * Phase 2: Formatting filesystems (`mkfs.ext2`, `mkfs.ext4`)
+   * Phase 3: Copying root filesystem (`rsync` with byte transfer tracking)
+   * Phase 4: Applying user account, timezone, fstab, and locale configuration
+   * Phase 5: Generating signed depthcharge FIT kernel partition (`depthchargectl` / `make-kpart.sh`)
+   * Phase 6: Verifying vboot signature (`futility show`)
+   The worker engine is detached under `setsid` via `sudo -n`, writing state to `/run/lazyos-install/state.json`.
+6. **Completion**:
+   Green success screen detailing how to boot internal storage (selecting "internal disk" in the Chromebook
+   developer menu), with quick action buttons to `[ Reboot System Now ]` or `[ Stay in Live Session ]`.
 
 ## Updating
 

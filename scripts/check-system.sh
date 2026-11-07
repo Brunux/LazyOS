@@ -57,6 +57,21 @@ info()    { printf '  ----  %s\n' "$*"; }
 section() { printf '\n%s==> %s%s\n' "$C_HEAD" "$*" "$C_OFF"; }
 have()    { command -v "$1" >/dev/null 2>&1; }
 
+# Optional repository checkout, for the declared-package check and repo binaries.
+_self="$(cd "$(dirname "$0")" && pwd)"
+REPO="${1:-$(cd "$_self/.." 2>/dev/null && pwd)}"
+if [ -z "$REPO" ] || [ ! -d "$REPO/packages" ] || [ ! -d "$REPO/uis" ]; then
+	REPO=""
+fi
+if [ -n "$REPO" ]; then
+	if [ -x "$REPO/rust/target/release/lazyos" ]; then
+		PATH="$REPO/rust/target/release:$PATH"
+	elif [ -x "$REPO/rust/target/debug/lazyos" ]; then
+		PATH="$REPO/rust/target/debug:$PATH"
+	fi
+	export PATH
+fi
+
 # The root menu's rows (spec 007), from the binary's own table: one line per row,
 # `key<TAB>group<TAB>label<TAB>what it runs`. `bar-menu` is a link to `lazyos` now,
 # so grepping that file would match strings inside an executable and prove
@@ -140,13 +155,6 @@ check_svc() {
 		*) fail "$2" ;;
 	esac
 }
-
-# Optional repository checkout, for the declared-package check.
-_self="$(cd "$(dirname "$0")" && pwd)"
-REPO="${1:-$(cd "$_self/.." 2>/dev/null && pwd)}"
-if [ -z "$REPO" ] || [ ! -d "$REPO/packages" ] || [ ! -d "$REPO/uis" ]; then
-	REPO=""
-fi
 
 # sway -C needs a runtime dir; keep one for the whole run.
 RUNTIME="$(mktemp -d)"
@@ -2125,89 +2133,51 @@ if [ -r "$HOME/.config/bin/rofi-places" ]; then
 	fi
 fi
 
-# Install LazyOS (the root menu's red row, the launcher entry, bin/rofi-install)
-# is a front-end for scripts/install-emmc.sh: the menu asks the questions, the
-# detached runner does the write by calling that script with CONFIRM=yes, and the
-# copy that lands on the internal disk is the one this port has proven boots.
-# Three things can therefore go wrong invisibly - a tool the installer needs is
-# missing (the menu then shows a red row instead of starting a doomed write, but
-# that row is only as good as this list), the runner grows a partitioning or
-# filesystem command of its own (the second implementation this port must never
-# have), and the typed confirmation turns back into a single Enter.
+# Install LazyOS (the full TUI installer wizard, spec 018: lazyos installer)
+# Replaces rofi-install, lazyos-install-run, and lazyos-install-log.
+# The TUI wizard provides pre-flight hardware inspection, timezone selection,
+# POSIX user account generation, partition diagrams, gated confirmation,
+# real-time progress gauge, and detached worker execution.
+if have lazyos; then
+	if lazyos --help 2>&1 | grep -qs "installer"; then
+		ok "lazyos installer registered in lazyos --help (spec 018)"
+	else
+		fail "lazyos installer missing from lazyos --help"
+	fi
+
+	if lazyos --symlinks 2>&1 | grep -qs "rofi-install[[:space:]]*installer"; then
+		ok "rofi-install resolves to lazyos installer in symlinks table"
+	else
+		fail "rofi-install does not resolve to installer in lazyos --symlinks"
+	fi
+
+	_inst_check="$(lazyos installer --check 2>&1 || true)"
+	case "$_inst_check" in
+		ok:*|unsafe:*)
+			ok "lazyos installer --check evaluates hardware & disk safety ($_inst_check)"
+			;;
+		*)
+			fail "lazyos installer --check failed or returned unexpected output: $_inst_check"
+			;;
+	esac
+else
+	skip "lazyos binary not installed: installer checks skipped"
+fi
+
 _install=""
-for _c in rsync parted cgpt depthchargectl mkfs.ext2 mkfs.ext4 blkid blockdev \
-	partx flock setsid; do
+for _c in rsync parted cgpt depthchargectl mkfs.ext2 mkfs.ext4 blkid blockdev partx; do
 	have "$_c" || _install="$_install $_c"
 done
-for _s in rofi-install lazyos-install-run lazyos-install-log; do
-	[ -x "$HOME/.config/bin/$_s" ] || _install="$_install bin/$_s"
-done
 if [ -z "$_install" ]; then
-	ok "install to the internal disk complete (rsync, parted, cgpt, depthchargectl, and the menu with its runner)"
+	ok "installer backend utilities available (rsync, parted, cgpt, depthchargectl, mkfs)"
 else
-	fail "install to the internal disk incomplete:$_install (the menu refuses, or the write stops halfway)"
+	fail "installer utilities incomplete:$_install"
 fi
 
-# The delegation is the safety, so it is asked of the file and not assumed: the
-# runner must call the installer with the CONFIRM the menu collected, and it must
-# not carry a partitioning, filesystem or copy command of its own - it is allowed
-# to prepare (stop udisks2, unmount) and to read the disk back, nothing else.
-if [ -r "$HOME/.config/bin/lazyos-install-run" ]; then
-	if grep -qs 'install-emmc.sh' "$HOME/.config/bin/lazyos-install-run" &&
-		grep -qs 'CONFIRM=yes' "$HOME/.config/bin/lazyos-install-run"; then
-		ok "the install runner delegates to scripts/install-emmc.sh with CONFIRM=yes"
-	else
-		fail "bin/lazyos-install-run no longer calls scripts/install-emmc.sh with CONFIRM=yes: the copy is not the one that is known to boot"
-	fi
-	_verbs=""
-	for _v in parted mkfs cgpt rsync dd; do
-		grep -qsE "(^|[^[:alnum:]_])$_v([^[:alnum:]_]|$)" "$HOME/.config/bin/lazyos-install-run" &&
-			_verbs="$_verbs $_v"
-	done
-	if [ -z "$_verbs" ]; then
-		ok "the install runner carries no partitioning, filesystem or copy command of its own"
-	else
-		fail "bin/lazyos-install-run contains$_verbs: the install has to be scripts/install-emmc.sh's, not a second one"
-	fi
-fi
-
-# The last gate is typed, and the order of the two lines is what says so: Enter
-# on a list row is exactly the gesture that must not erase a disk, so the menu
-# has to ask for the target's name (bar-pick -free) and compare it before it
-# starts the runner.
-_gate=missing
-if [ -r "$HOME/.config/bin/rofi-install" ]; then
-	_gate=$(awk '
-		/bar-pick/ && !asked { asked = NR }
-		/setsid.*lazyos-install-run/ && !started { started = NR }
-		END {
-			if (!asked || !started) print "missing"
-			else print (asked < started ? "before" : "after")
-		}' "$HOME/.config/bin/rofi-install")
-fi
-case $_gate in
-before) ok "the install menu asks for the disk's name typed in full before it starts the runner" ;;
-*) fail "bin/rofi-install: the typed confirmation is $_gate the runner start (or one of the two is gone)" ;;
-esac
-
-# The root menu is the documented way in (the launcher entry is the second copy),
-# and the log window is the only place the write's record can be read: the runner
-# is detached, so no terminal outlives the menu that started it.  The row *text*
-# is what is asked for, not the `case` arm: an arm whose row is gone leaves a menu
-# that looks unchanged and an install nobody can reach (the dead-row check below
-# covers the opposite direction).
 menu_label 'Install LazyOS' && menu_runs rofi-install &&
 	ok "root menu has the Install LazyOS row" ||
-	fail "the root menu has no Install LazyOS row: the install menu is only reachable by typing its name"
-if grep -qs -- '--app-id=lazyos-install' "$HOME/.config/bin/lazyos-install-log" 2>/dev/null; then
-	if grep -qs 'app_id="lazyos-install"' /etc/sway/config.d/31-install.conf 2>/dev/null; then
-		ok "the install log opens in a floated foot window (app-id lazyos-install)"
-	else
-		warn "config.d/31-install.conf is missing or does not match app_id lazyos-install: the log opens tiled"
-	fi
-else
-	fail "bin/lazyos-install-log lost --app-id=lazyos-install: its window cannot be matched or floated"
-fi
+	fail "the root menu has no Install LazyOS row"
+
 [ -r /usr/share/icons/LazyOS/48x48/apps/system-software-install.png ] &&
 	ok "the install icon is in the LazyOS theme (system-software-install)" ||
 	warn "the LazyOS theme has no system-software-install.png: the launcher row and the install card have no picture"
