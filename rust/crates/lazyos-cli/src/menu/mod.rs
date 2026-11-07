@@ -227,6 +227,7 @@ pub fn spawn_detached(argv: &[String], home: &str) -> io::Result<()> {
     let mut command = Command::new(program);
     command
         .args(args)
+        .env_remove("LAZYOS_UI")
         .current_dir(home)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
