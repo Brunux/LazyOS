@@ -237,7 +237,7 @@ pub fn menu(
 
     for agent in AGENTS {
         let installed = is_installed(agent.binary);
-        let is_default = def_agent.map_or(false, |d| d.binary == agent.binary);
+        let is_default = def_agent.is_some_and(|d| d.binary == agent.binary);
         let mark = if is_default { "● " } else { "  " };
 
         if installed {
@@ -477,7 +477,7 @@ pub fn menu(
                     } else if let Some(acc) = chosen.strip_prefix("use:") {
                         let _ = fs::write(dir.join("default"), acc);
                         say(
-                            &agent.name,
+                            agent.name,
                             format!("default account: {acc}"),
                             Urgency::Normal,
                             Glyph::People,

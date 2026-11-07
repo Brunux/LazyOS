@@ -324,7 +324,7 @@ pub fn menu(
         act if act.starts_with("ap:") => {
             let ssid = &act[3..];
             let target_ap = aps.iter().find(|a| a.ssid == ssid);
-            let is_open = target_ap.map_or(false, |a| a.security.is_empty() || a.security == "--");
+            let is_open = target_ap.is_some_and(|a| a.security.is_empty() || a.security == "--");
             let has_saved = has_saved_connection(ssid);
 
             if has_saved || is_open {
