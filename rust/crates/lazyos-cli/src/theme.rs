@@ -87,7 +87,7 @@ fn usage() -> i32 {
     EXIT_USAGE
 }
 
-fn theme(slug: &str) -> Result<Theme, String> {
+pub fn theme(slug: &str) -> Result<Theme, String> {
     let text = builtin::get(slug).ok_or_else(|| {
         format!(
             "'{slug}' is not a theme: {}",
@@ -253,21 +253,13 @@ fn next(paths: &Paths, rest: &[&str]) -> i32 {
     set(paths, &args)
 }
 
-fn set(paths: &Paths, args: &[&str]) -> i32 {
-    let force = args.contains(&"--force");
-    let headless = args.contains(&"--headless");
-    let Some(slug) = args.iter().find(|arg| !arg.starts_with("--")) else {
-        eprintln!("lazyos theme set: which theme?");
-        return usage();
-    };
-    let slug = *slug;
-    let theme = match theme(slug) {
-        Ok(theme) => theme,
-        Err(error) => {
-            eprintln!("lazyos theme set: {error}");
-            return EXIT_USAGE;
-        }
-    };
+pub fn apply_theme(
+    paths: &Paths,
+    slug: &str,
+    force: bool,
+    headless: bool,
+) -> Result<(Theme, usize, usize), String> {
+    let theme = theme(slug)?;
 
     // Generate the wallpaper and thumbnail for the theme (spec 013).
     let _ = wallpaper::get_or_generate(
@@ -306,28 +298,50 @@ fn set(paths: &Paths, args: &[&str]) -> i32 {
         }
     }
     if failed > 0 {
-        return EXIT_FAILED;
+        return Err("one or more surfaces failed to install".to_string());
     }
     if !edited.is_empty() {
-        eprintln!(
-            "lazyos theme: {} file(s) left alone: {}. Re-run with --force to replace them.",
+        return Err(format!(
+            "{} file(s) left alone: {}. Re-run with --force to replace them.",
             edited.len(),
             edited.join(", ")
-        );
-        return EXIT_NOTHING;
+        ));
     }
     if let Err(error) = store::set_active(paths, slug) {
-        eprintln!("lazyos theme: {error}");
-        return EXIT_FAILED;
+        return Err(error);
     }
-    say!(
-        "{slug}\t{}\t{written} written, {unchanged} unchanged",
-        theme.name
-    );
     if !headless {
         reload();
     }
-    EXIT_OK
+    Ok((theme, written, unchanged))
+}
+
+fn set(paths: &Paths, args: &[&str]) -> i32 {
+    let force = args.contains(&"--force");
+    let headless = args.contains(&"--headless");
+    let Some(slug) = args.iter().find(|arg| !arg.starts_with("--")) else {
+        eprintln!("lazyos theme set: which theme?");
+        return usage();
+    };
+    let slug = *slug;
+    match apply_theme(paths, slug, force, headless) {
+        Ok((theme, written, unchanged)) => {
+            say!(
+                "{slug}\t{}\t{written} written, {unchanged} unchanged",
+                theme.name
+            );
+            EXIT_OK
+        }
+        Err(error) => {
+            if error.contains("file(s) left alone") {
+                eprintln!("lazyos theme: {error}");
+                EXIT_NOTHING
+            } else {
+                eprintln!("lazyos theme set: {error}");
+                EXIT_FAILED
+            }
+        }
+    }
 }
 
 /// Asks the session to pick the new files up.
@@ -336,7 +350,7 @@ fn set(paths: &Paths, args: &[&str]) -> i32 {
 /// re-runs the `exec` lines that read a palette), waybar re-reads its stylesheet
 /// on SIGUSR2 and mako on `makoctl reload`. A missing program is a line, not a
 /// failure - a theme set over ssh has nothing to reload.
-fn reload() {
+pub fn reload() {
     if std::env::var("WAYLAND_DISPLAY").is_err() {
         return;
     }
@@ -443,26 +457,21 @@ fn render_into(args: &[&str]) -> i32 {
     EXIT_OK
 }
 
-/// The wallpaper half of `Alt+Shift+W`: the next name in the active theme's
-/// list, written through the same surface so it is regenerated and recorded.
-pub fn wallpaper_next(paths: &Paths) -> i32 {
-    let Some(slug) = store::active(paths) else {
-        eprintln!("lazyos theme: no theme is active");
-        return EXIT_NOTHING;
+/// Cycle the wallpaper for `for_slug` (or active theme if None).
+pub fn cycle_wallpaper_for(
+    paths: &Paths,
+    for_slug: Option<&str>,
+) -> Result<(String, &'static str), String> {
+    let slug = match for_slug {
+        Some(s) => s.to_string(),
+        None => store::active(paths).ok_or_else(|| "no theme is active".to_string())?,
     };
-    let theme = match theme(&slug) {
-        Ok(theme) => theme,
-        Err(error) => {
-            eprintln!("lazyos theme: {error}");
-            return EXIT_FAILED;
-        }
-    };
+    let theme = theme(&slug)?;
     if theme.wallpapers.len() < 2 {
-        eprintln!(
-            "lazyos theme: {} names one wallpaper, so there is nothing to cycle",
+        return Err(format!(
+            "{} names one wallpaper, so there is nothing to cycle",
             theme.name
-        );
-        return EXIT_NOTHING;
+        ));
     }
     let state = paths.state.join("wallpaper");
     let current = std::fs::read_to_string(&state).unwrap_or_default();
@@ -483,15 +492,27 @@ pub fn wallpaper_next(paths: &Paths) -> i32 {
         .iter()
         .find(|surface| surface.name == "sway")
         .expect("the wallpaper surface is in the table");
-    match store::install(paths, surface, &theme, &slug, true) {
-        Ok(_) => {}
+    store::install(paths, surface, &theme, &slug, true)?;
+    let _ = std::fs::write(&state, &theme.wallpapers[0]);
+    reload();
+    Ok((theme.wallpapers[0].clone(), surface.name))
+}
+
+/// The wallpaper half of `Alt+Shift+W`: the next name in the active theme's
+/// list, written through the same surface so it is regenerated and recorded.
+pub fn wallpaper_next(paths: &Paths) -> i32 {
+    match cycle_wallpaper_for(paths, None) {
+        Ok((wp, surf)) => {
+            say!("{wp}\t{surf}");
+            EXIT_OK
+        }
         Err(error) => {
             eprintln!("lazyos theme: {error}");
-            return EXIT_FAILED;
+            if error.contains("no theme is active") || error.contains("names one wallpaper") {
+                EXIT_NOTHING
+            } else {
+                EXIT_FAILED
+            }
         }
     }
-    let _ = std::fs::write(&state, &theme.wallpapers[0]);
-    say!("{}\t{}", theme.wallpapers[0], surface.name);
-    reload();
-    EXIT_OK
 }

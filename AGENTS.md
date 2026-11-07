@@ -239,6 +239,17 @@ yet present in `scripts/` as not implemented.
   regenerates them, like `make-icons.sh`. Two surfaces stay hand-written on purpose: the
   screensaver's profile (it carries the brand's cyan) and the GTK stylesheets (they are the
   session's, not a terminal's palette).
+- **Interactive theme selection is a zero-friction dual-pane TUI with live preview**
+  (`lazyos menu theme`, `rofi-theme`, `Alt+Shift+C`). Replaces blind terminal cycling with
+  an instant visual browser in `Shape::Task`: the left pane filters themes with case-folded
+  search, marking the active theme (`●`/`○`), while the right pane renders live memory-cached
+  previews — 16 ANSI truecolor terminal swatches, semantic role pills (`accent`, `surface`,
+  `border`, `ok`, `warn`, `danger`), simulated LazyOS desktop surfaces (mini Waybar status strip,
+  framed notification card, Starship prompt), and real-time WCAG 2.1 contrast verification.
+  Zero friction: Enter commits and reloads the session, `w` cycles wallpapers, and `p` / `Space`
+  toggles a live desktop peek (temporarily applying the palette to all active windows with safe,
+  automatic rollback on Escape). Headless query flags (`--list`, `--current`, `--rows`) serve scripts
+  and `check-system.sh` witnesses.
 - **A menu row is an enum action, never a shell string, and the root menu is that table** (spec
   007). `lazyos-cli/src/menu/table.rs` is `bar-menu` as data - its 43 rows (spec 016's *Local
   model* among them), its four groups (`open`, `ai`, `system`, `session`) and its order, plus

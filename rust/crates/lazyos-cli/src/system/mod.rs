@@ -124,6 +124,7 @@ pub mod settings;
 pub mod ssh;
 pub mod step;
 pub mod swap;
+pub mod theme_picker;
 pub mod translate;
 pub mod tz;
 pub mod vnc;
