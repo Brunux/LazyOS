@@ -233,12 +233,21 @@ impl Screen for PkgScreen {
                     ctx.design.style(TextStyle::Title),
                 );
                 let x = filter.x + 1 + Glyph::Search.cell().len() as u16;
-                ctx.buf.set_string(
-                    x,
-                    filter.y,
-                    "search packages...",
-                    ctx.design.style(TextStyle::Dim),
-                );
+                if self.input.text().is_empty() {
+                    ctx.buf.set_string(
+                        x,
+                        filter.y,
+                        "search packages...",
+                        ctx.design.style(TextStyle::Dim),
+                    );
+                } else {
+                    ctx.buf.set_string(
+                        x,
+                        filter.y,
+                        self.input.text(),
+                        ctx.design.style(TextStyle::Body),
+                    );
+                }
                 self.rows_height.set(rows.height);
                 self.list.render(rows, ctx.buf, ctx.design, true);
             }
@@ -251,12 +260,17 @@ impl Screen for PkgScreen {
                     ctx.design.style(TextStyle::Title),
                 );
                 let x = filter.x + 1 + Glyph::Search.cell().len() as u16;
-                ctx.buf.set_string(
-                    x,
-                    filter.y,
-                    &format!("results for \"{}\" · Enter installs", self.query),
-                    ctx.design.style(TextStyle::Dim),
-                );
+                let msg = if self.input.text().is_empty() {
+                    format!("results for \"{}\" · Enter installs", self.query)
+                } else {
+                    format!(
+                        "results for \"{}\" (filter: {}) · Enter installs",
+                        self.query,
+                        self.input.text()
+                    )
+                };
+                ctx.buf
+                    .set_string(x, filter.y, &msg, ctx.design.style(TextStyle::Dim));
                 self.rows_height.set(rows.height);
                 self.list.render(rows, ctx.buf, ctx.design, true);
             }

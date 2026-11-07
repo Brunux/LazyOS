@@ -193,6 +193,15 @@ impl Screen for EmojiScreen {
         }
     }
 
+    fn click(&mut self, row: Option<usize>) -> Outcome {
+        if let Some(r) = row {
+            self.list.set_cursor(r);
+            self.insert_emoji(r, false)
+        } else {
+            Outcome::Continue
+        }
+    }
+
     fn hit(&self, area: Rect, x: u16, y: u16, design: &Design) -> Option<usize> {
         let (_, rows) = super::pick::list_layout(area);
         self.list.hit_row(rows, x, y, design)
@@ -237,37 +246,13 @@ impl EmojiScreen {
                 lazyos_ui::Urgency::Normal,
                 Glyph::Smile,
             );
-        } else if have("wtype") {
-            let wtype_ok = std::process::Command::new("wtype")
-                .args(["-M", "shift", "-k", "Insert", "-m", "shift"])
-                .stdin(std::process::Stdio::null())
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false);
-            if wtype_ok {
-                // Success, inserted
-            } else {
-                say(
-                    "Emoji",
-                    format!(
-                        "{} copied · this window takes no virtual keyboard, paste it yourself",
-                        glyph
-                    ),
-                    lazyos_ui::Urgency::Normal,
-                    Glyph::Smile,
-                );
-            }
+            Outcome::Done(lazyos_ui::app::exit::OK)
         } else {
-            say(
-                "Emoji",
-                format!("{} copied · wtype not available, paste it yourself", glyph),
-                lazyos_ui::Urgency::Normal,
-                Glyph::Smile,
+            crate::system::spawn_detached(
+                "sleep 0.15; if command -v wtype >/dev/null 2>&1; then wtype -M shift -k Insert -m shift; fi",
             );
+            Outcome::Done(lazyos_ui::app::exit::OK)
         }
-        Outcome::Continue
     }
 
     fn list_layout(area: Rect) -> (Rect, Rect) {

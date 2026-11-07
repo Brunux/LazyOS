@@ -193,9 +193,10 @@ pub fn menu_for_path(
             } else {
                 &parent
             };
-            let _ = Command::new("foot")
-                .args(["--working-directory", dir.to_str().unwrap_or(".")])
-                .spawn();
+            crate::system::spawn_detached(&format!(
+                "exec foot --working-directory '{}'",
+                dir.display()
+            ));
             Ok(0)
         }
         "du" => {
@@ -312,27 +313,18 @@ pub fn menu_for_path(
         }
         "convert" => {
             let out_file = parent.join(format!("{}-converted.mp4", base));
-            let _ = Command::new("ffmpeg")
-                .args([
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-y",
-                    "-i",
-                    target.to_str().unwrap_or(""),
-                    "-c:v",
-                    "libx264",
-                    "-crf",
-                    "23",
-                    "-preset",
-                    "veryfast",
-                    "-c:a",
-                    "aac",
-                    "-b:a",
-                    "160k",
-                    out_file.to_str().unwrap_or(""),
-                ])
-                .spawn();
+            let escaped_target = target.display().to_string().replace('\'', "'\\''");
+            let escaped_out = out_file.display().to_string().replace('\'', "'\\''");
+            let escaped_base = base.replace('\'', "'\\''");
+            let cmd = format!(
+                "ffmpeg -hide_banner -loglevel error -y -i '{escaped_target}' -c:v libx264 -crf 23 -preset veryfast -c:a aac -b:a 160k '{escaped_out}' 2>&1; \
+                if [ $? -eq 0 ]; then \
+                    lazyos notify send --app Convert --title 'Conversion complete' --body '{escaped_base}' --glyph video; \
+                else \
+                    lazyos notify send --app Convert --title 'Conversion failed' --body '{escaped_base}' --glyph video --urgency critical; \
+                fi"
+            );
+            crate::system::spawn_detached(&cmd);
             say(
                 "Convert",
                 format!("Converting {base} in background…"),

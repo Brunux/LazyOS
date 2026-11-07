@@ -163,9 +163,11 @@ pub fn launch(agent: &AgentDef, account: Option<&str>) {
         cwd.display(),
         agent.binary
     );
-    let _ = Command::new("foot")
-        .args(["-T", &title, "-e", "bash", "-lc", &script])
-        .spawn();
+    let escaped_title = title.replace('\'', "'\\''");
+    let escaped_script = script.replace('\'', "'\\''");
+    crate::system::spawn_detached(&format!(
+        "exec foot -T '{escaped_title}' -e bash -lc '{escaped_script}'"
+    ));
 }
 
 /// Execute CLI query modes.
@@ -305,14 +307,10 @@ pub fn menu(
             } else {
                 PathBuf::from(home)
             };
-            let _ = Command::new("foot")
-                .args([
-                    "-T",
-                    "Work",
-                    "--working-directory",
-                    cwd.to_str().unwrap_or("."),
-                ])
-                .spawn();
+            crate::system::spawn_detached(&format!(
+                "exec foot -T Work --working-directory '{}'",
+                cwd.display()
+            ));
             Ok(0)
         }
         "default" => {
@@ -381,16 +379,11 @@ pub fn menu(
                     "npm install -g --prefix \"$HOME/.local\" --allow-scripts='{npm}' '{npm}' && echo && echo \"{} is in ~/.local/bin; ready.\" && read -r _",
                     agent.name
                 );
-                let _ = Command::new("foot")
-                    .args([
-                        "-T",
-                        &format!("Install {}", agent.name),
-                        "-e",
-                        "bash",
-                        "-lc",
-                        &cmd,
-                    ])
-                    .spawn();
+                let escaped_cmd = cmd.replace('\'', "'\\''");
+                crate::system::spawn_detached(&format!(
+                    "exec foot -T 'Install {}' -e bash -lc '{escaped_cmd}'",
+                    agent.name
+                ));
             }
             Ok(0)
         }

@@ -230,25 +230,23 @@ pub fn menu(
 
     match key.as_str() {
         "action:swap" => {
-            let _ = Command::new("lazyos").args(["menu", "swap"]).status();
+            crate::system::spawn_detached("exec lazyos menu swap");
             Ok(0)
         }
         "action:format" => {
-            let _ = Command::new("lazyos").args(["menu", "format"]).status();
+            crate::system::spawn_detached("exec lazyos menu format");
             Ok(0)
         }
         k if k.starts_with("term:") => {
             let path = &k[5..];
-            let _ = Command::new("foot")
-                .args(["--working-directory", path])
-                .spawn();
+            let escaped = path.replace('\'', "'\\''");
+            crate::system::spawn_detached(&format!("exec foot --working-directory '{escaped}'"));
             Ok(0)
         }
         k if k.starts_with("open:") => {
             let path = &k[5..];
-            let _ = Command::new("lazyos")
-                .args(["menu", "files", path])
-                .status();
+            let escaped = path.replace('\'', "'\\''");
+            crate::system::spawn_detached(&format!("exec lazyos menu files '{escaped}'"));
             Ok(0)
         }
         k if k.starts_with("mount:") => {
@@ -262,7 +260,10 @@ pub fn menu(
                     // "Mounted /dev/sda1 at /run/media/user/LABEL."
                     if let Some(pos) = text.rfind(" at ") {
                         let mp = text[pos + 4..].trim().trim_end_matches('.');
-                        let _ = Command::new("lazyos").args(["menu", "files", mp]).status();
+                        let escaped = mp.replace('\'', "'\\''");
+                        crate::system::spawn_detached(&format!(
+                            "exec lazyos menu files '{escaped}'"
+                        ));
                     } else {
                         say("Places", "Device mounted", Urgency::Normal, Glyph::Disk);
                     }

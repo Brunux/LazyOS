@@ -177,16 +177,19 @@ pub fn run_translate() -> i32 {
 
         if translated.len() > 400 || translated.lines().count() > 3 {
             // Open floated viewer
-            let _ = Command::new("foot")
-                .args([
-                    "--app-id=popup",
-                    "-T",
-                    &title,
-                    "-e",
-                    "bat",
-                    "--paging=always",
-                ])
-                .spawn();
+            let runtime_dir =
+                std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+            let doc = std::path::Path::new(&runtime_dir)
+                .join(format!("lazyos-translate.{}.txt", std::process::id()));
+            let content = format!("{title}\n\n{translated}\n\n── what was selected ──\n{text}\n");
+            if std::fs::write(&doc, content).is_ok() {
+                let escaped_title = title.replace('\'', "'\\''");
+                let escaped_doc = doc.display().to_string().replace('\'', "'\\''");
+                let script = format!(
+                    "exec foot --app-id=popup --title='{escaped_title}' -e sh -c 'env BAT_THEME=ansi bat --paging=always --style=plain --file-name=\"$1\" -- \"$2\"; rm -f \"$2\"' _ '{escaped_title}' '{escaped_doc}'"
+                );
+                crate::system::spawn_detached(&script);
+            }
         }
         0
     } else {

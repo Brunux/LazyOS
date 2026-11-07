@@ -108,22 +108,12 @@ pub fn show(payload: &str, title: &str) {
             let _ = f.write_all(payload.as_bytes());
         }
     }
-    let _ = std::process::Command::new("foot")
-        .args([
-            "--app-id=popup",
-            "-T",
-            title,
-            "-e",
-            "sh",
-            "-c",
-            "qrencode -t ANSIUTF8 -r \"$1\" || printf 'qrencode could not draw that\\n'; rm -f \"$1\"; printf '\\nEnter closes\\n'; IFS= read -r _ || true",
-            "sh",
-            &tmp.to_string_lossy(),
-        ])
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn();
+    let escaped_title = title.replace('\'', "'\\''");
+    let escaped_tmp = tmp.display().to_string().replace('\'', "'\\''");
+    let script = format!(
+        "exec foot --app-id=popup -T '{escaped_title}' -e sh -c 'qrencode -t ANSIUTF8 -r \"$1\" || printf \"qrencode could not draw that\\n\"; rm -f \"$1\"; printf \"\\nEnter closes\\n\"; IFS= read -r _ || true' sh '{escaped_tmp}'"
+    );
+    crate::system::spawn_detached(&script);
 }
 
 /// `lazyos menu qr --wifi` (`rofi-qr --wifi`): show the current Wi-Fi QR directly.

@@ -246,11 +246,7 @@ impl NotifyScreen {
                 let text = if n.body.is_empty() {
                     n.summary.clone()
                 } else {
-                    format!(
-                        "{}
-{}",
-                        n.summary, n.body
-                    )
+                    format!("{}\n{}", n.summary, n.body)
                 };
                 let _ = std::process::Command::new("wl-copy")
                     .arg(&text)
@@ -264,6 +260,7 @@ impl NotifyScreen {
                     lazyos_ui::Urgency::Normal,
                     Glyph::Clipboard,
                 );
+                return Outcome::Done(lazyos_ui::app::exit::OK);
             }
         } else {
             match key {

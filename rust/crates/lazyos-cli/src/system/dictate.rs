@@ -171,9 +171,9 @@ pub fn toggle() -> i32 {
                 Urgency::Normal,
                 Glyph::Mic,
             );
-            let _ = Command::new("foot")
-                .args(["-T", "Dictation · fetching model", "-e", "dictate-model"])
-                .spawn();
+            crate::system::spawn_detached(
+                "exec foot -T 'Dictation · fetching model' -e dictate-model",
+            );
             return 0;
         }
 
@@ -190,7 +190,9 @@ pub fn toggle() -> i32 {
         let _ = Command::new("playerctl").args(["-a", "pause"]).status();
         let _ = fs::remove_file(&wav_file);
 
-        let child = Command::new("parecord")
+        use std::os::unix::process::CommandExt;
+        let mut command = Command::new("parecord");
+        command
             .args([
                 "--rate=16000",
                 "--channels=1",
@@ -198,7 +200,18 @@ pub fn toggle() -> i32 {
                 "--file-format=wav",
                 wav_file.to_str().unwrap_or(""),
             ])
-            .spawn();
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setsid() < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        let child = command.spawn();
 
         match child {
             Ok(c) => {

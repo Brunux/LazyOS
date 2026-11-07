@@ -178,7 +178,7 @@ impl Screen for CalcScreen {
         }
         match key.code {
             KeyCode::Enter => {
-                let expr = self.input.text().trim().to_string();
+                let expr = self.list.filter().trim().to_string();
                 if !expr.is_empty() {
                     match Self::evaluate(&expr) {
                         Ok(result) => {
@@ -197,6 +197,8 @@ impl Screen for CalcScreen {
                                 lazyos_ui::Urgency::Normal,
                                 Glyph::Calculator,
                             );
+                            self.list.set_filter("");
+                            return Outcome::Done(lazyos_ui::app::exit::OK);
                         }
                         Err(e) => {
                             say(
@@ -205,10 +207,30 @@ impl Screen for CalcScreen {
                                 lazyos_ui::Urgency::Critical,
                                 Glyph::Calculator,
                             );
+                            return Outcome::Continue;
                         }
                     }
-                    self.input = Input::new();
-                    return Outcome::Continue;
+                } else if let Some(index) = self.list.selected_index() {
+                    if let Some(entry) = self.history.get(index) {
+                        if let Some(eq_pos) = entry.find(" = ") {
+                            let result = &entry[eq_pos + 3..];
+                            if have("wl-copy") {
+                                let _ = std::process::Command::new("wl-copy")
+                                    .arg(result)
+                                    .stdin(std::process::Stdio::null())
+                                    .stdout(std::process::Stdio::null())
+                                    .stderr(std::process::Stdio::null())
+                                    .status();
+                            }
+                            say(
+                                "Calculator",
+                                format!("{entry} · copied"),
+                                lazyos_ui::Urgency::Normal,
+                                Glyph::Calculator,
+                            );
+                            return Outcome::Done(lazyos_ui::app::exit::OK);
+                        }
+                    }
                 }
             }
             KeyCode::Esc => return Outcome::Done(lazyos_ui::app::exit::ESCAPE),
@@ -218,8 +240,22 @@ impl Screen for CalcScreen {
             ListAction::Activated(index) => {
                 if let Some(entry) = self.history.get(index) {
                     if let Some(eq_pos) = entry.find(" = ") {
-                        let past_expr = &entry[..eq_pos];
-                        self.input = Input::with_text(past_expr);
+                        let result = &entry[eq_pos + 3..];
+                        if have("wl-copy") {
+                            let _ = std::process::Command::new("wl-copy")
+                                .arg(result)
+                                .stdin(std::process::Stdio::null())
+                                .stdout(std::process::Stdio::null())
+                                .stderr(std::process::Stdio::null())
+                                .status();
+                        }
+                        say(
+                            "Calculator",
+                            format!("{entry} · copied"),
+                            lazyos_ui::Urgency::Normal,
+                            Glyph::Calculator,
+                        );
+                        return Outcome::Done(lazyos_ui::app::exit::OK);
                     }
                 }
                 Outcome::Continue
@@ -234,8 +270,22 @@ impl Screen for CalcScreen {
             if let Some(index) = self.list.selected_index() {
                 if let Some(entry) = self.history.get(index) {
                     if let Some(eq_pos) = entry.find(" = ") {
-                        let past_expr = &entry[..eq_pos];
-                        self.input = Input::with_text(past_expr);
+                        let result = &entry[eq_pos + 3..];
+                        if have("wl-copy") {
+                            let _ = std::process::Command::new("wl-copy")
+                                .arg(result)
+                                .stdin(std::process::Stdio::null())
+                                .stdout(std::process::Stdio::null())
+                                .stderr(std::process::Stdio::null())
+                                .status();
+                        }
+                        say(
+                            "Calculator",
+                            format!("{entry} · copied"),
+                            lazyos_ui::Urgency::Normal,
+                            Glyph::Calculator,
+                        );
+                        return Outcome::Done(lazyos_ui::app::exit::OK);
                     }
                 }
             }

@@ -677,13 +677,23 @@ pub fn menu(
 }
 
 fn spawn_subcommand(prog: &str, args: &[&str]) {
-    let _ = std::process::Command::new(prog)
+    use std::os::unix::process::CommandExt;
+    let mut command = std::process::Command::new(prog);
+    command
         .args(args)
         .env_remove("LAZYOS_UI")
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn();
+        .stderr(std::process::Stdio::null());
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    let _ = command.spawn();
 }
 
 fn missing(names: &[&str]) -> Option<String> {
