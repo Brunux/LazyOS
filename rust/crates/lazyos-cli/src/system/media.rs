@@ -32,7 +32,6 @@ pub struct MediaScreen {
     header: Header,
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
-    keys: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -47,7 +46,6 @@ struct Player {
 impl MediaScreen {
     pub fn new() -> Self {
         let mut screen = Self {
-            keys: Vec::new(),
             players: Vec::new(),
             list: ListState::new(),
             header: Header::new("LazyOS").subtitle("Media"),
@@ -156,7 +154,6 @@ impl MediaScreen {
                     .value("copy"),
             );
         }
-        self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
 }
@@ -224,10 +221,12 @@ impl MediaScreen {
             return Outcome::Continue;
         }
         let rows = self.list.rows();
-        if index >= rows.len() {
+        let Some(row) = rows.get(index) else {
             return Outcome::Continue;
-        }
-        let key = self.keys.get(index).cloned().unwrap_or_default();
+        };
+        let Some(key) = row.value.as_deref() else {
+            return Outcome::Continue;
+        };
         if key.is_empty() || key == "-" {
             return Outcome::Continue;
         }
@@ -257,11 +256,11 @@ impl MediaScreen {
             self.reload();
             Outcome::Continue
         } else {
-            match key.as_str() {
+            match key {
                 "play" | "pause" => {
                     for p in &self.players {
                         let _ = std::process::Command::new("playerctl")
-                            .args([key.as_str(), "-p", &p.name])
+                            .args([key, "-p", &p.name])
                             .stdin(std::process::Stdio::null())
                             .stdout(std::process::Stdio::null())
                             .stderr(std::process::Stdio::null())

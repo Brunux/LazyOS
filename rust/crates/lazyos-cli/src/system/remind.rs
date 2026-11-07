@@ -39,7 +39,6 @@ pub struct RemindScreen {
     header: Header,
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
-    keys: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -54,7 +53,6 @@ struct Reminder {
 impl RemindScreen {
     pub fn new() -> Self {
         let mut screen = Self {
-            keys: Vec::new(),
             reminders: Vec::new(),
             list: ListState::new().with_empty("no reminders waiting"),
             header: Header::new("LazyOS").subtitle("Reminders"),
@@ -252,7 +250,6 @@ impl RemindScreen {
                 .detail("say what, when, and whether it repeats")
                 .value("new"),
         );
-        self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
 }
@@ -323,10 +320,12 @@ impl Screen for RemindScreen {
 impl RemindScreen {
     fn activate(&mut self, index: usize) -> Outcome {
         let rows = self.list.rows();
-        if index >= rows.len() {
+        let Some(row) = rows.get(index) else {
             return Outcome::Continue;
-        }
-        let key = self.keys.get(index).cloned().unwrap_or_default();
+        };
+        let Some(key) = row.value.as_deref() else {
+            return Outcome::Continue;
+        };
         if key.is_empty() || key == "-" {
             return Outcome::Continue;
         }

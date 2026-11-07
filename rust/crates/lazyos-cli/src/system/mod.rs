@@ -267,6 +267,28 @@ pub fn busy_fail(tag: &str, _title: &str, message: &str, icon: &str) {
         .status();
 }
 
+/// Spawn a command detached in a new session (`setsid`), removing `LAZYOS_UI`
+/// and disconnecting stdio, so it survives terminal/foot closure and SIGHUP.
+pub fn spawn_detached(cmd: &str) {
+    use std::os::unix::process::CommandExt;
+    let mut command = std::process::Command::new("sh");
+    command
+        .args(["-c", cmd])
+        .env_remove("LAZYOS_UI")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    let _ = command.spawn();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

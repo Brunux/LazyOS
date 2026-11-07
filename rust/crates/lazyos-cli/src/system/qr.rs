@@ -35,7 +35,6 @@ pub struct QrScreen {
     header: Header,
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
-    keys: Vec<String>,
     typing: Option<Input>,
 }
 
@@ -146,7 +145,6 @@ pub fn wifi_dialog() -> i32 {
 impl QrScreen {
     pub fn new() -> Self {
         let mut screen = Self {
-            keys: Vec::new(),
             wifi_detail: "not connected".to_string(),
             wifi_colour: lazyos_ui::ColorRole::Dim,
             list: ListState::new(),
@@ -202,7 +200,6 @@ impl QrScreen {
                 .detail("type it, and it becomes a code")
                 .value("text"),
         );
-        self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
 
@@ -321,14 +318,16 @@ impl Screen for QrScreen {
 impl QrScreen {
     fn activate(&mut self, index: usize) -> Outcome {
         let rows = self.list.rows();
-        if index >= rows.len() {
+        let Some(row) = rows.get(index) else {
             return Outcome::Continue;
-        }
-        let key = self.keys.get(index).cloned().unwrap_or_default();
+        };
+        let Some(key) = row.value.as_deref() else {
+            return Outcome::Continue;
+        };
         if key.is_empty() || key == "-" {
             return Outcome::Continue;
         }
-        match key.as_str() {
+        match key {
             "wifi" => {
                 self.wifi_qr();
                 Outcome::Done(lazyos_ui::app::exit::OK)
@@ -385,16 +384,7 @@ mod tests {
 
     #[test]
     fn text_row_opens_input_and_esc_returns_to_list() {
-        let mut screen = QrScreen {
-            keys: vec!["wifi".into(), "text".into()],
-            wifi_detail: "not connected".into(),
-            wifi_colour: lazyos_ui::ColorRole::Dim,
-            list: ListState::new(),
-            header: Header::new("LazyOS").subtitle("QR code"),
-            keybar: Vec::new(),
-            rows_height: Cell::new(20),
-            typing: None,
-        };
+        let mut screen = QrScreen::new();
         screen.build_rows();
         assert_eq!(screen.activate(1), Outcome::Consumed);
         assert!(screen.typing.is_some());
