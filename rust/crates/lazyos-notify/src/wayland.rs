@@ -158,6 +158,12 @@ impl WaylandState {
             self.renderer.render(&mut pixmap, &mut self.notifications);
         }
 
+        // tiny-skia outputs RGBA in memory. Wayland wl_shm::Format::Argb8888 on little-endian
+        // is BGRA in memory. Swap Red (byte 0) and Blue (byte 2) so displayed colors match exactly.
+        for pixel in data.chunks_exact_mut(4) {
+            pixel.swap(0, 2);
+        }
+
         let _ = file.write_all_at(&data, 0);
 
         // Update input region around cards only
