@@ -12,10 +12,11 @@ pub const OSD_WIDTH: f32 = 280.0;
 pub const OSD_HEIGHT: f32 = 44.0;
 pub const CARD_WIDTH: f32 = 340.0;
 pub const CARD_SPACING: f32 = 8.0;
-pub const CORNER_RADIUS: f32 = 8.0;
+pub const CORNER_RADIUS: f32 = 6.0;
 
 pub struct CardTheme {
     pub bg: Color,
+    #[allow(dead_code)]
     pub bg_elevated: Color,
     pub border_subtle: Color,
     pub text_bright: Color,
@@ -32,11 +33,11 @@ pub struct CardTheme {
 impl Default for CardTheme {
     fn default() -> Self {
         Self {
-            bg: Color::from_rgba8(0, 43, 54, 230),
-            bg_elevated: Color::from_rgba8(7, 54, 66, 240),
-            border_subtle: Color::from_rgba8(88, 110, 117, 50),
-            text_bright: Color::from_rgba8(253, 246, 227, 255),
-            text_body: Color::from_rgba8(147, 161, 161, 255),
+            bg: Color::from_rgba8(7, 54, 66, 204),       // Waybar button background: rgba(surface, 0.80)
+            bg_elevated: Color::from_rgba8(9, 64, 76, 220),
+            border_subtle: Color::from_rgba8(9, 64, 76, 230), // Waybar button border: 1px solid rgba(hover, 0.90)
+            text_bright: Color::from_rgba8(42, 161, 152, 255), // Penguin icon color on the bar: accent
+            text_body: Color::from_rgba8(147, 161, 161, 220),
             text_dim: Color::from_rgba8(101, 123, 131, 255),
             accent: Color::from_rgba8(42, 161, 152, 255),
             danger: Color::from_rgba8(220, 50, 47, 255),
@@ -64,17 +65,18 @@ impl CardTheme {
 
     pub fn from_theme(theme: &lazyos_theme::Theme) -> Self {
         let r = theme.roles();
-        let c = &theme.colors;
         let to_color = |hex: lazyos_theme::Hex, a: u8| {
             Color::from_rgba8(hex.0.r, hex.0.g, hex.0.b, a)
         };
 
         Self {
-            bg: to_color(c.background, 230),
-            bg_elevated: to_color(r.surface, 240),
-            border_subtle: to_color(r.border, 50),
-            text_bright: to_color(r.text, 255),
-            text_body: to_color(r.text, 210),
+            // Button on Waybar: background rgba(surface, 0.80), border 1px solid rgba(hover, 0.90)
+            bg: to_color(r.surface, 204),
+            bg_elevated: to_color(r.hover, 220),
+            border_subtle: to_color(r.hover, 230),
+            // Font color matches the penguin on the bar: accent
+            text_bright: to_color(r.accent, 255),
+            text_body: to_color(r.text, 220),
             text_dim: to_color(r.dim, 255),
             accent: to_color(r.accent, 255),
             danger: to_color(r.danger, 255),
@@ -269,17 +271,17 @@ impl Renderer {
 
         notif.close_rect = None;
 
-        // 1. Background
+        // 1. Background (matching Waybar #custom-menu button: rgba(surface, 0.80))
         let mut bg_builder = PathBuilder::new();
         Self::add_rounded_rect(&mut bg_builder, card_x, card_y, card_w, card_h, CORNER_RADIUS);
         if let Some(bg_path) = bg_builder.finish() {
             let mut paint = Paint::default();
-            paint.set_color(self.theme.bg_elevated);
+            paint.set_color(self.theme.bg);
             paint.anti_alias = true;
             pixmap.fill_path(&bg_path, &paint, FillRule::Winding, Transform::identity(), None);
         }
 
-        // 2. Subtle 1px border - no color
+        // 2. Button border matching Waybar #custom-menu (1px solid rgba(hover, 0.90))
         let mut border_builder = PathBuilder::new();
         Self::add_rounded_rect(
             &mut border_builder,
@@ -308,7 +310,7 @@ impl Renderer {
         let is_brightness = notif.summary.to_lowercase().contains("brightness")
             || notif.app_icon.contains("brightness");
 
-        // 4. Vector glyph
+        // 4. Vector glyph in penguin accent color
         let icon_glyph = if is_brightness {
             "\u{f522}" // brightness
         } else if is_muted {
@@ -333,7 +335,7 @@ impl Renderer {
             false,
         );
 
-        // 5. Title & Value
+        // 5. Title & Value in console font (JetBrains Mono) and penguin accent color
         let content_x = card_x + 36.0;
         let right_margin = card_x + card_w - 14.0;
 
@@ -342,9 +344,9 @@ impl Renderer {
             &notif.summary,
             content_x,
             card_y + 17.0,
-            11.5,
+            12.0,
             self.theme.text_bright,
-            true,
+            false,
         );
 
         let val_str = if is_muted {
@@ -357,7 +359,7 @@ impl Renderer {
             "0%".to_string()
         };
 
-        let val_w = self.font.measure_width(&val_str, 11.5, true);
+        let val_w = self.font.measure_width(&val_str, 12.0, false);
         let val_color = if is_muted {
             self.theme.danger
         } else {
@@ -369,9 +371,9 @@ impl Renderer {
             &val_str,
             right_margin - val_w,
             card_y + 17.0,
-            11.5,
+            12.0,
             val_color,
-            true,
+            false,
         );
 
         // 6. Sleek level pill track
@@ -425,21 +427,22 @@ impl Renderer {
         let card_w = notif.card_bounds.w;
         let card_h = notif.card_bounds.h;
 
-        // 1. Background
+        // 1. Background (matching Waybar #custom-menu button: rgba(surface, 0.80))
         let mut bg_builder = PathBuilder::new();
         Self::add_rounded_rect(&mut bg_builder, card_x, card_y, card_w, card_h, CORNER_RADIUS);
         if let Some(bg_path) = bg_builder.finish() {
             let mut paint = Paint::default();
-            paint.set_color(if notif.is_hovered {
+            let bg_color = if notif.is_hovered {
                 self.theme.bg_elevated
             } else {
                 self.theme.bg
-            });
+            };
+            paint.set_color(bg_color);
             paint.anti_alias = true;
             pixmap.fill_path(&bg_path, &paint, FillRule::Winding, Transform::identity(), None);
         }
 
-        // 2. Subtle 1px border - no color
+        // 2. Button border matching Waybar #custom-menu (1px solid rgba(hover, 0.90))
         let mut border_builder = PathBuilder::new();
         Self::add_rounded_rect(
             &mut border_builder,
@@ -542,12 +545,12 @@ impl Renderer {
             cur_y + 9.0,
             9.5,
             self.theme.text_dim,
-            true,
+            false,
         );
 
         cur_y += 15.0;
 
-        // Summary (Title)
+        // Summary (Title in penguin accent color)
         self.font.draw_text(
             pixmap,
             &notif.summary,
@@ -555,7 +558,7 @@ impl Renderer {
             cur_y + 11.0,
             12.0,
             self.theme.text_bright,
-            true,
+            false,
         );
 
         cur_y += 16.0;

@@ -43,6 +43,8 @@ impl FontRenderer {
         for path in paths {
             if let Ok(bytes) = std::fs::read(path) {
                 if let Ok(font) = Font::from_bytes(bytes, FontSettings::default()) {
+                    #[cfg(test)]
+                    println!("Successfully loaded font from: {path}");
                     return Some(font);
                 }
             }
@@ -51,13 +53,16 @@ impl FontRenderer {
     }
 
     pub fn pick_font(&self, ch: char, bold: bool) -> Option<&Font> {
-        if self
-            .symbols
-            .as_ref()
-            .is_some_and(|f| f.lookup_glyph_index(ch) != 0)
-        {
-            return self.symbols.as_ref();
+        // For private-use codepoints (Nerd Font icon symbols), check symbol font first
+        if ch >= '\u{e000}' {
+            if let Some(ref f) = self.symbols {
+                if f.lookup_glyph_index(ch) != 0 {
+                    return Some(f);
+                }
+            }
         }
+
+        // For console text characters, use JetBrains Mono (bold or regular)
         if bold {
             if let Some(ref f) = self.bold {
                 if f.lookup_glyph_index(ch) != 0 {
@@ -70,9 +75,16 @@ impl FontRenderer {
                 return Some(f);
             }
         }
-        self.bold
+
+        if let Some(ref f) = self.symbols {
+            if f.lookup_glyph_index(ch) != 0 {
+                return Some(f);
+            }
+        }
+
+        self.regular
             .as_ref()
-            .or(self.regular.as_ref())
+            .or(self.bold.as_ref())
             .or(self.symbols.as_ref())
     }
 
@@ -217,5 +229,27 @@ impl FontRenderer {
         }
 
         cur_x
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_font_picking() {
+        let renderer = FontRenderer::new();
+        assert!(renderer.regular.is_some(), "regular font must be loaded");
+        assert!(renderer.bold.is_some(), "bold font must be loaded");
+        assert!(renderer.symbols.is_some(), "symbols font must be loaded");
+
+        // Verify ASCII text resolves to regular / bold console font
+        let font_a = renderer.pick_font('A', false);
+        assert!(font_a.is_some());
+        assert_ne!(renderer.regular.as_ref().unwrap().lookup_glyph_index('A'), 0);
+
+        // Verify symbol icon resolves to symbols font
+        let icon_font = renderer.pick_font('\u{eb75}', false);
+        assert!(icon_font.is_some());
     }
 }

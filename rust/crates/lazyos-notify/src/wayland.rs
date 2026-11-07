@@ -83,7 +83,9 @@ impl WaylandState {
 
         layer_surface
             .set_anchor(zwlr_layer_surface_v1::Anchor::Top | zwlr_layer_surface_v1::Anchor::Right);
-        layer_surface.set_margin(46, 12, 0, 0);
+        // Waybar exclusive zone is 30px. Margin top 16px places the notification at y = 46px,
+        // and margin right 12px places it at right = 12px, aligning precisely with Sway window corner.
+        layer_surface.set_margin(16, 12, 0, 0);
         layer_surface
             .set_keyboard_interactivity(zwlr_layer_surface_v1::KeyboardInteractivity::None);
         layer_surface.set_size(w, h);
