@@ -389,7 +389,23 @@ yet present in `scripts/` as not implemented.
 
 - **The final 9 rofi surfaces migrate into `lazyos menu`** (spec 017: `net`, `places`, `clean`, `kill`, `download`, `layout`, `file-actions`, `agents`, `translate`), completing the rofi replacement plan before spec 014 ledger closure.
 
-- **The eMMC installer is a standalone TUI wizard in `lazyos`, not a rofi prompt** (spec 018). It replaces `rofi-install`, `lazyos-install-run`, and `lazyos-install-log`. It guides the user through account creation, password confirmation, timezone selection, strict host eMMC safety gates, and live progress bars with TaskView log streaming, resolving `~/.config/bin/rofi-install` as a compatibility symlink to `/usr/bin/lazyos`.
+- **The eMMC installer is a standalone TUI wizard in `lazyos`, not a rofi prompt** (spec 018).
+  It replaces `rofi-install`, `lazyos-install-run`, and `lazyos-install-log` with `lazyos installer`
+  running as a full-screen Ratatui wizard (`Shape::Full`). The wizard steps through 6 phases:
+  (1) Welcome & Pre-Flight with strict safety invariant blocking execution if root `/` is on eMMC
+  (`/dev/mmcblk0`); (2) Localization with searchable IANA timezone filtering, locale picker, and
+  keyboard layout selector with an interactive keypress test field; (3) User account creation with
+  POSIX-validated username (`^[a-z_][a-z0-9_-]{0,31}$`), masked password confirmation, hostname, and
+  SSH host key regeneration toggle; (4) Visual ChromeOS GPT partition diagram (`p1` FIT 128MB, `p2`
+  boot 512MB, `p3` root ~57.6GB) with gated confirmation defaulting focus to `[ Cancel ]` and requiring
+  typing `"mmcblk0"` or `"DESTROY"` before the install action unlocks; (5) Installation TaskView with
+  an overall progress gauge (0-100%), 6 sequential status phases, and streaming real-time log pane driven
+  by a detached worker under `setsid` via `sudo -n` writing to `/run/lazyos-install/state.json`; and
+  (6) Completion with quick reboot or live session actions. Headless modes `lazyos installer --check` and
+  `lazyos installer --dry-run` verify safety checks and simulate installation without touching storage.
+  Three witnesses: `check-system.sh` verifies `lazyos installer` in `lazyos --help`, symlink resolution, and
+  safety evaluation; `05-system.md` § *Install LazyOS* documents the full wizard; unit tests in `config.rs`,
+  `preflight.rs`, and `worker.rs` cover POSIX validation, disk safety guards, and state IPC serialization.
 
 - **The notification daemon moves to native Wayland layer-shell with `tiny-skia` 2D rendering, replacing `mako`** (spec 019). Ratatui cannot draw floating transparent overlay surfaces without a terminal window, and GTK4/Adwaita brings 50+ MB of resident libraries. `lazyos-notify` implements the D-Bus `org.freedesktop.Notifications` protocol in a dedicated binary, rendering antialiased cards, action buttons, progress bars, and unified palette theming with minimal memory and sub-millisecond redraws.
   The daemon anchors to `top-right` on the `overlay` layer (margin 36px top, 12px right) directly under Waybar, dynamically adjusting surface geometry and releasing pointer input regions when empty so underlying windows never suffer click occlusion. Cards feature antialiased rounded rectangles, layered soft drop shadows, dynamic urgency borders and status dots, high-resolution theme PNG loading with Nerd Font symbol fallbacks, pill action buttons with hover state feedback, and progress tracks for system volume/brightness overlays and slow background tasks. Structured history logs to `$XDG_STATE_HOME/lazyos/notify/history.jsonl`, queried by `lazyos menu notify` (Alt+Ctrl+N) without resident daemon overhead, and quiet mode is managed via `$XDG_RUNTIME_DIR/lazyos/notify/dnd` while letting critical system alerts pass through. Witnesses: `cargo test -p lazyos-notify`, `check-system.sh` busctl check for `lazyos-notify` owning `org.freedesktop.Notifications`, and documentation in `05-system.md`.

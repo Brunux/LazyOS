@@ -41,6 +41,7 @@ pub mod ask;
 pub mod command;
 pub mod files;
 pub mod host;
+pub mod installer;
 pub mod mcp;
 pub mod menu;
 mod notify;
@@ -401,6 +402,11 @@ fn query(resolved: &Resolved) -> Option<i32> {
             Some(EXIT_OK)
         }
         ("menu translate", []) => Some(system::translate::run_translate()),
+        ("installer", ["--check"] | ["check"]) => Some(installer::check()),
+        ("installer", ["apply", ..]) => {
+            let rest: Vec<String> = resolved.args.iter().skip(1).cloned().collect();
+            Some(installer::apply(&rest))
+        }
         _ => None,
     }
 }
@@ -517,6 +523,10 @@ fn execute(
         "menu translate" => system::translate::menu(&resolved.args, terminal, design),
         "menu dictate" => system::dictate::menu(),
         "task attach" => task_cmd::attach(resolved, terminal, design),
+        "installer" => {
+            let dry_run = resolved.args.iter().any(|a| a == "--dry-run");
+            installer::menu(terminal, design, dry_run)
+        }
         other => Err(Failure::new(
             format!("`{other}` is in the table but has no implementation"),
             "this is a bug: the command table and this match disagree",

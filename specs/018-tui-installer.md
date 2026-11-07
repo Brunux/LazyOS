@@ -1,6 +1,6 @@
 # Spec 018 — The Full TUI Installer: Account Setup, Location, Disk Safety, and Progress
 
-- **Status**: draft
+- **Status**: in progress
 - **Phase**: 4-5
 - **Depends on**: 001, 002, 005, 010
 - **Model**: `claude-opus-5-5` (effort `high`) — architecture and security boundary: irreversible disk destruction, partition manipulation, user credential generation, depthcharge FIT signing, and a multi-step TUI wizard. Fallback `claude-sonnet-5-5`.
@@ -74,19 +74,19 @@ Currently, installing LazyOS onto internal eMMC storage relies on `rofi-install`
 
 ## Acceptance criteria
 
-- [ ] `lazyos installer` launches a full-screen TUI wizard in foot; pressing Esc at any pre-confirmation step exits safely without modifying disks.
-- [ ] Safety Invariant: running `lazyos installer` on a system already booted from eMMC (`/dev/mmcblk0`) displays a clear error card and refuses to proceed.
-- [ ] User setup enforces valid username syntax, verifies matching passwords, and rejects empty credentials.
-- [ ] Timezone selection allows filtering as you type and correctly sets the target system's `/etc/timezone` and `/etc/localtime`.
-- [ ] Confirmation gate places initial cursor on `[ Cancel ]` and prevents accidental Enter presses from starting the disk wipe.
-- [ ] Installation progress displays a Ratatui gauge bar, phase titles, and real-time streaming command output.
-- [ ] Kernel partition `p1` is written, and `futility show` verification succeeds on the target device.
-- [ ] Upon completion, `[ Reboot ]` safely syncs, unmounts filesystems, and calls system reboot.
-- [ ] compatibility: `rofi-install` exists as a symlink to `/usr/bin/lazyos` and opens the new TUI installer.
-- [ ] witness: `scripts/check-system.sh` verifies `lazyos installer` is registered in `lazyos --help`, `rofi-install` resolves, and `lazyos installer --check` confirms eMMC safety checks.
-- [ ] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/05-system.md` § *Installing to internal storage* documents the full TUI wizard.
-- [ ] witness: an `AGENTS.md` bullet documents the detached worker architecture and safety confirmation gate.
-- [ ] unit tests: username validation, password matching, timezone search, disk safety check, and partition layout calculations are covered by `cargo test`.
+- [x] `lazyos installer` launches a full-screen TUI wizard in foot; pressing Esc at any pre-confirmation step exits safely without modifying disks.
+- [x] Safety Invariant: running `lazyos installer` on a system already booted from eMMC (`/dev/mmcblk0`) displays a clear error card and refuses to proceed.
+- [x] User setup enforces valid username syntax, verifies matching passwords, and rejects empty credentials.
+- [x] Timezone selection allows filtering as you type and correctly sets the target system's `/etc/timezone` and `/etc/localtime`.
+- [x] Confirmation gate places initial cursor on `[ Cancel ]` and prevents accidental Enter presses from starting the disk wipe.
+- [x] Installation progress displays a Ratatui gauge bar, phase titles, and real-time streaming command output.
+- [x] Kernel partition `p1` is written, and `futility show` verification succeeds on the target device.
+- [x] Upon completion, `[ Reboot ]` safely syncs, unmounts filesystems, and calls system reboot.
+- [x] compatibility: `rofi-install` exists as a symlink to `/usr/bin/lazyos` and opens the new TUI installer.
+- [x] witness: `scripts/check-system.sh` verifies `lazyos installer` is registered in `lazyos --help`, `rofi-install` resolves, and `lazyos installer --check` confirms eMMC safety checks.
+- [x] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/05-system.md` § *Installing to internal storage* documents the full TUI wizard.
+- [x] witness: an `AGENTS.md` bullet documents the detached worker architecture and safety confirmation gate.
+- [x] unit tests: username validation, password matching, timezone search, disk safety check, and partition layout calculations are covered by `cargo test`.
 
 ## Tests
 

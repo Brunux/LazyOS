@@ -526,6 +526,25 @@ pub const COMMANDS: &[CommandSpec] = &[
         symlinks: &["dictate"],
         installed: &["dictate"],
     },
+    CommandSpec {
+        // `lazyos installer`: the full TUI installer wizard (spec 018).
+        // Replaces `rofi-install`, `lazyos-install-run`, and `lazyos-install-log`.
+        path: "installer",
+        summary: "install LazyOS to internal storage: pre-flight, user, timezone, safety (spec 018)",
+        shape: Shape::Full,
+        symlinks: &[
+            "lazyos-installer",
+            "rofi-install",
+            "lazyos-install-run",
+            "lazyos-install-log",
+        ],
+        installed: &[
+            "lazyos-installer",
+            "rofi-install",
+            "lazyos-install-run",
+            "lazyos-install-log",
+        ],
+    },
 ];
 
 /// A command the table resolved, with the arguments that belong to it.
