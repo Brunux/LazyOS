@@ -263,9 +263,10 @@ pub fn menu(
         },
         "cache" => {
             let cache_dir = Path::new(&home).join(".cache");
-            let _ = Command::new("lazyos")
-                .args(["menu", "files", cache_dir.to_str().unwrap_or(".")])
-                .status();
+            crate::system::spawn_detached(&format!(
+                "exec lazyos menu files '{}'",
+                cache_dir.display()
+            ));
             Ok(0)
         }
         _ => Ok(0),

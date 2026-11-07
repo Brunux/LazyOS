@@ -205,47 +205,7 @@ impl Screen for ClipScreen {
             KeyCode::Esc => return Outcome::Done(lazyos_ui::app::exit::ESCAPE),
             KeyCode::Enter => {
                 if let Some(index) = self.list.selected_index() {
-                    if index < self.entries.len() {
-                        let entry = &self.entries[index];
-                        let decode_output =
-                            out(&["cliphist", "decode", &entry.id]).unwrap_or_default();
-                        if !decode_output.is_empty() {
-                            let copied = std::process::Command::new("wl-copy")
-                                .stdin(Stdio::piped())
-                                .stdout(Stdio::null())
-                                .stderr(Stdio::null())
-                                .status()
-                                .map(|s| s.success())
-                                .unwrap_or(false);
-                            if copied {
-                                let msg = match self.entries[index].kind {
-                                    ClipKind::Image => {
-                                        "Image copied back to the clipboard".to_string()
-                                    }
-                                    _ => {
-                                        let preview = &self.entries[index].preview;
-                                        let shown =
-                                            preview.trim().replace("\n", " ").replace("\t", " ");
-                                        format!("Copied: {}", shown)
-                                    }
-                                };
-                                say(
-                                    "Clipboard",
-                                    msg,
-                                    lazyos_ui::Urgency::Normal,
-                                    Glyph::Clipboard,
-                                );
-                            } else {
-                                say(
-                                    "Clipboard",
-                                    "Could not copy that entry back",
-                                    lazyos_ui::Urgency::Critical,
-                                    Glyph::Clipboard,
-                                );
-                            }
-                        }
-                    }
-                    return Outcome::Continue;
+                    return self.activate(index);
                 }
             }
             _ => {}
@@ -253,53 +213,17 @@ impl Screen for ClipScreen {
         // Handle list activation
         let action = self.list.handle(key, self.rows_height.get(), design);
         match action {
-            ListAction::Activated(index) => {
-                if index < self.entries.len() {
-                    let entry = &self.entries[index];
-                    let decode_output = out(&["cliphist", "decode", &entry.id]).unwrap_or_default();
-                    if !decode_output.is_empty() {
-                        let copied = std::process::Command::new("wl-copy")
-                            .stdin(Stdio::piped())
-                            .stdout(Stdio::null())
-                            .stderr(Stdio::null())
-                            .status()
-                            .map(|s| s.success())
-                            .unwrap_or(false);
-                        if copied {
-                            let msg = match self.entries[index].kind {
-                                ClipKind::Image => "Image copied back to the clipboard".to_string(),
-                                _ => {
-                                    let preview = &self.entries[index].preview;
-                                    let shown = preview
-                                        .trim()
-                                        .replace(
-                                            "
-", " ",
-                                        )
-                                        .replace("	", " ");
-                                    format!("Copied: {}", shown)
-                                }
-                            };
-                            say(
-                                "Clipboard",
-                                msg,
-                                lazyos_ui::Urgency::Normal,
-                                Glyph::Clipboard,
-                            );
-                        } else {
-                            say(
-                                "Clipboard",
-                                "Could not copy that entry back",
-                                lazyos_ui::Urgency::Critical,
-                                Glyph::Clipboard,
-                            );
-                        }
-                    }
-                    return Outcome::Continue;
-                }
-                return Outcome::Continue;
-            }
+            ListAction::Activated(index) => self.activate(index),
             ListAction::Ignored | ListAction::Moved => Outcome::Continue,
+        }
+    }
+
+    fn click(&mut self, row: Option<usize>) -> Outcome {
+        if let Some(r) = row {
+            self.list.set_cursor(r);
+            self.activate(r)
+        } else {
+            Outcome::Continue
         }
     }
 
@@ -337,52 +261,100 @@ impl ClipScreen {
         (filter, rows)
     }
 
-    fn copy_entry_inline(&mut self, index: usize) -> Outcome {
-        if index >= self.entries.len() {
+    fn activate(&mut self, index: usize) -> Outcome {
+        let Some(key) = self.keys.get(index) else {
             return Outcome::Continue;
-        }
-        let entry = &self.entries[index];
-        let decode_output = out(&["cliphist", "decode", &entry.id]).unwrap_or_default();
-        if decode_output.is_empty() {
-            say(
-                "Clipboard",
-                "Could not copy that entry back",
-                lazyos_ui::Urgency::Critical,
-                Glyph::Clipboard,
-            );
-            return Outcome::Continue;
-        }
-        let copied = std::process::Command::new("wl-copy")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-        if copied {
-            let msg = match self.entries[index].kind {
-                ClipKind::Image => "Image copied back to the clipboard".to_string(),
-                _ => {
-                    let preview = &self.entries[index].preview;
-                    let shown = preview.trim().replace("\n", " ").replace("\t", " ");
-                    format!("Copied: {}", shown)
+        };
+        match key.as_str() {
+            "save" => {
+                let img_entry = self.entries.iter().find(|e| e.kind == ClipKind::Image);
+                if let Some(entry) = img_entry {
+                    let cmd = format!(
+                        "tmp=$(mktemp /tmp/clipimg.XXXXXX); \
+                        cliphist decode '{}' > \"$tmp\" 2>/dev/null; \
+                        ext=$(file --brief --mime-type \"$tmp\" 2>/dev/null | sed -e 's|.*/||' -e 's|jpeg|jpg|' -e 's|[^a-z0-9]||g'); \
+                        [ -n \"$ext\" ] || ext=png; \
+                        dir=\"$HOME/Pictures/clipboard\"; \
+                        mkdir -p \"$dir\"; \
+                        dest=\"$dir/clip-$(date +%Y%m%d-%H%M%S).$ext\"; \
+                        mv -f \"$tmp\" \"$dest\"; \
+                        exec xdg-open \"$dest\"",
+                        entry.id
+                    );
+                    crate::system::spawn_detached(&cmd);
+                    say(
+                        "Clipboard",
+                        "Saved image to ~/Pictures/clipboard and opened it",
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Image,
+                    );
+                    Outcome::Done(lazyos_ui::app::exit::OK)
+                } else {
+                    say(
+                        "Clipboard",
+                        "No image in clipboard history",
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Image,
+                    );
+                    Outcome::Continue
                 }
-            };
-            say(
-                "Clipboard",
-                msg,
-                lazyos_ui::Urgency::Normal,
-                Glyph::Clipboard,
-            );
-        } else {
-            say(
-                "Clipboard",
-                "Could not copy that entry back",
-                lazyos_ui::Urgency::Critical,
-                Glyph::Clipboard,
-            );
+            }
+            "wipe" => {
+                let _ = std::process::Command::new("cliphist")
+                    .arg("wipe")
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status();
+                say(
+                    "Clipboard",
+                    format!("History cleared ({} entries)", self.entries.len()),
+                    lazyos_ui::Urgency::Normal,
+                    Glyph::Trash,
+                );
+                Outcome::Done(lazyos_ui::app::exit::OK)
+            }
+            "empty" => Outcome::Continue,
+            id => {
+                let entry = self.entries.iter().find(|e| e.id == id);
+                let copied = std::process::Command::new("sh")
+                    .args(["-c", "cliphist decode \"$1\" | wl-copy", "--", id])
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false);
+                if copied {
+                    let msg = if let Some(e) = entry {
+                        match e.kind {
+                            ClipKind::Image => "Image copied back to the clipboard".to_string(),
+                            _ => {
+                                let shown = e.preview.trim().replace(['\n', '\t'], " ");
+                                format!("Copied: {}", shown)
+                            }
+                        }
+                    } else {
+                        "Entry copied back to the clipboard".to_string()
+                    };
+                    say(
+                        "Clipboard",
+                        msg,
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Clipboard,
+                    );
+                    Outcome::Done(lazyos_ui::app::exit::OK)
+                } else {
+                    say(
+                        "Clipboard",
+                        "Could not copy that entry back",
+                        lazyos_ui::Urgency::Critical,
+                        Glyph::Clipboard,
+                    );
+                    Outcome::Continue
+                }
+            }
         }
-        Outcome::Continue
     }
 }
 

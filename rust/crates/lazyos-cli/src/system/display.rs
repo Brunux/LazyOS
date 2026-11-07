@@ -530,7 +530,7 @@ fn display_menu(
                         return Ok(0);
                     }
                     let _ = out(&["swaymsg", "workspace", "number", "11"]);
-                    std::process::Command::new("wdisplays").spawn().ok();
+                    crate::system::spawn_detached("exec wdisplays");
                 }
                 _ => {}
             }
@@ -743,7 +743,7 @@ fn display_menu(
                 return Ok(0);
             }
             let _ = out(&["swaymsg", "workspace", "number", "11"]);
-            std::process::Command::new("wdisplays").spawn().ok();
+            crate::system::spawn_detached("exec wdisplays");
             Ok(0)
         }
         "enable:panel" => {

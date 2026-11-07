@@ -310,15 +310,11 @@ pub fn menu(
             Ok(0)
         }
         "qr" => {
-            let _ = Command::new("lazyos")
-                .args(["menu", "qr", "--wifi"])
-                .status();
+            crate::system::spawn_detached("exec lazyos menu qr --wifi");
             Ok(0)
         }
         "nmtui" => {
-            let _ = Command::new("foot")
-                .args(["--app-id=popup", "nmtui"])
-                .spawn();
+            crate::system::spawn_detached("exec foot --app-id=popup nmtui");
             Ok(0)
         }
         act if act.starts_with("ap:") => {

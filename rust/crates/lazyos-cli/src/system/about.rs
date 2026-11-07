@@ -534,37 +534,17 @@ impl AboutScreen {
                 );
             }
             FactAction::Errors => {
-                let _ = std::process::Command::new("setsid")
-                    .args(["sh", "-c", CMD_ERRORS])
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
+                crate::system::spawn_detached(CMD_ERRORS);
             }
             FactAction::BootTime => {
-                let _ = std::process::Command::new("setsid")
-                    .args(["sh", "-c", CMD_BOOT])
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
+                crate::system::spawn_detached(CMD_BOOT);
             }
             FactAction::Devices => {
-                let _ = std::process::Command::new("setsid")
-                    .args(["sh", "-c", CMD_DEVICES])
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
+                crate::system::spawn_detached(CMD_DEVICES);
             }
             FactAction::Fastfetch => {
                 if have("fastfetch") {
-                    let _ = std::process::Command::new("setsid")
-                        .args(["sh", "-c", CMD_FASTFETCH])
-                        .stdin(std::process::Stdio::null())
-                        .stdout(std::process::Stdio::null())
-                        .stderr(std::process::Stdio::null())
-                        .spawn();
+                    crate::system::spawn_detached(CMD_FASTFETCH);
                 } else {
                     say(
                         "About",

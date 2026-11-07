@@ -55,22 +55,6 @@ pub fn spawn_download(url: &str, audio_only: bool) {
     let dl = Path::new(&home).join("Downloads");
     let _ = fs::create_dir_all(&dl);
 
-    let mut args = vec![
-        "-P".to_string(),
-        dl.to_string_lossy().to_string(),
-        "--no-playlist".to_string(),
-        "--no-mtime".to_string(),
-    ];
-
-    if audio_only {
-        args.push("-x".to_string());
-        args.push("--audio-format".to_string());
-        args.push("m4a".to_string());
-    }
-
-    args.push("--".to_string());
-    args.push(url.to_string());
-
     say(
         "Download",
         format!("Fetching {}…", url.chars().take(48).collect::<String>()),
@@ -78,7 +62,24 @@ pub fn spawn_download(url: &str, audio_only: bool) {
         Glyph::Download,
     );
 
-    let _ = Command::new("yt-dlp").args(&args).spawn();
+    let audio_flag = if audio_only {
+        "-x --audio-format m4a"
+    } else {
+        ""
+    };
+    let escaped_url = url.replace('\'', "'\\''");
+    let cmd = format!(
+        "out=$(yt-dlp -P '{dl}' --no-playlist --no-mtime --no-simulate {audio_flag} --print after_move:filepath -- '{escaped_url}' 2>&1); \
+        rc=$?; \
+        if [ $rc -eq 0 ]; then \
+            name=$(echo \"$out\" | tail -n 1); \
+            lazyos notify send --app Download --title 'Download complete' --body \"Saved ${{name##*/}}\" --glyph download; \
+        else \
+            lazyos notify send --app Download --title 'Download failed' --body 'yt-dlp failed to download URL' --glyph download --urgency critical; \
+        fi",
+        dl = dl.display()
+    );
+    crate::system::spawn_detached(&cmd);
 }
 
 /// Interactive `lazyos menu download`.
@@ -155,9 +156,7 @@ pub fn menu(
         "folder" => {
             let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
             let dl = Path::new(&home).join("Downloads");
-            let _ = Command::new("lazyos")
-                .args(["menu", "files", dl.to_str().unwrap_or(".")])
-                .status();
+            crate::system::spawn_detached(&format!("exec lazyos menu files '{}'", dl.display()));
             Ok(0)
         }
         "stop" => {

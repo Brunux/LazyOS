@@ -465,12 +465,7 @@ impl BluetoothScreen {
                 self.reload();
             }
             "bluetoothctl" => {
-                let _ = std::process::Command::new("foot")
-                    .args(["--app-id=popup", "bluetoothctl"])
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
+                crate::system::spawn_detached("exec foot --app-id=popup bluetoothctl");
             }
             k if k.starts_with("device:") => {
                 let mac = &k[7..];
