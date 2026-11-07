@@ -2,9 +2,21 @@
 //! dispatch, the host decision and the paths without a process.
 
 fn main() {
-    // Append /usr/sbin and /sbin if not already present, just as lib-rofi.sh does.
+    // Ensure ~/.config/bin, ~/.local/bin, /usr/sbin and /sbin are on PATH so that
+    // session helpers (e.g. lazyos-profile) and system tools (blkid, mkswap) are
+    // always discoverable even when greetd or a wrapper starts with a stripped PATH.
     if let Ok(path) = std::env::var("PATH") {
         let mut new_path = path.clone();
+        if let Ok(home) = std::env::var("HOME") {
+            let config_bin = format!("{home}/.config/bin");
+            if !new_path.split(':').any(|p| p == config_bin) {
+                new_path = format!("{config_bin}:{new_path}");
+            }
+            let local_bin = format!("{home}/.local/bin");
+            if !new_path.split(':').any(|p| p == local_bin) {
+                new_path.push_str(&format!(":{local_bin}"));
+            }
+        }
         if !new_path.split(':').any(|p| p == "/usr/sbin") {
             new_path.push_str(":/usr/sbin");
         }
