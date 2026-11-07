@@ -14,9 +14,13 @@ The bar replaces Waybar only after feature parity and hardware validation. Wayba
 
 ## 2. Design references
 
-- [Bar overview](lazyos-bar-overview.svg): top-level composition, spacing and state colors.
-- [Panel and menu map](lazyos-bar-panels.svg): representative panels and root menu taxonomy.
-- The original generated concept image in the design conversation is the mood reference; the SVGs above are the reproducible, source-controlled implementation references.
+- [Bar overview](lazyos-bar-overview.svg): provisional top-level composition, spacing and state colors.
+- [Panel and menu map](lazyos-bar-panels.svg): initial panel inventory, not a complete visual specification.
+- [Complete menu tree](lazyos-bar-menu-tree.md): canonical root categories, nested routes, stable IDs, availability rules and indicator context menus.
+- [Menu tree diagram](lazyos-bar-menu-tree.svg): graphical overview of all root categories and major nested routes.
+- [Panel visual contracts](lazyos-bar-panel-spec.md): detailed layout, states, controls and interaction behavior for every required panel.
+- [Panel gallery](lazyos-bar-panel-gallery.svg): provisional graphical wireframes for the palette, network, audio, calendar, task, confirmation and shared panel frame.
+- **Reference-image fidelity is not yet validated.** The earlier SVGs are assistant-authored provisional diagrams, not faithful reproductions of the original generated concept image. Do not treat their geometry or styling as pixel-accurate source material. The original image remains the visual source of truth once reattached.
 
 ## 3. Visual system
 
@@ -206,3 +210,28 @@ Do a short hardware spike before committing to a toolkit:
 - `uis/sway/files/home/.config/bin/bar-*` — compatibility adapters and existing interaction contracts.
 - `docs/plan-ui.md` — Ratatui terminal UI framework; keep responsibilities distinct.
 - `docs/design/lazyos-bar-overview.svg` and `docs/design/lazyos-bar-panels.svg` — source-controlled graphical references.
+
+
+## 12. Complete nested navigation and panel contracts
+
+The canonical menu hierarchy and stable route model are defined in [lazyos-bar-menu-tree.md](lazyos-bar-menu-tree.md). The detailed panel geometry, reusable components, visual states, and behavior are defined in [lazyos-bar-panel-spec.md](lazyos-bar-panel-spec.md). These are normative for functional scope; the SVGs are explanatory wireframes.
+
+Implementation requirements:
+- Build menu entries from typed route data with stable dotted IDs; never use translated labels as IDs or execute arbitrary shell strings from menu configuration.
+- Root palette and indicator context menus must dispatch the same action IDs.
+- Every nested view must expose a breadcrumb and a deterministic back route.
+- Search must index nested actions and show their breadcrumb.
+- Capability-gated features must be hidden or disabled with an explicit reason.
+- Confirmation, progress, error, empty, and completed states are part of each panel contract, not optional polish.
+- The panel gallery is a provisional layout reference, not the final visual target. Reconcile exact proportions, spacing, typography, glyphs, and color treatment with the original concept image before declaring visual sign-off.
+
+## 13. Design sign-off status
+
+- [x] Root category taxonomy and full nested menu routes documented.
+- [x] Indicator context menus and shared action routing documented.
+- [x] Shared panel frame and reusable graphical components documented.
+- [x] Required panel layouts and visual state matrix documented.
+- [x] Provisional SVG diagrams added for menu tree and representative panels.
+- [ ] Original generated concept image reattached and inspected.
+- [ ] SVGs and dimensions reconciled against the original image.
+- [ ] Visual sign-off on target Chromebook at native and fractional scaling.
