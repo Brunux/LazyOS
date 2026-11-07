@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120">
+<defs><style>
+.bg{fill:#002b36}.surface{fill:#073642;stroke:#2aa198;stroke-width:1.3}.surface2{fill:#073642;stroke:#586e75;stroke-width:1}.title{fill:#2aa198;font:bold 19px 'JetBrains Mono','DejaVu Sans Mono',monospace}.head{fill:#b58900;font:bold 14px 'JetBrains Mono','DejaVu Sans Mono',monospace}.txt{fill:#eee8d5;font:13px 'JetBrains Mono','DejaVu Sans Mono',monospace}.muted{fill:#839496;font:11px 'JetBrains Mono','DejaVu Sans Mono',monospace}.line{stroke:#586e75;stroke-width:1.2;fill:none}.accent{stroke:#2aa198;stroke-width:2;fill:none}
+</style></defs>
+<rect width="1600" height="1120" class="bg"/>
+<text x="42" y="46" class="title">lazyos-bar / complete navigation map</text>
+<text x="42" y="72" class="muted">FUNCTIONAL MENU TAXONOMY · PROVISIONAL VISUAL REFERENCE · DETAILS IN lazyos-bar-menu-tree.md</text>
+<rect x="610" y="100" width="380" height="68" rx="3" class="surface"/>
+<text x="800" y="129" text-anchor="middle" class="title">z_ / command palette</text>
+<text x="800" y="151" text-anchor="middle" class="muted">global search · recents · favorites · breadcrumb</text>
+<path d="M800 168V202 M150 202H1450 M150 202V230 M367 202V230 M584 202V230 M800 202V230 M1017 202V230 M1234 202V230 M1450 202V230" class="accent"/>
+<g>
+<rect x="45" y="230" width="210" height="58" class="surface"/><text x="150" y="265" text-anchor="middle" class="head">01 SYSTEM</text>
+<rect x="262" y="230" width="210" height="58" class="surface"/><text x="367" y="265" text-anchor="middle" class="head">02 CONNECTIVITY</text>
+<rect x="479" y="230" width="210" height="58" class="surface"/><text x="584" y="265" text-anchor="middle" class="head">03 PERSONALIZE</text>
+<rect x="695" y="230" width="210" height="58" class="surface"/><text x="800" y="265" text-anchor="middle" class="head">04 APPLICATIONS</text>
+<rect x="912" y="230" width="210" height="58" class="surface"/><text x="1017" y="265" text-anchor="middle" class="head">05 FILES &amp; TOOLS</text>
+<rect x="1129" y="230" width="210" height="58" class="surface"/><text x="1234" y="265" text-anchor="middle" class="head">06 SESSION</text>
+<rect x="1345" y="230" width="210" height="58" class="surface"/><text x="1450" y="265" text-anchor="middle" class="head">07 DEVELOPER*</text>
+</g>
+<g>
+<path d="M150 288V320 M367 288V320 M584 288V320 M800 288V320 M1017 288V320 M1234 288V320 M1450 288V320" class="line"/>
+<rect x="45" y="320" width="210" height="510" class="surface2"/>
+<text x="62" y="350" class="head">SYSTEM</text>
+<text x="62" y="382" class="txt">Overview</text><text x="62" y="410" class="txt">Resources</text><text x="76" y="436" class="muted">CPU / Memory / Swap</text><text x="76" y="458" class="muted">Storage / Sensors</text><text x="76" y="480" class="muted">Processes → details</text><text x="62" y="512" class="txt">Devices</text><text x="76" y="538" class="muted">Displays / Audio</text><text x="76" y="560" class="muted">Input / Battery</text><text x="62" y="592" class="txt">Services → detail / logs</text><text x="62" y="620" class="txt">Logs → filter / follow</text><text x="62" y="648" class="txt">Updates → task view</text><text x="62" y="676" class="txt">Disks &amp; mounts</text><text x="62" y="704" class="txt">About</text><text x="62" y="732" class="txt">Power &amp; session</text>
+<rect x="262" y="320" width="210" height="510" class="surface2"/>
+<text x="279" y="350" class="head">CONNECTIVITY</text>
+<text x="279" y="382" class="txt">Network</text><text x="293" y="408" class="muted">Wi-Fi → scan → SSID</text><text x="293" y="430" class="muted">Password → connect</text><text x="293" y="452" class="muted">Saved → forget / confirm</text><text x="293" y="474" class="muted">Ethernet / VPN</text><text x="279" y="510" class="txt">Bluetooth</text><text x="293" y="536" class="muted">Scan → device detail</text><text x="293" y="558" class="muted">Pair → passkey → connect</text><text x="293" y="580" class="muted">Trust / remove / confirm</text><text x="279" y="616" class="txt">Screen sharing / VNC</text><text x="293" y="642" class="muted">Start → security confirm</text><text x="293" y="664" class="muted">Stop → client warning</text><text x="279" y="700" class="txt">Diagnostics</text><text x="293" y="726" class="muted">Route / DNS / gateway</text>
+<rect x="479" y="320" width="210" height="510" class="surface2"/>
+<text x="496" y="350" class="head">PERSONALIZATION</text>
+<text x="496" y="382" class="txt">Appearance</text><text x="510" y="408" class="muted">Theme → preview / apply</text><text x="510" y="430" class="muted">Density / transparency</text><text x="496" y="466" class="txt">Bar layout</text><text x="510" y="492" class="muted">Modules / position</text><text x="510" y="514" class="muted">Overflow / output</text><text x="496" y="550" class="txt">Workspaces</text><text x="496" y="578" class="txt">Keyboard layouts</text><text x="496" y="606" class="txt">Display → brightness</text><text x="496" y="634" class="txt">Sound → audio panel</text><text x="496" y="662" class="txt">Notifications</text><text x="510" y="688" class="muted">History / Mako settings</text><text x="496" y="724" class="txt">Keep awake</text>
+<rect x="695" y="320" width="210" height="510" class="surface2"/>
+<text x="712" y="350" class="head">APPLICATIONS</text>
+<text x="712" y="382" class="txt">Application launcher</text><text x="712" y="412" class="txt">Recent applications</text><text x="712" y="442" class="txt">Favorites</text><text x="712" y="472" class="txt">Default applications*</text><text x="712" y="502" class="txt">Run command</text><text x="726" y="528" class="muted">Command → execute / cancel</text><text x="712" y="580" class="muted">Actions are capability-gated.</text><text x="712" y="606" class="muted">No fake terminal command</text><text x="712" y="628" class="muted">execution; typed action IDs</text>
+<rect x="912" y="320" width="210" height="510" class="surface2"/>
+<text x="929" y="350" class="head">FILES &amp; TOOLS</text>
+<text x="929" y="382" class="txt">Search files</text><text x="929" y="412" class="txt">File manager</text><text x="929" y="442" class="txt">Terminal</text><text x="929" y="472" class="txt">Clipboard history*</text><text x="929" y="502" class="txt">Help</text><text x="943" y="528" class="muted">LazyOS / bar help</text><text x="943" y="550" class="muted">Keybindings → search</text><text x="929" y="586" class="txt">Diagnostics</text><text x="943" y="612" class="muted">Collect → copy → open</text><text x="929" y="660" class="muted">*Optional provider required</text>
+<rect x="1129" y="320" width="210" height="510" class="surface2"/>
+<text x="1146" y="350" class="head">SESSION</text>
+<text x="1146" y="382" class="txt">Lock</text><text x="1146" y="412" class="txt">Logout → confirm</text><text x="1146" y="442" class="txt">Restart compositor</text><text x="1160" y="468" class="muted">→ confirm</text><text x="1146" y="500" class="txt">Reboot → confirm</text><text x="1146" y="530" class="txt">Shutdown → confirm</text><text x="1146" y="590" class="muted">Cancel is default focus</text><text x="1146" y="616" class="muted">for disruptive actions.</text>
+<rect x="1345" y="320" width="210" height="510" class="surface2"/>
+<text x="1362" y="350" class="head">DEVELOPER*</text>
+<text x="1362" y="382" class="txt">LazyOS status</text><text x="1362" y="412" class="txt">Package manager</text><text x="1376" y="438" class="muted">Lookup / update / task</text><text x="1362" y="474" class="txt">Build tools*</text><text x="1362" y="504" class="txt">GPU status</text><text x="1362" y="534" class="txt">Logs &amp; traces</text><text x="1362" y="564" class="txt">Debug bundle</text><text x="1362" y="640" class="muted">*Hidden if unavailable</text>
+</g>
+<rect x="45" y="870" width="1510" height="170" class="surface"/>
+<text x="70" y="906" class="head">GLOBAL ROUTING RULES</text>
+<text x="70" y="940" class="txt">Search → results include category + breadcrumb · Backspace / Left = parent · Escape = close / cancel confirmation</text>
+<text x="70" y="970" class="txt">Disabled items explain why · async actions own a task view · destructive actions always require confirmation</text>
+<text x="70" y="1000" class="txt">Root palette and indicator context menus share stable action IDs; translated labels never become action identifiers.</text>
+<text x="70" y="1024" class="muted">*Conditional on installed backend/provider. Full route IDs and data contract: lazyos-bar-menu-tree.md</text>
+</svg>
