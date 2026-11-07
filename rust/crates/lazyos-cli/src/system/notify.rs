@@ -30,7 +30,6 @@ pub struct NotifyScreen {
     header: Header,
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
-    keys: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -44,7 +43,6 @@ struct Notification {
 impl NotifyScreen {
     pub fn new() -> Self {
         let mut screen = Self {
-            keys: Vec::new(),
             notifications: Vec::new(),
             dnd: false,
             list: ListState::new(),
@@ -167,7 +165,6 @@ impl NotifyScreen {
                 .detail(format!("{} in the history", count))
                 .value("dismiss"),
         );
-        self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
 }
@@ -234,10 +231,12 @@ impl Screen for NotifyScreen {
 impl NotifyScreen {
     fn activate(&mut self, index: usize) -> Outcome {
         let rows = self.list.rows();
-        if index >= rows.len() {
+        let Some(row) = rows.get(index) else {
             return Outcome::Continue;
-        }
-        let key = self.keys.get(index).cloned().unwrap_or_default();
+        };
+        let Some(key) = row.value.as_deref() else {
+            return Outcome::Continue;
+        };
         if key.is_empty() || key == "-" {
             return Outcome::Continue;
         }
@@ -267,7 +266,7 @@ impl NotifyScreen {
                 );
             }
         } else {
-            match key.as_str() {
+            match key {
                 "dnd" => {
                     let _ = std::process::Command::new("makoctl")
                         .args(["mode", "-t", "do-not-disturb"])

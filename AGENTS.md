@@ -1871,10 +1871,17 @@ exactly what forky ships) and **scenefx 0.5**, and `scripts/build-swayfx.sh` bui
   grimshot wrote `$HOME` - `XDG_PICTURES_DIR` has no `user-dirs.dirs` to come from - and every
   screenshot landed among the dotfiles (the card's report). The three keys and the capture menu
   all go through the wrapper, `check-system.sh` fails when the wrapper is not executable, and the
-  notification prints the path and carries the image. `swappy -f FILE` annotates, which writes the edits back over the same file
+  notification prints the path and carries the image. `swappy -f FILE -o FILE` annotates, which writes the edits back over the same file
   and exits when its window closes, `slurp -d` + `grim -g` for one region that `tesseract FILE
   stdout -l eng` (English is the only `tesseract-ocr-*` the image ships) or `zbarimg -q --raw`
   reads, the result copied with `ui_copy` and the first line in the notification.
+  **Region capturing in ported framework menus must detach and close the menu first**: when running
+  under `foot` in `LAZYOS_UI=1`, selecting a region capture (`shot:save:area`, `shot:copy:area`,
+  `annotate`, `ocr`, `qr`, `rec:area`, or colour picker `pick`) closes the menu window immediately,
+  allowing Sway to unmap the floating foot surface before `slurp` grabs the screen after a 200ms delay.
+  Background jobs are spawned detached with `setsid` and `LAZYOS_UI` stripped so closing foot's pty
+  does not deliver SIGHUP to the child screencopy tools. Menu row activation directly reads each row's
+  value from `ListState` rather than filtered index tables, ensuring separator rows cannot skew actions.
   **`wf-recorder` is the one action that outlives the menu**, so it is started and stopped from the
   same list and its pid and file name live in `$XDG_RUNTIME_DIR/lazyos-capture`: a session that dies
   takes the state with it (a stale pid is `kill -0`-tested), the `.mp4` stays. x264 on the CPU

@@ -49,7 +49,6 @@ pub struct BluetoothScreen {
     header: Header,
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
-    keys: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -68,7 +67,6 @@ impl BluetoothScreen {
             Vec::new()
         };
         let mut screen = Self {
-            keys: Vec::new(),
             devices,
             powered,
             scanning: false,
@@ -234,7 +232,6 @@ impl BluetoothScreen {
             );
         }
 
-        self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
 }
@@ -415,14 +412,16 @@ pub fn menu(
 impl BluetoothScreen {
     fn activate(&mut self, index: usize) -> Outcome {
         let rows = self.list.rows();
-        if index >= rows.len() {
+        let Some(row) = rows.get(index) else {
             return Outcome::Continue;
-        }
-        let key = self.keys.get(index).cloned().unwrap_or_default();
+        };
+        let Some(key) = row.value.as_deref() else {
+            return Outcome::Continue;
+        };
         if key.is_empty() || key == "-" {
             return Outcome::Continue;
         }
-        match key.as_str() {
+        match key {
             "scan" => {
                 if !self.scanning {
                     self.start_scan(3);

@@ -43,7 +43,7 @@ impl ColourScreen {
             list,
             header: Header::new("LazyOS").subtitle("Colour"),
             keybar: vec![
-                KeyHint::new("Enter", "pick a pixel"),
+                KeyHint::new("Enter", "copy / pick"),
                 KeyHint::new("Esc", "close"),
             ],
             rows_height: Cell::new(20),
@@ -96,13 +96,40 @@ impl ColourScreen {
         })
     }
 
+    fn pick_detached() {
+        let script = r#"sleep 0.2
+pos=$(slurp -p -f '%x,%y' 2>/dev/null) || exit 0
+[ -n "$pos" ] || exit 0
+rgb=$(grim -g "$pos 1x1" - 2>/dev/null | ffmpeg -v error -i pipe:0 -frames:v 1 -f rawvideo -pix_fmt rgb24 pipe:1 2>/dev/null | od -An -tu1) || rgb=
+set -- ${rgb:-}
+if [ $# -lt 3 ]; then
+    notify-send -a LazyOS -u critical -i dialog-error "Colour" "That pixel could not be read"
+    exit 1
+fi
+hex=$(printf '#%02x%02x%02x' "$1" "$2" "$3")
+printf '%s' "$hex" | wl-copy
+notify-send -a LazyOS -i color-picker "Colour" "$hex copied to the clipboard (${pos%%,*}, ${pos#*,})"
+"#;
+        crate::system::spawn_detached(script);
+    }
+
     fn build_rows(&mut self) {
         let mut rows = Vec::new();
+        rows.push(
+            Row::new("Pick a pixel")
+                .glyph(Glyph::Brush)
+                .detail("the colour under the pointer, to the clipboard")
+                .value("pick"),
+        );
         if let Some(c) = &self.picked {
             rows.push(
                 Row::new(format!("Picked: {}", c.hex))
                     .glyph(Glyph::Brush)
-                    .detail(format!("RGB({}, {}, {})", c.rgb.0, c.rgb.1, c.rgb.2)),
+                    .detail(format!(
+                        "RGB({}, {}, {}) · Enter copies",
+                        c.rgb.0, c.rgb.1, c.rgb.2
+                    ))
+                    .value(format!("hex:{}", c.hex)),
             );
         }
         // Solarized palette swatches
@@ -128,7 +155,8 @@ impl ColourScreen {
             rows.push(
                 Row::new(format!("{}  {}", name, hex.to_uppercase()))
                     .glyph(Glyph::Brush)
-                    .detail(role),
+                    .detail(format!("{role} · Enter copies"))
+                    .value(format!("hex:{}", hex)),
             );
         }
         self.list.set_rows(rows);
@@ -142,7 +170,7 @@ impl Screen for ColourScreen {
         ctx.buf.set_string(
             filter.x,
             filter.y,
-            "Enter picks a pixel · the hex, RGB and palette follow",
+            "Enter copies or picks a pixel · Escape closes",
             ctx.design.style(TextStyle::Dim),
         );
         self.rows_height.set(rows.height);
@@ -155,27 +183,16 @@ impl Screen for ColourScreen {
         }
         let rows_height = self.rows_height.get();
         match key.code {
-            KeyCode::Enter => {
-                if let Some(colour) = Self::pick_pixel() {
-                    self.picked = Some(colour.clone());
-                    self.build_rows();
-                    say(
-                        "Colour",
-                        format!(
-                            "{} · RGB({}, {}, {})",
-                            colour.hex, colour.rgb.0, colour.rgb.1, colour.rgb.2
-                        ),
-                        lazyos_ui::Urgency::Normal,
-                        Glyph::Brush,
-                    );
-                }
-                return Outcome::Continue;
-            }
             KeyCode::Esc => return Outcome::Done(lazyos_ui::app::exit::ESCAPE),
+            KeyCode::Enter => {
+                if let Some(index) = self.list.selected_index() {
+                    return self.activate(index);
+                }
+            }
             _ => {}
         }
         match self.list.handle(key, rows_height, design) {
-            ListAction::Activated(_) => Outcome::Continue,
+            ListAction::Activated(index) => self.activate(index),
             _ => Outcome::Continue,
         }
     }
@@ -183,6 +200,9 @@ impl Screen for ColourScreen {
     fn click(&mut self, row: Option<usize>) -> Outcome {
         if let Some(row) = row {
             self.list.set_cursor(row);
+            if let Some(index) = self.list.selected_index() {
+                return self.activate(index);
+            }
         }
         Outcome::Continue
     }
@@ -201,7 +221,37 @@ impl Screen for ColourScreen {
     }
 }
 
-impl ColourScreen {}
+impl ColourScreen {
+    fn activate(&mut self, index: usize) -> Outcome {
+        let rows = self.list.rows();
+        let Some(row) = rows.get(index) else {
+            return Outcome::Continue;
+        };
+        let Some(key) = row.value.as_deref() else {
+            return Outcome::Continue;
+        };
+        if key == "pick" {
+            Self::pick_detached();
+            Outcome::Done(lazyos_ui::app::exit::OK)
+        } else if let Some(hex) = key.strip_prefix("hex:") {
+            let _ = std::process::Command::new("wl-copy")
+                .arg(hex)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+            say(
+                "Colour",
+                format!("{hex} copied to the clipboard"),
+                lazyos_ui::Urgency::Normal,
+                Glyph::Brush,
+            );
+            Outcome::Done(lazyos_ui::app::exit::OK)
+        } else {
+            Outcome::Continue
+        }
+    }
+}
 
 /// `lazyos menu colour` (`rofi-color`): the window.
 pub fn menu(
@@ -229,8 +279,11 @@ mod tests {
 
     #[test]
     fn colour_palette_is_complete() {
-        let screen = ColourScreen::new();
-        // The solarized palette has 16 entries + 1 for picked
-        // This test just ensures the module compiles and the constants are right
+        let mut screen = ColourScreen::new();
+        screen.build_rows();
+        // 1 pick row + 16 solarized palette swatches = 17 rows
+        assert_eq!(screen.list.rows().len(), 17);
+        assert_eq!(screen.list.rows()[0].value.as_deref(), Some("pick"));
+        assert_eq!(screen.list.rows()[1].value.as_deref(), Some("hex:#002b36"));
     }
 }
