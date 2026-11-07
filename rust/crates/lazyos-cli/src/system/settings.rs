@@ -537,11 +537,11 @@ pub fn menu(
             Ok(0)
         }
         "wifi" => {
-            let _ = std::process::Command::new(bin_script("bar-net")).spawn();
+            spawn_subcommand(&bin_script("bar-net"), &[]);
             Ok(0)
         }
         "bt" => {
-            let _ = std::process::Command::new(bin_script("bar-bt")).spawn();
+            spawn_subcommand(&bin_script("bar-bt"), &[]);
             Ok(0)
         }
         "night" => {
@@ -554,14 +554,11 @@ pub fn menu(
             Ok(0)
         }
         "notify" => {
-            let _ = std::process::Command::new("lazyos")
-                .arg("menu")
-                .arg("notify")
-                .spawn();
+            spawn_subcommand("lazyos", &["menu", "notify"]);
             Ok(0)
         }
         "vnc" => {
-            let _ = std::process::Command::new(bin_script("rofi-vnc")).spawn();
+            spawn_subcommand(&bin_script("rofi-vnc"), &[]);
             Ok(0)
         }
         "touchpad" => {
@@ -609,7 +606,7 @@ pub fn menu(
             Ok(0)
         }
         "display" => {
-            let _ = std::process::Command::new(bin_script("rofi-display")).spawn();
+            spawn_subcommand(&bin_script("rofi-display"), &[]);
             Ok(0)
         }
         "automount" => {
@@ -652,33 +649,41 @@ pub fn menu(
             Ok(0)
         }
         "layout" => {
-            let _ = std::process::Command::new(bin_script("rofi-layout")).spawn();
+            spawn_subcommand(&bin_script("rofi-layout"), &[]);
             Ok(0)
         }
         "translate" => {
-            let _ = std::process::Command::new(bin_script("translate"))
-                .arg("config")
-                .spawn();
+            spawn_subcommand(&bin_script("translate"), &["config"]);
             Ok(0)
         }
         "audio" => {
-            let _ = std::process::Command::new(bin_script("bar-audio")).spawn();
+            spawn_subcommand(&bin_script("bar-audio"), &[]);
             Ok(0)
         }
         "mixer" => {
-            let _ = std::process::Command::new("pavucontrol").spawn();
+            spawn_subcommand("pavucontrol", &[]);
             Ok(0)
         }
         "media" => {
-            let _ = std::process::Command::new(bin_script("rofi-media")).spawn();
+            spawn_subcommand(&bin_script("rofi-media"), &[]);
             Ok(0)
         }
         "power" => {
-            let _ = std::process::Command::new(bin_script("bar-power")).spawn();
+            spawn_subcommand(&bin_script("bar-power"), &[]);
             Ok(0)
         }
         _ => Ok(0),
     }
+}
+
+fn spawn_subcommand(prog: &str, args: &[&str]) {
+    let _ = std::process::Command::new(prog)
+        .args(args)
+        .env_remove("LAZYOS_UI")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
 }
 
 fn missing(names: &[&str]) -> Option<String> {

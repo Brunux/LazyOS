@@ -33,6 +33,15 @@ case ":$PATH:" in
 	*) PATH="/usr/local/bin${PATH:+:$PATH}" ;;
 esac
 
+# Session scripts and helpers live here (~/.config/bin).
+# Prepended so user scripts and ported symlinks are discoverable.
+if [ -n "${HOME:-}" ]; then
+	case ":$PATH:" in
+		*":$HOME/.config/bin:"*) ;;
+		*) PATH="$HOME/.config/bin${PATH:+:$PATH}" ;;
+	esac
+fi
+
 # User-installed binaries (cargo, pipx, a user-level npm prefix) live here.
 # Appended, so a system package always wins over a user copy of the same name.
 if [ -n "${HOME:-}" ]; then

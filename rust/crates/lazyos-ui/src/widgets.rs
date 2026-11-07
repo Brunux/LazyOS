@@ -1583,6 +1583,7 @@ pub enum InputAction {
 #[derive(Clone, Debug, Default)]
 pub struct Input {
     text: String,
+    masked: bool,
 }
 
 impl Input {
@@ -1591,7 +1592,23 @@ impl Input {
     }
 
     pub fn with_text(text: impl Into<String>) -> Self {
-        Self { text: text.into() }
+        Self {
+            text: text.into(),
+            masked: false,
+        }
+    }
+
+    pub fn with_masked(mut self, masked: bool) -> Self {
+        self.masked = masked;
+        self
+    }
+
+    pub fn set_masked(&mut self, masked: bool) {
+        self.masked = masked;
+    }
+
+    pub fn is_masked(&self) -> bool {
+        self.masked
     }
 
     pub fn text(&self) -> &str {
@@ -1662,6 +1679,28 @@ impl Input {
                     .bg(design.color(ColorRole::Surface)),
             );
             put(buf, x, area.y, " ", 1, design.style(TextStyle::Key));
+            return;
+        }
+        if self.masked {
+            const STARS: &str = "****************************************************************************************************";
+            let count = self.text.chars().count();
+            let draw_len = (count as u16).min(room);
+            let stars_slice = if (draw_len as usize) <= STARS.len() {
+                &STARS[..draw_len as usize]
+            } else {
+                &STARS[..STARS.len()]
+            };
+            let end = put(
+                buf,
+                x,
+                area.y,
+                stars_slice,
+                room,
+                design
+                    .style(TextStyle::Body)
+                    .bg(design.color(ColorRole::Surface)),
+            );
+            put(buf, end, area.y, " ", 1, design.style(TextStyle::Key));
             return;
         }
         // The tail that fits, measured in cells from the end.
@@ -1946,5 +1985,18 @@ mod tests {
             .map(|x| buf.cell((x, 0)).unwrap().symbol().to_string())
             .collect();
         assert!(line.ends_with('\u{2026}'), "{line:?}");
+    }
+
+    #[test]
+    fn masked_input_renders_asterisks() {
+        let area = Rect::new(0, 0, 20, 1);
+        let mut buf = Buffer::empty(area);
+        let design = Design::solarized();
+        let input = Input::with_text("secret").with_masked(true);
+        input.render(area, &mut buf, &design, "password");
+        let rendered: String = (1..7)
+            .map(|x| buf.cell((x, 0)).unwrap().symbol().to_string())
+            .collect();
+        assert_eq!(rendered, "******");
     }
 }

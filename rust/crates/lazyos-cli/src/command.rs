@@ -446,6 +446,86 @@ pub const COMMANDS: &[CommandSpec] = &[
         symlinks: &["rofi-about"],
         installed: &["rofi-about"],
     },
+    CommandSpec {
+        // Wi-Fi network manager (spec 017): scan, signal, connect.
+        path: "menu net",
+        summary: "scan Wi-Fi networks, signal gauge, connect (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["bar-net"],
+        installed: &["bar-net"],
+    },
+    CommandSpec {
+        // AI agents selector (spec 017): agents and accounts.
+        path: "menu agents",
+        summary: "AI agent selector and accounts (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-agents"],
+        installed: &["rofi-agents"],
+    },
+    CommandSpec {
+        // Places & bookmarks (spec 017): folders, disks, mount.
+        path: "menu places",
+        summary: "user directories, mounted and mountable disks (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-places"],
+        installed: &["rofi-places"],
+    },
+    CommandSpec {
+        // Disk cleaner (spec 017): apt, journal, thumbnails, trash.
+        path: "menu clean",
+        summary: "reclaim disk space from caches, trash and journal (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-clean"],
+        installed: &["rofi-clean"],
+    },
+    CommandSpec {
+        // Process killer (spec 017): user processes, memory, SIGTERM.
+        path: "menu kill",
+        summary: "user processes with PID and memory, signal with SIGTERM (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-kill"],
+        installed: &["rofi-kill"],
+    },
+    CommandSpec {
+        // Media downloader (spec 017): yt-dlp into ~/Downloads.
+        path: "menu download",
+        summary: "download video or audio from link with yt-dlp (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-download"],
+        installed: &["rofi-download"],
+    },
+    CommandSpec {
+        // Keyboard layout (spec 017): switch layout via Sway IPC.
+        path: "menu layout",
+        summary: "switch keyboard layout via Sway IPC (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-layout"],
+        installed: &["rofi-layout"],
+    },
+    CommandSpec {
+        // Contextual file actions (spec 017): du, pack, unpack, convert.
+        path: "menu file-actions",
+        summary: "contextual file actions: du, compress, extract, convert (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["rofi-file-actions"],
+        installed: &["rofi-file-actions"],
+    },
+    CommandSpec {
+        // Translation (spec 017): translate selection or clipboard.
+        path: "menu translate",
+        summary: "translate selected text or clipboard via Google/MyMemory (spec 017)",
+        shape: Shape::Pick,
+        symlinks: &["translate"],
+        installed: &["translate"],
+    },
+    CommandSpec {
+        // Speech dictation (spec 017): toggle speech-to-text.
+        path: "menu dictate",
+        summary: "speech-to-text dictation with whisper-cli and wtype (spec 017)",
+        shape: Shape::Direct,
+        symlinks: &["dictate"],
+        installed: &["dictate"],
+    },
 ];
 
 /// A command the table resolved, with the arguments that belong to it.

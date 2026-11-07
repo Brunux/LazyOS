@@ -21,8 +21,8 @@ use std::cell::Cell;
 
 use lazyos_ui::widgets::put_trunc;
 use lazyos_ui::{
-    BodyCtx, Confirm, ConfirmAction, Design, Glyph, Header, KeyHint, ListAction, ListState,
-    Outcome, Row, Screen, TextStyle, draw_card,
+    BodyCtx, Confirm, ConfirmAction, Design, Glyph, Header, Input, InputAction, KeyHint,
+    ListAction, ListState, Outcome, Row, Screen, TextStyle, draw_card,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
@@ -77,6 +77,13 @@ pub enum Question {
         /// The value this question answers with once the verb is chosen.
         answer: String,
     },
+    /// A single-line text input question (e.g. Wi-Fi password or download URL).
+    Input {
+        title: String,
+        note: String,
+        placeholder: String,
+        masked: bool,
+    },
 }
 
 impl Question {
@@ -91,6 +98,20 @@ impl Question {
             note: note.into(),
             rows,
             keys,
+        }
+    }
+
+    pub fn input(
+        title: impl Into<String>,
+        note: impl Into<String>,
+        placeholder: impl Into<String>,
+        masked: bool,
+    ) -> Self {
+        Question::Input {
+            title: title.into(),
+            note: note.into(),
+            placeholder: placeholder.into(),
+            masked,
         }
     }
 
@@ -129,7 +150,8 @@ impl Question {
         match self {
             Question::Choose { title, .. }
             | Question::Ask { title, .. }
-            | Question::Rows { title, .. } => title,
+            | Question::Rows { title, .. }
+            | Question::Input { title, .. } => title,
         }
     }
 
@@ -137,7 +159,8 @@ impl Question {
         match self {
             Question::Choose { note, .. }
             | Question::Ask { note, .. }
-            | Question::Rows { note, .. } => note,
+            | Question::Rows { note, .. }
+            | Question::Input { note, .. } => note,
         }
     }
 }
@@ -152,6 +175,7 @@ pub struct Picker {
     at: usize,
     list: ListState,
     confirm: Option<Confirm>,
+    input: Option<Input>,
     answers: Vec<String>,
     header: Header,
     /// The current question's title and note with the answers already given
@@ -173,6 +197,7 @@ impl Picker {
             at: 0,
             list: ListState::new(),
             confirm: None,
+            input: None,
             answers: Vec::new(),
             header: Header::new(title.to_string()),
             subtitle: String::new(),
@@ -199,6 +224,7 @@ impl Picker {
     fn load(&mut self) {
         self.list = ListState::new();
         self.confirm = None;
+        self.input = None;
         let answers = self.answers.clone();
         let (subtitle, status, keys): (String, String, Vec<(&str, &str)>) =
             match self.questions.get(self.at) {
@@ -254,6 +280,14 @@ impl Picker {
                             ("Enter", "answer"),
                             ("Esc", "cancel"),
                         ],
+                    )
+                }
+                Some(Question::Input { title, masked, .. }) => {
+                    self.input = Some(Input::new().with_masked(*masked));
+                    (
+                        fill(title, &answers),
+                        "Type and press Enter · Escape goes back".to_string(),
+                        vec![("Enter", "confirm"), ("Esc", "back")],
                     )
                 }
                 None => ("".to_string(), String::new(), Vec::new()),
@@ -322,6 +356,17 @@ impl Screen for Picker {
                     confirm.render(ctx.area, ctx.buf, ctx.design);
                 }
             }
+            Question::Input { placeholder, .. } => {
+                if let Some(input) = &self.input {
+                    let input_rect = Rect {
+                        x: filter.x,
+                        y: filter.y + 2,
+                        width: filter.width,
+                        height: 1,
+                    };
+                    input.render(input_rect, ctx.buf, ctx.design, placeholder);
+                }
+            }
         }
     }
 
@@ -362,6 +407,19 @@ impl Screen for Picker {
                     ConfirmAction::Chosen(1) => self.advance(answer),
                     ConfirmAction::Chosen(_) | ConfirmAction::Cancelled => self.back(),
                     ConfirmAction::None => Outcome::Continue,
+                }
+            }
+            Question::Input { .. } => {
+                let Some(input) = self.input.as_mut() else {
+                    return Outcome::Continue;
+                };
+                match input.handle(key) {
+                    InputAction::Submitted => {
+                        let text = input.text().to_string();
+                        self.advance(text)
+                    }
+                    InputAction::Cancelled => self.back(),
+                    _ => Outcome::Continue,
                 }
             }
         }

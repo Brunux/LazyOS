@@ -54,6 +54,7 @@ pub struct DevScreen {
     keybar: Vec<KeyHint>,
     rows_height: Cell<u16>,
     stage: DevStage,
+    current_action: Option<DevAction>,
     archives: Vec<ArchiveEntry>,
     archive_list: ListState,
     target_dir: String,
@@ -107,6 +108,7 @@ impl DevScreen {
             ],
             rows_height: Cell::new(20),
             stage: DevStage::Main,
+            current_action: None,
             archives: Vec::new(),
             archive_list: ListState::new().ranked(),
             target_dir: String::new(),
@@ -116,6 +118,16 @@ impl DevScreen {
             ],
             running_keyhints: vec![KeyHint::new("Esc", "back")],
         }
+    }
+
+    pub fn profile_bin() -> std::path::PathBuf {
+        if let Ok(home) = std::env::var("HOME") {
+            let p = std::path::PathBuf::from(home).join(".config/bin/lazyos-profile");
+            if p.exists() {
+                return p;
+            }
+        }
+        std::path::PathBuf::from("lazyos-profile")
     }
 
     fn entry_row(e: &DevEntry) -> Row {
@@ -146,16 +158,16 @@ impl DevScreen {
         }
     }
 
-    fn pick_target(&mut self, prompt: &str, message: &str) -> Option<String> {
-        // For now, use a simple approach - in the full implementation this would
-        // show a picker with mounted disks and mountable partitions
-        // This is a placeholder that uses $HOME/Downloads as default
-        Some(std::env::var("HOME").unwrap_or_default() + "/Downloads")
+    fn pick_target(&mut self, _prompt: &str, _message: &str) -> Option<String> {
+        let dir = std::env::var("HOME").unwrap_or_default() + "/Downloads";
+        let _ = std::fs::create_dir_all(&dir);
+        Some(dir)
     }
 
     fn list_archives(&mut self) -> Vec<ArchiveEntry> {
         // Call lazyos-profile list-archives
-        let output = std::process::Command::new("lazyos-profile")
+        let profile = Self::profile_bin();
+        let output = std::process::Command::new(profile)
             .args(["list-archives"])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
@@ -223,7 +235,8 @@ impl DevScreen {
         self.stage = DevStage::Running;
         let _ = busy("dev-export", "Developer", "Exporting profile...", "box");
 
-        let result = std::process::Command::new("lazyos-profile")
+        let profile = Self::profile_bin();
+        let result = std::process::Command::new(profile)
             .args(["export", target])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
@@ -263,7 +276,8 @@ impl DevScreen {
         self.stage = DevStage::Running;
         let _ = busy("dev-import", "Developer", "Restoring profile...", "undo");
 
-        let result = std::process::Command::new("lazyos-profile")
+        let profile = Self::profile_bin();
+        let result = std::process::Command::new(profile)
             .args(["import", archive])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
@@ -308,7 +322,8 @@ impl DevScreen {
             "bug",
         );
 
-        let result = std::process::Command::new("lazyos-profile")
+        let profile = Self::profile_bin();
+        let result = std::process::Command::new(profile)
             .args(["report", target])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
@@ -421,6 +436,7 @@ impl Screen for DevScreen {
                     KeyCode::Enter => {
                         if let Some(selected) = self.list.selected_index() {
                             if let Some(entry) = self.entries.get(selected) {
+                                self.current_action = Some(entry.action.clone());
                                 match entry.action {
                                     DevAction::Export => {
                                         if let Some(target) = self.pick_target(
@@ -479,16 +495,11 @@ impl Screen for DevScreen {
             DevStage::PickTarget => {
                 match key.code {
                     KeyCode::Enter => {
-                        // Determine which action we're doing based on last main selection
-                        if let Some(selected) = self.list.selected_index() {
-                            if let Some(entry) = self.entries.get(selected) {
-                                let target = self.target_dir.clone();
-                                match entry.action {
-                                    DevAction::Export => self.run_export(&target),
-                                    DevAction::Report => self.run_report(&target),
-                                    _ => {}
-                                }
-                            }
+                        let target = self.target_dir.clone();
+                        match self.current_action {
+                            Some(DevAction::Export) => self.run_export(&target),
+                            Some(DevAction::Report) => self.run_report(&target),
+                            _ => {}
                         }
                         self.stage = DevStage::Main;
                     }
@@ -637,7 +648,12 @@ pub fn menu(
     terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
     design: &Design,
 ) -> Result<i32, crate::Failure> {
-    if let Some(said) = missing(&["lazyos-profile", "wl-copy", "sudo", "tar", "gpg", "zstd"]) {
+    let profile_exists = DevScreen::profile_bin().exists() || have("lazyos-profile");
+    let mut needed = vec!["wl-copy", "sudo", "tar", "gpg", "zstd"];
+    if !profile_exists {
+        needed.push("lazyos-profile");
+    }
+    if let Some(said) = missing(&needed) {
         say(
             "Developer",
             format!("{said} (lazyos-profile, wl-clipboard, sudo, tar, gnupg, zstd)"),

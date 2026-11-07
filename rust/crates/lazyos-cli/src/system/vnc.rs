@@ -126,7 +126,7 @@ pub fn status_bar() -> String {
     const EYE: &str = "\u{f06e}"; // Font Awesome eye
     if sharing() {
         format!(
-            "{{\"text\":\"<span font_desc=\\'JetBrains Mono 13\\'>{}</span>\",\"class\":\"on\",\"tooltip\":\"sharing this screen read-only on localhost:{}\\nclick for the menu, right click to stop\"}}",
+            "{{\"text\":\"<span font_desc='JetBrains Mono 13'>{}</span>\",\"class\":\"on\",\"tooltip\":\"sharing this screen read-only on localhost:{}\\nclick for the menu, right click to stop\"}}",
             EYE, PORT
         )
     } else {

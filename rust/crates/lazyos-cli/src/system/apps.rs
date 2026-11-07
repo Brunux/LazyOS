@@ -290,6 +290,7 @@ impl AppsScreen {
         // Spawn detached
         let _ = std::process::Command::new("setsid")
             .args(["sh", "-c", &exec_cmd])
+            .env_remove("LAZYOS_UI")
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

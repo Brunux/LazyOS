@@ -1,6 +1,6 @@
 # Spec 017 — Remaining Interactive Surfaces: Network, Places, Cleaner, Agents, and Utilities
 
-- **Status**: draft
+- **Status**: in progress
 - **Phase**: 4
 - **Depends on**: 007, 010, 012
 - **Model**: `claude-sonnet-5-5` (effort `high`) — multi-surface interactive port covering NetworkManager IPC/nmcli, process signals, safety confirmations, disk reclamation, and agent model switching. Fallback `claude-opus-5-5`.
@@ -82,19 +82,19 @@ While 35 surfaces have migrated to native Rust/Ratatui (`lazyos`), 9 user-facing
 
 ## Acceptance criteria
 
-- [ ] `lazyos menu net` lists visible Wi-Fi networks with signal strength and encryption status; selecting an unconfigured protected network prompts for password and connects via `nmcli`.
-- [ ] `lazyos menu net --status` prints formatted status JSON suitable for waybar polling without opening a window.
-- [ ] `lazyos menu agents` displays available agents, marks the current active default, and selecting a new agent persists choice to configuration.
-- [ ] `lazyos menu places` lists standard folders and connected external drives; selecting a folder opens it in file browser, selecting an unmounted drive mounts it via udisks2.
-- [ ] `lazyos menu clean` shows calculated reclaimable space for apt, journals, thumbnails, and trash; confirms before purging selected caches.
-- [ ] `lazyos menu kill` lists running processes; typing filters by process name, and selecting a process terminates it with `SIGTERM`.
-- [ ] `lazyos menu download` prompts for URL (auto-fills from clipboard), prompts format, and spawns download task in `~/Downloads`.
-- [ ] `lazyos menu layout` lists keyboard layouts and switches the active Sway keyboard mapping on selection.
-- [ ] compatibility: all 9 legacy paths (`bar-net`, `rofi-agents`, `rofi-places`, `rofi-clean`, `rofi-kill`, `rofi-download`, `rofi-layout`, `rofi-file-actions`, `translate`, `dictate`) exist as symlinks to `lazyos` and dispatch to their corresponding commands.
-- [ ] witness: `scripts/check-system.sh` verifies every ported surface exists in `lazyos --symlinks` and `lazyos --help`, and passes behavioral tests for `menu net --status`, `menu clean --dry-run`, and `menu places --rows`.
-- [ ] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/02-rofi.md` documents the migrated interactive surfaces under their `lazyos menu <subcommand>` paths.
-- [ ] witness: an `AGENTS.md` bullet documents the completion of the interactive surface migration and the retirement of `rofi -dmenu` workflows.
-- [ ] unit tests: network output parser, process table parser, cleaner target calculation, and places drive detection are covered by `cargo test`.
+- [x] `lazyos menu net` lists visible Wi-Fi networks with signal strength and encryption status; selecting an unconfigured protected network prompts for password and connects via `nmcli`.
+- [x] `lazyos menu net --status` prints formatted status JSON suitable for waybar polling without opening a window.
+- [x] `lazyos menu agents` displays available agents, marks the current active default, and selecting a new agent persists choice to configuration.
+- [x] `lazyos menu places` lists standard folders and connected external drives; selecting a folder opens it in file browser, selecting an unmounted drive mounts it via udisks2.
+- [x] `lazyos menu clean` shows calculated reclaimable space for apt, journals, thumbnails, and trash; confirms before purging selected caches.
+- [x] `lazyos menu kill` lists running processes; typing filters by process name, and selecting a process terminates it with `SIGTERM`.
+- [x] `lazyos menu download` prompts for URL (auto-fills from clipboard), prompts format, and spawns download task in `~/Downloads`.
+- [x] `lazyos menu layout` lists keyboard layouts and switches the active Sway keyboard mapping on selection.
+- [x] compatibility: all 9 legacy paths (`bar-net`, `rofi-agents`, `rofi-places`, `rofi-clean`, `rofi-kill`, `rofi-download`, `rofi-layout`, `rofi-file-actions`, `translate`, `dictate`) exist as symlinks to `lazyos` and dispatch to their corresponding commands.
+- [x] witness: `scripts/check-system.sh` verifies every ported surface exists in `lazyos --symlinks` and `lazyos --help`, and passes behavioral tests for `menu net --status`, `menu clean --dry-run`, and `menu places --rows`.
+- [x] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/02-rofi.md` documents the migrated interactive surfaces under their `lazyos menu <subcommand>` paths.
+- [x] witness: an `AGENTS.md` bullet documents the completion of the interactive surface migration and the retirement of `rofi -dmenu` workflows.
+- [x] unit tests: network output parser, process table parser, cleaner target calculation, and places drive detection are covered by `cargo test`.
 
 ## Tests
 
