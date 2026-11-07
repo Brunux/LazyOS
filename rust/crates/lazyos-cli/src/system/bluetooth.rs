@@ -1,13 +1,16 @@
 //! Bluetooth picker (`bar-bt`): scan, connect, disconnect, bluetoothctl.
 //!
-//! The old script scanned for 3 seconds, listed known devices with connected
-//! ones first, and offered connect/disconnect, turn off, and open bluetoothctl.
+//! Scans for nearby devices asynchronously, lists known devices with connected ones first,
+//! prioritizes friendly human names over raw BLE beacons, and offers
+//! connect/disconnect, power toggle, background scanning ('s' key), and bluetoothctl.
 
 #![allow(unused_imports)]
 #![allow(dead_code)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::vec_init_then_push)]
 use std::cell::Cell;
+use std::sync::mpsc::{Receiver, channel};
+use std::time::Duration;
 
 use lazyos_ui::{
     BodyCtx, Design, Glyph, Header, KeyHint, ListAction, ListState, Outcome, Row, Screen,
@@ -16,14 +19,32 @@ use lazyos_ui::{
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::layout::Rect;
 
-use crate::system::{missing, out, say};
+use crate::system::{busy, busy_end, busy_fail, missing, out, say};
 
 const NEEDED: &[&str] = &["bluetoothctl", "foot"];
+
+/// Returns true if the device name is just a formatted MAC address (e.g. "44-F9-B4-7F-6C-CA").
+fn is_raw_mac(name: &str) -> bool {
+    let clean = name.replace([':', '-'], "");
+    clean.len() == 12 && clean.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Run an active scan for discovery using bluetoothctl.
+fn do_scan(secs: u32) {
+    let _ = std::process::Command::new("bluetoothctl")
+        .args(["--timeout", &secs.to_string(), "scan", "on"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+}
 
 /// The bluetooth screen.
 pub struct BluetoothScreen {
     devices: Vec<Device>,
     powered: bool,
+    scanning: bool,
+    scan_rx: Option<Receiver<Vec<Device>>>,
     list: ListState,
     header: Header,
     keybar: Vec<KeyHint>,
@@ -40,20 +61,52 @@ struct Device {
 
 impl BluetoothScreen {
     pub fn new() -> Self {
+        let powered = Self::get_powered();
+        let devices = if powered {
+            Self::get_devices()
+        } else {
+            Vec::new()
+        };
         let mut screen = Self {
             keys: Vec::new(),
-            devices: Vec::new(),
-            powered: false,
+            devices,
+            powered,
+            scanning: false,
+            scan_rx: None,
             list: ListState::new(),
             header: Header::new("LazyOS").subtitle("Bluetooth"),
             keybar: vec![
-                KeyHint::new("Enter", "connect/disconnect"),
+                KeyHint::new("Enter", "select"),
+                KeyHint::new("s", "scan"),
                 KeyHint::new("Esc", "close"),
             ],
             rows_height: Cell::new(20),
         };
-        screen.reload();
+
+        // If powered on, start a background scan immediately so newly
+        // advertising devices appear automatically without blocking the UI.
+        if powered {
+            screen.start_scan(3);
+        } else {
+            screen.build_rows();
+        }
+
         screen
+    }
+
+    fn start_scan(&mut self, secs: u32) {
+        if self.scanning {
+            return;
+        }
+        self.scanning = true;
+        let (tx, rx) = channel();
+        self.scan_rx = Some(rx);
+        std::thread::spawn(move || {
+            do_scan(secs);
+            let devs = BluetoothScreen::get_devices();
+            let _ = tx.send(devs);
+        });
+        self.build_rows();
     }
 
     fn reload(&mut self) {
@@ -85,7 +138,7 @@ impl BluetoothScreen {
             }
         }
 
-        // Get all known devices
+        // Get all known/discovered devices
         let known = out(&["bluetoothctl", "devices"]).unwrap_or_default();
         let mut devices = Vec::new();
         for line in known.lines() {
@@ -102,11 +155,16 @@ impl BluetoothScreen {
                 }
             }
         }
-        // Connected first, then alphabetical
+
+        // Ordering:
+        // 1. Connected devices first
+        // 2. Named friendly devices before raw MAC addresses
+        // 3. Alphabetical by name
         devices.sort_by(|a, b| {
             b.connected
                 .cmp(&a.connected)
-                .then_with(|| a.name.cmp(&b.name))
+                .then_with(|| is_raw_mac(&a.name).cmp(&is_raw_mac(&b.name)))
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
         });
         devices
     }
@@ -120,13 +178,8 @@ impl BluetoothScreen {
                     .detail("power on the controller")
                     .value("power-on"),
             );
-        } else if self.devices.is_empty() {
-            rows.push(
-                Row::new("No devices found")
-                    .glyph(Glyph::Bluetooth)
-                    .detail("scan to discover"),
-            );
         } else {
+            // Devices list
             for d in &self.devices {
                 let label = if d.connected {
                     format!("* {} · connected", d.name)
@@ -140,8 +193,33 @@ impl BluetoothScreen {
                         .value(format!("device:{}", d.mac)),
                 );
             }
-        }
-        if self.powered {
+
+            // Scan action row
+            let (scan_label, scan_detail) = if self.scanning {
+                (
+                    "Scanning for devices…",
+                    "discovery in progress · please wait",
+                )
+            } else if self.devices.is_empty() {
+                (
+                    "Scan for devices",
+                    "no devices found · press Enter or 's' to scan",
+                )
+            } else {
+                (
+                    "Scan for devices",
+                    "discover nearby Bluetooth devices (or press 's')",
+                )
+            };
+
+            rows.push(
+                Row::new(scan_label)
+                    .glyph(Glyph::Sync)
+                    .detail(scan_detail)
+                    .value("scan"),
+            );
+
+            // Power off and helper tools
             rows.push(
                 Row::new("Turn Bluetooth off")
                     .glyph(Glyph::Bluetooth)
@@ -155,6 +233,7 @@ impl BluetoothScreen {
                     .value("bluetoothctl"),
             );
         }
+
         self.keys = rows.iter().filter_map(|r| r.value.clone()).collect();
         self.list.set_rows(rows);
     }
@@ -171,11 +250,18 @@ impl Screen for BluetoothScreen {
                 "Bluetooth is off · Enter turns it on",
                 ctx.design.style(TextStyle::Dim),
             );
+        } else if self.scanning {
+            ctx.buf.set_string(
+                filter.x,
+                filter.y,
+                "Scanning for nearby Bluetooth devices… · Esc to close",
+                ctx.design.style(TextStyle::Body),
+            );
         } else {
             ctx.buf.set_string(
                 filter.x,
                 filter.y,
-                "Enter connects/disconnects · footer rows for power off and bluetoothctl",
+                "Enter connects/disconnects · 's' scans for nearby devices",
                 ctx.design.style(TextStyle::Dim),
             );
         }
@@ -190,6 +276,12 @@ impl Screen for BluetoothScreen {
         let rows_height = self.rows_height.get();
         match key.code {
             KeyCode::Esc => return Outcome::Done(lazyos_ui::app::exit::ESCAPE),
+            KeyCode::Char('s') | KeyCode::Char('S') => {
+                if self.powered && !self.scanning {
+                    self.start_scan(3);
+                    return Outcome::Continue;
+                }
+            }
             KeyCode::Enter => {
                 if let Some(index) = self.list.selected_index() {
                     return self.activate(index);
@@ -225,9 +317,39 @@ impl Screen for BluetoothScreen {
     fn header(&self) -> Option<&Header> {
         Some(&self.header)
     }
-}
 
-impl BluetoothScreen {}
+    fn needs_tick(&self) -> Option<Duration> {
+        if self.scanning {
+            Some(Duration::from_millis(100))
+        } else {
+            None
+        }
+    }
+
+    fn tick(&mut self) -> Outcome {
+        if self.scanning {
+            if let Some(rx) = &self.scan_rx {
+                if let Ok(devs) = rx.try_recv() {
+                    self.devices = devs;
+                    self.scanning = false;
+                    self.scan_rx = None;
+                    self.build_rows();
+                    say(
+                        "Bluetooth",
+                        if self.devices.is_empty() {
+                            "No devices found".to_string()
+                        } else {
+                            format!("{} devices found", self.devices.len())
+                        },
+                        lazyos_ui::Urgency::Normal,
+                        Glyph::Bluetooth,
+                    );
+                }
+            }
+        }
+        Outcome::Continue
+    }
+}
 
 /// The `--status` (`status`) JSON output for waybar (`custom/bt`).
 pub fn status() -> String {
@@ -301,13 +423,20 @@ impl BluetoothScreen {
             return Outcome::Continue;
         }
         match key.as_str() {
+            "scan" => {
+                if !self.scanning {
+                    self.start_scan(3);
+                }
+            }
             "power-on" => {
+                busy("bt", "Bluetooth", "Powering on…", "bluetooth");
                 let _ = std::process::Command::new("bluetoothctl")
                     .args(["power", "on"])
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .status();
+                busy_end("bt", "Bluetooth", "Bluetooth on");
                 say(
                     "Bluetooth",
                     "Bluetooth on",
@@ -315,20 +444,25 @@ impl BluetoothScreen {
                     Glyph::Bluetooth,
                 );
                 self.reload();
+                self.start_scan(3);
             }
             "power-off" => {
+                busy("bt", "Bluetooth", "Powering off…", "bluetooth");
                 let _ = std::process::Command::new("bluetoothctl")
                     .args(["power", "off"])
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .status();
+                busy_end("bt", "Bluetooth", "Bluetooth off");
                 say(
                     "Bluetooth",
                     "Bluetooth off",
                     lazyos_ui::Urgency::Normal,
                     Glyph::Bluetooth,
                 );
+                self.scanning = false;
+                self.scan_rx = None;
                 self.reload();
             }
             "bluetoothctl" => {
@@ -341,33 +475,114 @@ impl BluetoothScreen {
             }
             k if k.starts_with("device:") => {
                 let mac = &k[7..];
-                if let Some(d) = self.devices.iter().find(|d| d.mac == mac) {
+                if let Some(d) = self.devices.iter().find(|d| d.mac == mac).cloned() {
                     if d.connected {
-                        let _ = std::process::Command::new("bluetoothctl")
+                        busy(
+                            "bt",
+                            "Bluetooth",
+                            &format!("Disconnecting {}…", d.name),
+                            "bluetooth",
+                        );
+                        let out = std::process::Command::new("bluetoothctl")
                             .args(["disconnect", mac])
                             .stdin(std::process::Stdio::null())
-                            .stdout(std::process::Stdio::null())
-                            .stderr(std::process::Stdio::null())
-                            .status();
-                        say(
-                            "Bluetooth",
-                            format!("Disconnected {}", d.name),
-                            lazyos_ui::Urgency::Normal,
-                            Glyph::Bluetooth,
-                        );
+                            .stdout(std::process::Stdio::piped())
+                            .stderr(std::process::Stdio::piped())
+                            .output();
+                        let text = out
+                            .as_ref()
+                            .map(|o| String::from_utf8_lossy(&o.stdout))
+                            .unwrap_or_default();
+                        if text.contains("Successful disconnected")
+                            || out.as_ref().map(|o| o.status.success()).unwrap_or(false)
+                        {
+                            busy_end("bt", "Bluetooth", &format!("Disconnected {}", d.name));
+                            say(
+                                "Bluetooth",
+                                format!("Disconnected {}", d.name),
+                                lazyos_ui::Urgency::Normal,
+                                Glyph::Bluetooth,
+                            );
+                        } else {
+                            busy_fail("bt", "Bluetooth", "Disconnect failed", "dialog-error");
+                            say(
+                                "Bluetooth",
+                                format!("Could not disconnect {}", d.name),
+                                lazyos_ui::Urgency::Normal,
+                                Glyph::Warning,
+                            );
+                        }
                     } else {
-                        let _ = std::process::Command::new("bluetoothctl")
+                        busy(
+                            "bt",
+                            "Bluetooth",
+                            &format!("Connecting to {}…", d.name),
+                            "bluetooth",
+                        );
+                        let out = std::process::Command::new("bluetoothctl")
                             .args(["connect", mac])
                             .stdin(std::process::Stdio::null())
-                            .stdout(std::process::Stdio::null())
-                            .stderr(std::process::Stdio::null())
-                            .status();
-                        say(
-                            "Bluetooth",
-                            format!("Connected to {}", d.name),
-                            lazyos_ui::Urgency::Normal,
-                            Glyph::Bluetooth,
-                        );
+                            .stdout(std::process::Stdio::piped())
+                            .stderr(std::process::Stdio::piped())
+                            .output();
+                        let text = out
+                            .as_ref()
+                            .map(|o| String::from_utf8_lossy(&o.stdout))
+                            .unwrap_or_default();
+                        if text.contains("Connection successful") {
+                            busy_end("bt", "Bluetooth", &format!("Connected to {}", d.name));
+                            say(
+                                "Bluetooth",
+                                format!("Connected to {}", d.name),
+                                lazyos_ui::Urgency::Normal,
+                                Glyph::Bluetooth,
+                            );
+                        } else {
+                            // If direct connect failed, attempt pairing first
+                            let pair_out = std::process::Command::new("bluetoothctl")
+                                .args(["pair", mac])
+                                .stdin(std::process::Stdio::null())
+                                .stdout(std::process::Stdio::piped())
+                                .stderr(std::process::Stdio::piped())
+                                .output();
+                            let pair_text = pair_out
+                                .as_ref()
+                                .map(|o| String::from_utf8_lossy(&o.stdout))
+                                .unwrap_or_default();
+                            if pair_text.contains("Pairing successful") {
+                                let _ = std::process::Command::new("bluetoothctl")
+                                    .args(["trust", mac])
+                                    .stdin(std::process::Stdio::null())
+                                    .stdout(std::process::Stdio::null())
+                                    .stderr(std::process::Stdio::null())
+                                    .status();
+                                let _ = std::process::Command::new("bluetoothctl")
+                                    .args(["connect", mac])
+                                    .stdin(std::process::Stdio::null())
+                                    .stdout(std::process::Stdio::null())
+                                    .stderr(std::process::Stdio::null())
+                                    .status();
+                                busy_end(
+                                    "bt",
+                                    "Bluetooth",
+                                    &format!("Paired and connected to {}", d.name),
+                                );
+                                say(
+                                    "Bluetooth",
+                                    format!("Connected to {}", d.name),
+                                    lazyos_ui::Urgency::Normal,
+                                    Glyph::Bluetooth,
+                                );
+                            } else {
+                                busy_fail("bt", "Bluetooth", "Connection failed", "dialog-error");
+                                say(
+                                    "Bluetooth",
+                                    format!("Could not connect to {}", d.name),
+                                    lazyos_ui::Urgency::Normal,
+                                    Glyph::Warning,
+                                );
+                            }
+                        }
                     }
                     self.reload();
                 }
@@ -375,25 +590,6 @@ impl BluetoothScreen {
             _ => {}
         }
         Outcome::Continue
-    }
-
-    fn list_layout(area: Rect) -> (Rect, Rect) {
-        let inner = Rect {
-            x: area.x + 2,
-            y: area.y + 1,
-            width: area.width.saturating_sub(4),
-            height: area.height.saturating_sub(2),
-        };
-        let filter = Rect {
-            height: 1.min(inner.height),
-            ..inner
-        };
-        let rows = Rect {
-            y: inner.y + 2,
-            height: inner.height.saturating_sub(2),
-            ..inner
-        };
-        (filter, rows)
     }
 }
 
@@ -405,6 +601,14 @@ mod tests {
     fn bluetooth_needed_tools() {
         assert!(NEEDED.contains(&"bluetoothctl"));
         assert!(NEEDED.contains(&"foot"));
+    }
+
+    #[test]
+    fn raw_mac_detection() {
+        assert!(is_raw_mac("44-F9-B4-7F-6C-CA"));
+        assert!(is_raw_mac("44:F9:B4:7F:6C:CA"));
+        assert!(!is_raw_mac("Sala de estar tv"));
+        assert!(!is_raw_mac("AirPods"));
     }
 
     #[test]
