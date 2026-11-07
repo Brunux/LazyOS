@@ -151,7 +151,7 @@ notify-send -a LazyOS -i color-picker "Colour" "$hex copied to the clipboard (${
             ("cyan", "#2aa198", "accent / cyan"),
             ("green", "#859900", "success"),
         ];
-        for (name, hex, role) in SOLARIZED.iter().copied() {
+        for (name, hex, role) in SOLARIZED {
             rows.push(
                 Row::new(format!("{}  {}", name, hex.to_uppercase()))
                     .glyph(Glyph::Brush)

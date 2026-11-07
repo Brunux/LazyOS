@@ -305,7 +305,10 @@ impl CaptureScreen {
                     let shotdir = dirs::picture_dir()
                         .map(|p| p.join("Screenshots"))
                         .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("Pictures"));
-                    crate::system::spawn_detached(&format!("exec xdg-open '{}'", shotdir.display()));
+                    crate::system::spawn_detached(&format!(
+                        "exec xdg-open '{}'",
+                        shotdir.display()
+                    ));
                     Outcome::Done(lazyos_ui::app::exit::OK)
                 }
                 _ => Outcome::Continue,
