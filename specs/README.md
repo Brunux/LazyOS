@@ -144,6 +144,7 @@ boundary (008).
 | 017 remaining surfaces | nmcli IPC + process manager + cleaner + places | `claude-sonnet-5-5` (high) | `claude-opus-5-5` |
 | 018 TUI installer | full TUI wizard: user, password, timezone, disk safety, progress | `claude-opus-5-5` (high) | `claude-sonnet-5-5` |
 | 019 notification daemon | layer-shell + D-Bus server + tiny-skia 2D card rendering + actions | `claude-opus-5-5` (high) | `claude-sonnet-5-5` |
+| 020 frictionless UX | auto-discovery, in-window progress/TaskView, retire TUI toasts, layout consistency | `claude-opus-5-5` (high) | `claude-sonnet-5-5` |
 
 The assignment is still a **starting hypothesis**: each PR records the model, the effort, the
 harness and whether the criteria and tests passed on the first review, and the table is revised
@@ -214,6 +215,7 @@ specs.
 | 017 | [`017-remaining-surfaces.md`](017-remaining-surfaces.md) — remaining interactive surfaces: network, places, clean, agents, and utilities | 4 | merged |
 | 018 | [`018-tui-installer.md`](018-tui-installer.md) — full TUI installer: user setup, timezone, disk safety, progress | 4-5 | merged |
 | 019 | [`019-notification-daemon.md`](019-notification-daemon.md) — eye-candy layer-shell notification daemon, actions, progress | 5 | merged |
+| 020 | [`020-frictionless-ux.md`](020-frictionless-ux.md) — intuitive, frictionless, self-contained UX overhaul | 6 | draft |
 
 The status column is the word that opens each file's `**Status**` line, and CI fails when the two
 disagree (`The index status is the spec's status`, `.github/workflows/specs.yml`). `merged` means

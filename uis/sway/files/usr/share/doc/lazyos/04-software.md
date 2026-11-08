@@ -36,10 +36,15 @@ that is built. For the machine in front of you, `apt install` is the answer.
 
 ## The terminal
 
-**foot**, solarized, JetBrains Mono with a Nerd Font fallback for glyphs.
+**foot**, themed in the active session palette, JetBrains Mono with a Nerd Font
+fallback for glyphs. Selecting text with the mouse automatically copies it to
+both the PRIMARY selection and the system CLIPBOARD (`selection-target=both` in
+`~/.config/foot/foot.ini`), so you can immediately paste in any application with
+`Ctrl+V` or `Ctrl+Shift+V` without pressing `Ctrl+Shift+C` first.
 
 | Keys | Does |
 |---|---|
+| Mouse drag / select | auto-copy selection to clipboard and primary |
 | Ctrl+Shift+C / Ctrl+Shift+V | copy / paste |
 | Ctrl+Shift+N | new window |
 | Ctrl+Plus / Ctrl+Minus | text size |
@@ -74,14 +79,16 @@ in a narrower column.
 
 ### The prompt
 
-**starship**, in the shape of a powerline: one coloured block per question, left
-to right - who you are, where you are, which branch and what the tree looks like,
-which languages this directory has, which container, what time - then a second
-line that is nothing but the character: cyan `❯` when the last command worked,
-red `✗` when it did not. The blocks are solarized (base3 on orange for the user,
-base02/base01 for time and containers, cyan for git, blue for the languages) and
-the separators are the triangles `U+E0B0`/`U+E0B2`, which is the form that looks
-the same in foot and in kitty.
+**starship**, using the **Gruvbox Rainbow** powerline pill preset
+(`https://starship.rs/presets/gruvbox-rainbow`): one coloured block per question,
+left to right - who you are, where you are, which branch and what the tree looks
+like, which languages this directory has, which container, what time - then a
+second line that is nothing but the character: green `` when the last command
+worked, red `` when it did not. The blocks follow the active theme's rainbow
+progression (`bright1` orange for the user, `regular3` yellow for directory,
+`regular6` cyan/aqua for git, `regular4` blue for languages, `dim` and `surface`
+for containers and time) and the separators are the powerline round caps and
+arrows (`U+E0B6`, `U+E0B0`, `U+E0B4`).
 
 Two things are worth knowing before editing `~/.config/starship.toml`:
 

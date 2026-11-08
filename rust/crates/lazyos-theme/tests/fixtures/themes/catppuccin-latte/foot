@@ -36,14 +36,14 @@
 # (U+F306). The names are the families `fc-list : family` prints, "version 6"
 # included.
 #
-# The prompt's separators are the triangles U+E0B0/U+E0B2, which JetBrains Mono
-# draws itself and which therefore tile with the cell at any size. The rounded
-# caps U+E0B6/U+E0B4 exist only in the symbol font, and drawn at its own size they
-# sit short of the segment they close - which is why ~/.config/starship.toml uses
-# triangles rather than caps.
+# The prompt's separators are the powerline round caps and arrows U+E0B6/U+E0B0/U+E0B4,
+# which Symbols Nerd Font Mono and JetBrains Mono draw to form the Gruvbox Rainbow pill.
 font=JetBrains Mono:size=11, Symbols Nerd Font Mono:size=12, Font Awesome 6 Free Solid:size=12, Material Design Icons version 6:size=12
 pad=6x6
 dpi-aware=no
+
+# Auto-copy selected text directly to both the PRIMARY selection and the system CLIPBOARD.
+selection-target=both
 
 [scrollback]
 lines=1000

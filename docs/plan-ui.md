@@ -596,10 +596,26 @@ the workflow and the routing.
    shipping image and purged from `uis/sway/packages.list`.
 5. **v0.5.x** — in progress: `lazyos-notify` layer-shell daemon landed (spec 019), 16 themes with
    wallpapers and interactive dual-pane visual theme browser (`lazyos menu theme`, spec 013) across
-   13 desktop surfaces. Next: `lazyos-greeter`, bar elevation, and the host migration of
-   [`plan.md`](plan.md).
-6. **Later** — `theme from-wallpaper` (matugen-style), sound design (if enabled), custom lock
-   and which-key overlay (if un-parked).
+   13 desktop surfaces.
+6. **Frictionless, Self-Contained & Domain-Tailored UX Overhaul** — in progress (spec 020):
+   - **Anticipate primary intent on open**: Tools trigger their primary discovery/refresh action
+     automatically in the background on open (`menu net` scans Wi-Fi immediately while showing cached
+     APs; `menu bluetooth` scans on open and after power-on; `menu clean` calculates reclaimable sizes
+     asynchronously; `menu calc` evaluates live on keystroke).
+   - **Self-contained in-window feedback over external toasts**: Interactive TUI tools own their
+     lifecycle and never close just to block on a subprocess and fire a `notify-send` / `Card::send()`
+     toast, nor fire desktop notifications while the TUI window is open. All 1–8 s operations use
+     in-window spinners/status banners and update rows in-place; multi-step/streaming operations
+     (`pkg`, `format`, `swap`, `dev` profile backup/restore, `download`, `updates`) run inside
+     in-window `TaskView`. External notifications (`lazyos-notify`) are strictly reserved for headless
+     events (hardware OSD, post-close screen capture, in-place dictation/translation, secret copy).
+   - **Consistent foundation & domain-tailored layouts**: Unified density-aware card layout
+     (`draw_card` inner geometry), universal `ListState::type_filter` search, single-advance Nerd Font
+     glyphs on every row, persistent toggle loops (`settings`, `display`, `audio`, `net`, `bluetooth`,
+     `clean`), and domain-tailored views (`menu theme` dual-pane live preview, `menu audio` live
+     volume gauges, `menu qr` inline UTF-8 QR rendering, native `bar-power` battery/memory TUI).
+7. **Later** — `lazyos-greeter`, bar elevation, `theme from-wallpaper` (matugen-style), sound design
+   (if enabled), custom lock and which-key overlay (if un-parked).
 
 **First technical step (the only spike)**: done — `rust/crates/spike-sixel` rendered a 48 px
 theme PNG and a document picture via sixel in real foot on the device (commit `spike: …`),

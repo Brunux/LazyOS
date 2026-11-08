@@ -1625,6 +1625,14 @@ else
 	fi
 fi
 
+if [ -r "$HOME/.config/foot/foot.ini" ]; then
+	if grep -rqsE '^[[:space:]]*selection-target[[:space:]]*=[[:space:]]*(both|clipboard)' "$HOME/.config/foot/foot.ini"; then
+		ok "foot automatically copies selection to clipboard (selection-target=both)"
+	else
+		fail "foot does not auto-copy selection: selection-target=both is missing from $HOME/.config/foot/foot.ini"
+	fi
+fi
+
 # Non-Latin coverage in one question.  A file name, a web page or an EPUB in
 # Arabic is a row of boxes when no installed font claims the script, and nothing
 # logs it.  fonts-noto-core is the package that answers for Arabic, Hebrew,
