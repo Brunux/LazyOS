@@ -59,10 +59,13 @@ if pgrep -f "$APP_ID" >/dev/null 2>&1; then
 	done
 fi
 
-args=(-c "$BACKDROP")
-if [ -r "$WALLPAPER" ]; then
-	# Absolute path: swaylock -f chdirs to / before it daemonizes.
-	args+=(-i "$WALLPAPER" -s fill)
+args=()
+if [ ! -r "$HOME/.config/swaylock/config" ]; then
+	args=(-c "$BACKDROP")
+	if [ -r "$WALLPAPER" ]; then
+		# Absolute path: swaylock -f chdirs to / before it daemonizes.
+		args+=(-i "$WALLPAPER" -s fill)
+	fi
 fi
 
 # A fifo carries the readiness line from swaylock back here.  It is opened

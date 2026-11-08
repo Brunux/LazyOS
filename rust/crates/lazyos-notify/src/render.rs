@@ -1,9 +1,7 @@
 #![allow(unknown_lints)]
 #![allow(clippy::chunks_exact_to_as_chunks)]
 
-use tiny_skia::{
-    Color, FillRule, Paint, PathBuilder, PixmapMut, Stroke, Transform,
-};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, PixmapMut, Stroke, Transform};
 
 use crate::font::FontRenderer;
 use crate::model::{Notification, Rect, Urgency};
@@ -13,6 +11,11 @@ pub const OSD_HEIGHT: f32 = 44.0;
 pub const CARD_WIDTH: f32 = 340.0;
 pub const CARD_SPACING: f32 = 8.0;
 pub const CORNER_RADIUS: f32 = 6.0;
+
+fn with_alpha(c: Color, alpha: f32) -> Color {
+    let a = (c.alpha() * alpha).clamp(0.0, 1.0);
+    Color::from_rgba(c.red(), c.green(), c.blue(), a).unwrap_or(c)
+}
 
 pub struct CardTheme {
     pub bg: Color,
@@ -28,21 +31,27 @@ pub struct CardTheme {
     pub warn: Color,
     #[allow(dead_code)]
     pub ok: Color,
+    pub track_bg: Color,
+    pub btn_bg: Color,
+    pub btn_bg_hover: Color,
 }
 
 impl Default for CardTheme {
     fn default() -> Self {
         Self {
-            bg: Color::from_rgba8(7, 54, 66, 204),       // Waybar button background: rgba(surface, 0.80)
-            bg_elevated: Color::from_rgba8(9, 64, 76, 220),
-            border_subtle: Color::from_rgba8(9, 64, 76, 230), // Waybar button border: 1px solid rgba(hover, 0.90)
-            text_bright: Color::from_rgba8(42, 161, 152, 255), // Penguin icon color on the bar: accent
-            text_body: Color::from_rgba8(147, 161, 161, 220),
+            bg: Color::from_rgba8(7, 54, 66, 240), // surface: #073642
+            bg_elevated: Color::from_rgba8(9, 64, 76, 248),
+            border_subtle: Color::from_rgba8(101, 123, 131, 220), // dim: #657b83
+            text_bright: Color::from_rgba8(42, 161, 152, 255),    // accent: #2aa198
+            text_body: Color::from_rgba8(253, 246, 227, 235),     // strong: #fdf6e3
             text_dim: Color::from_rgba8(101, 123, 131, 255),
             accent: Color::from_rgba8(42, 161, 152, 255),
             danger: Color::from_rgba8(220, 50, 47, 255),
             warn: Color::from_rgba8(181, 137, 0, 255),
             ok: Color::from_rgba8(133, 153, 0, 255),
+            track_bg: Color::from_rgba8(9, 64, 76, 160),
+            btn_bg: Color::from_rgba8(9, 64, 76, 204),
+            btn_bg_hover: Color::from_rgba8(9, 64, 76, 245),
         }
     }
 }
@@ -65,23 +74,27 @@ impl CardTheme {
 
     pub fn from_theme(theme: &lazyos_theme::Theme) -> Self {
         let r = theme.roles();
-        let to_color = |hex: lazyos_theme::Hex, a: u8| {
-            Color::from_rgba8(hex.0.r, hex.0.g, hex.0.b, a)
-        };
+        let to_color =
+            |hex: lazyos_theme::Hex, a: u8| Color::from_rgba8(hex.0.r, hex.0.g, hex.0.b, a);
 
         Self {
-            // Button on Waybar: background rgba(surface, 0.80), border 1px solid rgba(hover, 0.90)
-            bg: to_color(r.surface, 204),
-            bg_elevated: to_color(r.hover, 220),
-            border_subtle: to_color(r.hover, 230),
+            // Swaybar hover box (tooltip) style:
+            // background: {{ surface }}, border: 1px solid {{ dim }}, border-radius: 6px
+            bg: to_color(r.surface, 240),
+            bg_elevated: to_color(r.hover, 248),
+            border_subtle: to_color(r.dim, 220),
             // Font color matches the penguin on the bar: accent
             text_bright: to_color(r.accent, 255),
-            text_body: to_color(r.text, 220),
+            // Content matches tooltip label: strong text
+            text_body: to_color(r.strong, 235),
             text_dim: to_color(r.dim, 255),
             accent: to_color(r.accent, 255),
             danger: to_color(r.danger, 255),
             warn: to_color(r.warn, 255),
             ok: to_color(r.ok, 255),
+            track_bg: to_color(r.hover, 160),
+            btn_bg: to_color(r.hover, 204),
+            btn_bg_hover: to_color(r.hover, 245),
         }
     }
 }
@@ -157,25 +170,26 @@ impl Renderer {
                 continue;
             }
 
-            let text_max_width = card_w - 48.0 - 28.0;
+            let text_max_width = card_w - 36.0 - 24.0;
             let body_lines = if notif.body.is_empty() {
                 Vec::new()
             } else {
-                self.font.wrap_text(&notif.body, 11.0, text_max_width, 4, false)
+                self.font
+                    .wrap_text(&notif.body, 12.0, text_max_width, 4, false)
             };
 
-            let mut height = 12.0 + 14.0 + 16.0; // padding + app_name + summary
-            if !body_lines.is_empty() {
-                height += body_lines.len() as f32 * 15.0 + 4.0;
-            }
+            let mut height = if body_lines.is_empty() {
+                OSD_HEIGHT
+            } else {
+                20.0 + 6.0 + (body_lines.len() as f32 * 16.0) + 12.0
+            };
             if notif.progress.is_some() {
                 height += 16.0;
             }
             if !notif.actions.is_empty() {
-                height += 32.0;
+                height += 30.0;
             }
-            height += 12.0; // bottom padding
-            height = height.max(56.0);
+            height = height.max(OSD_HEIGHT);
 
             notif.card_y = cur_y;
             notif.card_height = height;
@@ -271,14 +285,31 @@ impl Renderer {
 
         notif.close_rect = None;
 
+        let (scale, alpha) = notif.animation_factors();
+        let cx = card_x + card_w * 0.5;
+        let cy = card_y + card_h * 0.5;
+        let transform = Transform::from_translate(-cx, -cy)
+            .post_scale(scale, scale)
+            .post_translate(cx, cy);
+
+        let map_x = |x: f32| cx + (x - cx) * scale;
+        let map_y = |y: f32| cy + (y - cy) * scale;
+
         // 1. Background (matching Waybar #custom-menu button: rgba(surface, 0.80))
         let mut bg_builder = PathBuilder::new();
-        Self::add_rounded_rect(&mut bg_builder, card_x, card_y, card_w, card_h, CORNER_RADIUS);
+        Self::add_rounded_rect(
+            &mut bg_builder,
+            card_x,
+            card_y,
+            card_w,
+            card_h,
+            CORNER_RADIUS,
+        );
         if let Some(bg_path) = bg_builder.finish() {
             let mut paint = Paint::default();
-            paint.set_color(self.theme.bg);
+            paint.set_color(with_alpha(self.theme.bg, alpha));
             paint.anti_alias = true;
-            pixmap.fill_path(&bg_path, &paint, FillRule::Winding, Transform::identity(), None);
+            pixmap.fill_path(&bg_path, &paint, FillRule::Winding, transform, None);
         }
 
         // 2. Button border matching Waybar #custom-menu (1px solid rgba(hover, 0.90))
@@ -297,9 +328,9 @@ impl Renderer {
                 ..Default::default()
             };
             let mut paint = Paint::default();
-            paint.set_color(self.theme.border_subtle);
+            paint.set_color(with_alpha(self.theme.border_subtle, alpha));
             paint.anti_alias = true;
-            pixmap.stroke_path(&border_path, &paint, &stroke, Transform::identity(), None);
+            pixmap.stroke_path(&border_path, &paint, &stroke, transform, None);
         }
 
         // 3. Status checks
@@ -328,10 +359,10 @@ impl Renderer {
         self.font.draw_text(
             pixmap,
             icon_glyph,
-            card_x + 12.0,
-            card_y + 26.0,
-            16.0,
-            icon_color,
+            map_x(card_x + 12.0),
+            map_y(card_y + 26.0),
+            16.0 * scale,
+            with_alpha(icon_color, alpha),
             false,
         );
 
@@ -342,24 +373,37 @@ impl Renderer {
         self.font.draw_text(
             pixmap,
             &notif.summary,
-            content_x,
-            card_y + 17.0,
-            12.0,
-            self.theme.text_bright,
+            map_x(content_x),
+            map_y(card_y + 17.0),
+            12.0 * scale,
+            with_alpha(self.theme.text_bright, alpha),
             false,
         );
 
+        let effective_pct = if let Some(pct) = notif.progress {
+            pct.min(100)
+        } else if let Some(n) = notif
+            .body
+            .trim()
+            .strip_suffix('%')
+            .and_then(|s| s.trim().parse::<u16>().ok())
+        {
+            (n.min(100)) as u8
+        } else {
+            0
+        };
+
         let val_str = if is_muted {
             "MUTED".to_string()
-        } else if let Some(pct) = notif.progress {
-            format!("{pct}%")
+        } else if notif.progress.is_some() || notif.body.trim().ends_with('%') {
+            format!("{effective_pct}%")
         } else if !notif.body.is_empty() {
             notif.body.clone()
         } else {
             "0%".to_string()
         };
 
-        let val_w = self.font.measure_width(&val_str, 12.0, false);
+        let val_w = self.font.measure_width(&val_str, 12.0 * scale, false);
         let val_color = if is_muted {
             self.theme.danger
         } else {
@@ -369,10 +413,10 @@ impl Renderer {
         self.font.draw_text(
             pixmap,
             &val_str,
-            right_margin - val_w,
-            card_y + 17.0,
-            12.0,
-            val_color,
+            map_x(right_margin) - val_w,
+            map_y(card_y + 17.0),
+            12.0 * scale,
+            with_alpha(val_color, alpha),
             false,
         );
 
@@ -384,19 +428,25 @@ impl Renderer {
         let track_r = 2.0f32;
 
         let mut track_builder = PathBuilder::new();
-        Self::add_rounded_rect(&mut track_builder, track_x, track_y, track_w, track_h, track_r);
+        Self::add_rounded_rect(
+            &mut track_builder,
+            track_x,
+            track_y,
+            track_w,
+            track_h,
+            track_r,
+        );
         if let Some(track_path) = track_builder.finish() {
             let mut paint = Paint::default();
-            paint.set_color(Color::from_rgba8(255, 255, 255, 22));
+            paint.set_color(with_alpha(self.theme.track_bg, alpha));
             paint.anti_alias = true;
-            pixmap.fill_path(&track_path, &paint, FillRule::Winding, Transform::identity(), None);
+            pixmap.fill_path(&track_path, &paint, FillRule::Winding, transform, None);
         }
 
-        let pct = notif.progress.unwrap_or(0);
         let fill_pct = if is_muted {
             0.0
         } else {
-            (pct as f32 / 100.0).clamp(0.0, 1.0)
+            (effective_pct as f32 / 100.0).clamp(0.0, 1.0)
         };
         let fill_w = if is_muted {
             0.0
@@ -406,12 +456,19 @@ impl Renderer {
 
         if fill_w > 0.0 {
             let mut fill_builder = PathBuilder::new();
-            Self::add_rounded_rect(&mut fill_builder, track_x, track_y, fill_w, track_h, track_r);
+            Self::add_rounded_rect(
+                &mut fill_builder,
+                track_x,
+                track_y,
+                fill_w,
+                track_h,
+                track_r,
+            );
             if let Some(fill_path) = fill_builder.finish() {
                 let mut paint = Paint::default();
-                paint.set_color(icon_color);
+                paint.set_color(with_alpha(icon_color, alpha));
                 paint.anti_alias = true;
-                pixmap.fill_path(&fill_path, &paint, FillRule::Winding, Transform::identity(), None);
+                pixmap.fill_path(&fill_path, &paint, FillRule::Winding, transform, None);
             }
         }
     }
@@ -427,9 +484,26 @@ impl Renderer {
         let card_w = notif.card_bounds.w;
         let card_h = notif.card_bounds.h;
 
+        let (scale, alpha) = notif.animation_factors();
+        let cx = card_x + card_w * 0.5;
+        let cy = card_y + card_h * 0.5;
+        let transform = Transform::from_translate(-cx, -cy)
+            .post_scale(scale, scale)
+            .post_translate(cx, cy);
+
+        let map_x = |x: f32| cx + (x - cx) * scale;
+        let map_y = |y: f32| cy + (y - cy) * scale;
+
         // 1. Background (matching Waybar #custom-menu button: rgba(surface, 0.80))
         let mut bg_builder = PathBuilder::new();
-        Self::add_rounded_rect(&mut bg_builder, card_x, card_y, card_w, card_h, CORNER_RADIUS);
+        Self::add_rounded_rect(
+            &mut bg_builder,
+            card_x,
+            card_y,
+            card_w,
+            card_h,
+            CORNER_RADIUS,
+        );
         if let Some(bg_path) = bg_builder.finish() {
             let mut paint = Paint::default();
             let bg_color = if notif.is_hovered {
@@ -437,9 +511,9 @@ impl Renderer {
             } else {
                 self.theme.bg
             };
-            paint.set_color(bg_color);
+            paint.set_color(with_alpha(bg_color, alpha));
             paint.anti_alias = true;
-            pixmap.fill_path(&bg_path, &paint, FillRule::Winding, Transform::identity(), None);
+            pixmap.fill_path(&bg_path, &paint, FillRule::Winding, transform, None);
         }
 
         // 2. Button border matching Waybar #custom-menu (1px solid rgba(hover, 0.90))
@@ -458,53 +532,54 @@ impl Renderer {
                 ..Default::default()
             };
             let mut paint = Paint::default();
-            paint.set_color(self.theme.border_subtle);
+            paint.set_color(with_alpha(self.theme.border_subtle, alpha));
             paint.anti_alias = true;
-            pixmap.stroke_path(&border_path, &paint, &stroke, Transform::identity(), None);
+            pixmap.stroke_path(&border_path, &paint, &stroke, transform, None);
         }
 
-        // 3. Icon box on the left
-        let icon_box_size = 28.0f32;
-        let icon_box_x = card_x + 12.0;
-        let icon_box_y = card_y + 12.0;
-
-        let mut icon_bg = PathBuilder::new();
-        Self::add_rounded_rect(
-            &mut icon_bg,
-            icon_box_x,
-            icon_box_y,
-            icon_box_size,
-            icon_box_size,
-            6.0,
+        // 3. Vector glyph directly (like the penguin/icons on Waybar)
+        let glyph = Self::resolve_glyph(
+            &notif.app_icon,
+            &notif.app_name,
+            &notif.summary,
+            notif.urgency,
         );
-        if let Some(icon_path) = icon_bg.finish() {
-            let mut paint = Paint::default();
-            paint.set_color(Color::from_rgba8(255, 255, 255, 12));
-            paint.anti_alias = true;
-            pixmap.fill_path(&icon_path, &paint, FillRule::Winding, Transform::identity(), None);
-        }
-
-        let glyph = Self::resolve_glyph(&notif.app_icon, &notif.app_name, &notif.summary, notif.urgency);
         let glyph_color = match notif.urgency {
             Urgency::Low => self.theme.text_dim,
             Urgency::Normal => self.theme.accent,
             Urgency::Critical => self.theme.danger,
         };
 
+        let is_single_line = notif.body.is_empty();
+        let icon_y = if is_single_line {
+            card_y + 26.0
+        } else {
+            card_y + 23.0
+        };
+
         self.font.draw_text(
             pixmap,
             glyph,
-            icon_box_x + 7.0,
-            icon_box_y + 20.0,
-            14.0,
-            glyph_color,
+            map_x(card_x + 12.0),
+            map_y(icon_y),
+            16.0 * scale,
+            with_alpha(glyph_color, alpha),
             false,
         );
 
         // 4. Close '×' button
-        let close_x = card_x + card_w - 24.0;
-        let close_y = card_y + 10.0;
-        let close_rect = Rect::new(close_x - 4.0, close_y - 2.0, 20.0, 20.0);
+        let close_x = card_x + card_w - 20.0;
+        let close_y = if is_single_line {
+            card_y + 26.0
+        } else {
+            card_y + 19.0
+        };
+        let close_rect = Rect::new(
+            map_x(close_x - 4.0),
+            map_y(close_y - 12.0),
+            18.0 * scale,
+            18.0 * scale,
+        );
         notif.close_rect = Some(close_rect);
 
         let close_color = if notif.is_hovered {
@@ -515,84 +590,78 @@ impl Renderer {
         self.font.draw_text(
             pixmap,
             "\u{ea76}", // Codicons close
-            close_x + 2.0,
-            close_y + 13.0,
-            12.0,
-            close_color,
+            map_x(close_x),
+            map_y(close_y),
+            12.0 * scale,
+            with_alpha(close_color, alpha),
             false,
         );
 
-        // 5. Content
-        let content_x = card_x + 48.0;
-        let mut cur_y = card_y + 12.0;
+        // 5. Content (Dropped LazyOS / app header line as requested)
+        let content_x = card_x + 36.0;
+        let right_limit = card_x + card_w - 24.0;
+        let text_max_width = right_limit - content_x;
 
-        let app_label = if let Some(cat) = &notif.category {
-            if notif.app_name.is_empty() {
-                cat.to_uppercase()
-            } else {
-                format!("{} • {}", notif.app_name.to_uppercase(), cat.to_uppercase())
-            }
-        } else if notif.app_name.is_empty() {
-            "LAZYOS".to_string()
-        } else {
-            notif.app_name.to_uppercase()
-        };
-
-        self.font.draw_text(
-            pixmap,
-            &app_label,
-            content_x,
-            cur_y + 9.0,
-            9.5,
-            self.theme.text_dim,
-            false,
-        );
-
-        cur_y += 15.0;
-
-        // Summary (Title in penguin accent color)
-        self.font.draw_text(
-            pixmap,
-            &notif.summary,
-            content_x,
-            cur_y + 11.0,
-            12.0,
-            self.theme.text_bright,
-            false,
-        );
-
-        cur_y += 16.0;
-
-        // Body lines
-        let text_max_width = card_w - 48.0 - 24.0;
-        let body_lines = self.font.wrap_text(&notif.body, 11.0, text_max_width, 4, false);
-        for line in &body_lines {
+        let mut cur_y = if is_single_line {
             self.font.draw_text(
                 pixmap,
-                line,
-                content_x,
-                cur_y + 10.0,
-                11.0,
-                self.theme.text_body,
+                &notif.summary,
+                map_x(content_x),
+                map_y(card_y + 26.0),
+                12.0 * scale,
+                with_alpha(self.theme.text_bright, alpha),
                 false,
             );
-            cur_y += 15.0;
-        }
+            card_y + 26.0
+        } else {
+            let mut y = card_y + 20.0;
+            self.font.draw_text(
+                pixmap,
+                &notif.summary,
+                map_x(content_x),
+                map_y(y),
+                12.0 * scale,
+                with_alpha(self.theme.text_bright, alpha),
+                false,
+            );
+
+            y += 4.0;
+            let body_lines = self
+                .font
+                .wrap_text(&notif.body, 12.0, text_max_width, 4, false);
+            for line in &body_lines {
+                y += 16.0;
+                self.font.draw_text(
+                    pixmap,
+                    line,
+                    map_x(content_x),
+                    map_y(y),
+                    12.0 * scale,
+                    with_alpha(self.theme.text_body, alpha),
+                    false,
+                );
+            }
+            y
+        };
 
         // 6. Progress Bar (if present)
         if let Some(pct) = notif.progress {
-            cur_y += 4.0;
+            let bar_y = if is_single_line {
+                card_y + 32.0
+            } else {
+                cur_y + 8.0
+            };
             let bar_x = content_x;
-            let bar_w = card_w - 48.0 - 16.0;
+            let bar_w = text_max_width;
             let bar_h = 4.0f32;
 
             let mut track_builder = PathBuilder::new();
-            Self::add_rounded_rect(&mut track_builder, bar_x, cur_y, bar_w, bar_h, 2.0);
+            Self::add_rounded_rect(&mut track_builder, bar_x, bar_y, bar_w, bar_h, 2.0);
             if let Some(track_path) = track_builder.finish() {
                 let mut paint = Paint::default();
-                paint.set_color(Color::from_rgba8(255, 255, 255, 22));
+                paint.set_color(with_alpha(self.theme.track_bg, alpha));
                 paint.anti_alias = true;
-                pixmap.fill_path(&track_path, &paint, FillRule::Winding, Transform::identity(), None);
+                pixmap.fill_path(&track_path, &paint, FillRule::Winding, transform, None);
             }
 
             let fill_pct = (pct as f32 / 100.0).clamp(0.0, 1.0);
@@ -604,15 +673,13 @@ impl Renderer {
             };
 
             let mut fill_builder = PathBuilder::new();
-            Self::add_rounded_rect(&mut fill_builder, bar_x, cur_y, fill_w, bar_h, 2.0);
+            Self::add_rounded_rect(&mut fill_builder, bar_x, bar_y, fill_w, bar_h, 2.0);
             if let Some(fill_path) = fill_builder.finish() {
                 let mut paint = Paint::default();
-                paint.set_color(fill_color);
+                paint.set_color(with_alpha(fill_color, alpha));
                 paint.anti_alias = true;
-                pixmap.fill_path(&fill_path, &paint, FillRule::Winding, Transform::identity(), None);
+                pixmap.fill_path(&fill_path, &paint, FillRule::Winding, transform, None);
             }
-
-            cur_y += 10.0;
         }
 
         // 7. Action buttons
@@ -623,11 +690,11 @@ impl Renderer {
             let mut btn_x = card_x + card_w - 14.0;
 
             for action in notif.actions.iter().rev() {
-                let label_w = self.font.measure_width(&action.label, 10.5, true);
-                let btn_w = label_w + 16.0;
+                let unscaled_label_w = self.font.measure_width(&action.label, 10.5, true);
+                let btn_w = unscaled_label_w + 16.0;
                 btn_x -= btn_w;
 
-                let rect = Rect::new(btn_x, cur_y, btn_w, btn_h);
+                let rect = Rect::new(map_x(btn_x), map_y(cur_y), btn_w * scale, btn_h * scale);
                 notif.action_rects.push((action.key.clone(), rect));
 
                 let is_btn_hovered = notif.hovered_action.as_deref() == Some(&action.key);
@@ -636,39 +703,43 @@ impl Renderer {
                 Self::add_rounded_rect(&mut btn_builder, btn_x, cur_y, btn_w, btn_h, 4.0);
                 if let Some(btn_path) = btn_builder.finish() {
                     let mut paint = Paint::default();
-                    paint.set_color(if is_btn_hovered {
-                        Color::from_rgba8(255, 255, 255, 35)
+                    let btn_bg = if is_btn_hovered {
+                        self.theme.btn_bg_hover
                     } else {
-                        Color::from_rgba8(255, 255, 255, 16)
-                    });
+                        self.theme.btn_bg
+                    };
+                    paint.set_color(with_alpha(btn_bg, alpha));
                     paint.anti_alias = true;
-                    pixmap.fill_path(&btn_path, &paint, FillRule::Winding, Transform::identity(), None);
+                    pixmap.fill_path(&btn_path, &paint, FillRule::Winding, transform, None);
 
                     let stroke = Stroke {
                         width: 1.0,
                         ..Default::default()
                     };
                     let mut bpaint = Paint::default();
-                    bpaint.set_color(if is_btn_hovered {
+                    let btn_border = if is_btn_hovered {
                         self.theme.accent
                     } else {
                         self.theme.border_subtle
-                    });
+                    };
+                    bpaint.set_color(with_alpha(btn_border, alpha));
                     bpaint.anti_alias = true;
-                    pixmap.stroke_path(&btn_path, &bpaint, &stroke, Transform::identity(), None);
+                    pixmap.stroke_path(&btn_path, &bpaint, &stroke, transform, None);
                 }
+
+                let label_color = if is_btn_hovered {
+                    self.theme.text_bright
+                } else {
+                    self.theme.text_body
+                };
 
                 self.font.draw_text(
                     pixmap,
                     &action.label,
-                    btn_x + 8.0,
-                    cur_y + 15.0,
-                    10.5,
-                    if is_btn_hovered {
-                        self.theme.text_bright
-                    } else {
-                        self.theme.text_body
-                    },
+                    map_x(btn_x + 8.0),
+                    map_y(cur_y + 15.0),
+                    10.5 * scale,
+                    with_alpha(label_color, alpha),
                     true,
                 );
 
@@ -681,7 +752,7 @@ impl Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::ActionItem;
+    use crate::model::{ActionItem, AnimState};
     use std::time::{Duration, Instant};
 
     #[test]
@@ -709,6 +780,7 @@ mod tests {
             sync_tag: None,
             created_at: Instant::now(),
             timeout: Duration::from_secs(5),
+            anim_state: AnimState::Active,
             card_y: 0.0,
             card_height: 0.0,
             card_bounds: Rect::new(0.0, 0.0, 0.0, 0.0),
@@ -725,12 +797,11 @@ mod tests {
         assert!(metrics.total_height > 50.0);
         assert!(notifications[0].card_height > 50.0);
 
-        let mut data = vec![
-            0u8;
-            (metrics.total_width.ceil() as usize)
-                * (metrics.total_height.ceil() as usize)
-                * 4
-        ];
+        let mut data =
+            vec![
+                0u8;
+                (metrics.total_width.ceil() as usize) * (metrics.total_height.ceil() as usize) * 4
+            ];
         let mut pixmap = PixmapMut::from_bytes(
             &mut data,
             metrics.total_width.ceil() as u32,
@@ -768,6 +839,7 @@ mod tests {
             sync_tag: Some("lazyos-osd".to_string()),
             created_at: Instant::now(),
             timeout: Duration::from_millis(1200),
+            anim_state: AnimState::Active,
             card_y: 0.0,
             card_height: 0.0,
             card_bounds: Rect::new(0.0, 0.0, 0.0, 0.0),
@@ -783,12 +855,11 @@ mod tests {
         assert_eq!(notifications[0].card_height, 44.0);
         assert!(notifications[0].is_osd());
 
-        let mut data = vec![
-            0u8;
-            (metrics.total_width.ceil() as usize)
-                * (metrics.total_height.ceil() as usize)
-                * 4
-        ];
+        let mut data =
+            vec![
+                0u8;
+                (metrics.total_width.ceil() as usize) * (metrics.total_height.ceil() as usize) * 4
+            ];
         let mut pixmap = PixmapMut::from_bytes(
             &mut data,
             metrics.total_width.ceil() as u32,

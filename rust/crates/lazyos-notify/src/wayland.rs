@@ -1,6 +1,7 @@
 use std::os::fd::AsFd;
 use std::os::unix::fs::FileExt;
 use std::sync::mpsc::Sender;
+use std::time::Instant;
 
 use wayland_client::protocol::{
     wl_buffer, wl_compositor, wl_pointer, wl_region, wl_registry, wl_seat, wl_shm, wl_shm_pool,
@@ -9,7 +10,7 @@ use wayland_client::protocol::{
 use wayland_client::{Connection, Dispatch, QueueHandle};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
-use crate::model::Notification;
+use crate::model::{AnimState, Notification};
 use crate::render::Renderer;
 
 pub enum UiEvent {
@@ -83,9 +84,10 @@ impl WaylandState {
 
         layer_surface
             .set_anchor(zwlr_layer_surface_v1::Anchor::Top | zwlr_layer_surface_v1::Anchor::Right);
-        // Waybar exclusive zone is 30px. Margin top 16px places the notification at y = 46px,
-        // and margin right 12px places it at right = 12px, aligning precisely with Sway window corner.
-        layer_surface.set_margin(16, 12, 0, 0);
+        // Waybar exclusive zone is 34px. Margin top 12px places the notification at y = 46px
+        // (aligning exactly with the Sway terminal window top border at y = 46px), and margin right 12px
+        // places it at right = 12px, aligning with the Sway window right border.
+        layer_surface.set_margin(12, 12, 0, 0);
         layer_surface
             .set_keyboard_interactivity(zwlr_layer_surface_v1::KeyboardInteractivity::None);
         layer_surface.set_size(w, h);
@@ -202,6 +204,9 @@ impl WaylandState {
         let mut clicked_close = false;
 
         for (i, notif) in self.notifications.iter().enumerate() {
+            if notif.is_closing() {
+                continue;
+            }
             if notif.card_bounds.contains(px, py) {
                 clicked_index = Some(i);
 
@@ -228,32 +233,54 @@ impl WaylandState {
             return;
         };
 
+        let reduced = std::env::var("LAZYOS_REDUCED_MOTION").is_ok();
+
         match button {
             0x110 => {
                 // Left click
                 if clicked_close {
                     let id = self.notifications[idx].id;
-                    self.notifications.remove(idx);
-                    let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                    if self.notifications.is_empty() {
-                        self.destroy_surface();
+                    if reduced {
+                        self.notifications.remove(idx);
+                        let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
+                        if self.notifications.is_empty() {
+                            self.destroy_surface();
+                        } else {
+                            let metrics = self.renderer.compute_layout(&mut self.notifications);
+                            self.width = metrics.total_width.ceil() as u32;
+                            self.height = metrics.total_height.ceil() as u32;
+                            self.paint_surface(qh);
+                        }
                     } else {
-                        let metrics = self.renderer.compute_layout(&mut self.notifications);
-                        self.width = metrics.total_width.ceil() as u32;
-                        self.height = metrics.total_height.ceil() as u32;
+                        self.notifications[idx].anim_state = AnimState::Closing {
+                            start: Instant::now(),
+                            reason: 2,
+                        };
+                        self.notifications[idx].is_hovered = false;
+                        self.notifications[idx].hovered_action = None;
                         self.paint_surface(qh);
                     }
                 } else if let Some(action_key) = clicked_action {
                     let id = self.notifications[idx].id;
-                    self.notifications.remove(idx);
                     let _ = self.event_tx.send(UiEvent::ActionInvoked(id, action_key));
-                    let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                    if self.notifications.is_empty() {
-                        self.destroy_surface();
+                    if reduced {
+                        self.notifications.remove(idx);
+                        let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
+                        if self.notifications.is_empty() {
+                            self.destroy_surface();
+                        } else {
+                            let metrics = self.renderer.compute_layout(&mut self.notifications);
+                            self.width = metrics.total_width.ceil() as u32;
+                            self.height = metrics.total_height.ceil() as u32;
+                            self.paint_surface(qh);
+                        }
                     } else {
-                        let metrics = self.renderer.compute_layout(&mut self.notifications);
-                        self.width = metrics.total_width.ceil() as u32;
-                        self.height = metrics.total_height.ceil() as u32;
+                        self.notifications[idx].anim_state = AnimState::Closing {
+                            start: Instant::now(),
+                            reason: 2,
+                        };
+                        self.notifications[idx].is_hovered = false;
+                        self.notifications[idx].hovered_action = None;
                         self.paint_surface(qh);
                     }
                 } else {
@@ -268,6 +295,32 @@ impl WaylandState {
                             .event_tx
                             .send(UiEvent::ActionInvoked(id, "default".to_string()));
                     }
+                    if reduced {
+                        self.notifications.remove(idx);
+                        let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
+                        if self.notifications.is_empty() {
+                            self.destroy_surface();
+                        } else {
+                            let metrics = self.renderer.compute_layout(&mut self.notifications);
+                            self.width = metrics.total_width.ceil() as u32;
+                            self.height = metrics.total_height.ceil() as u32;
+                            self.paint_surface(qh);
+                        }
+                    } else {
+                        self.notifications[idx].anim_state = AnimState::Closing {
+                            start: Instant::now(),
+                            reason: 2,
+                        };
+                        self.notifications[idx].is_hovered = false;
+                        self.notifications[idx].hovered_action = None;
+                        self.paint_surface(qh);
+                    }
+                }
+            }
+            0x111 => {
+                // Right click: dismiss card
+                let id = self.notifications[idx].id;
+                if reduced {
                     self.notifications.remove(idx);
                     let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
                     if self.notifications.is_empty() {
@@ -278,40 +331,48 @@ impl WaylandState {
                         self.height = metrics.total_height.ceil() as u32;
                         self.paint_surface(qh);
                     }
-                }
-            }
-            0x111 => {
-                // Right click: dismiss card
-                let id = self.notifications[idx].id;
-                self.notifications.remove(idx);
-                let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                if self.notifications.is_empty() {
-                    self.destroy_surface();
                 } else {
-                    let metrics = self.renderer.compute_layout(&mut self.notifications);
-                    self.width = metrics.total_width.ceil() as u32;
-                    self.height = metrics.total_height.ceil() as u32;
+                    self.notifications[idx].anim_state = AnimState::Closing {
+                        start: Instant::now(),
+                        reason: 2,
+                    };
+                    self.notifications[idx].is_hovered = false;
+                    self.notifications[idx].hovered_action = None;
                     self.paint_surface(qh);
                 }
             }
             0x112 => {
                 // Middle click: dismiss all from this app
                 let app = self.notifications[idx].app_name.clone();
-                let mut remaining = Vec::new();
-                for notif in self.notifications.drain(..) {
-                    if notif.app_name == app {
-                        let _ = self.event_tx.send(UiEvent::NotificationClosed(notif.id, 2));
-                    } else {
-                        remaining.push(notif);
+                if reduced {
+                    let mut remaining = Vec::new();
+                    for notif in self.notifications.drain(..) {
+                        if notif.app_name == app {
+                            let _ = self.event_tx.send(UiEvent::NotificationClosed(notif.id, 2));
+                        } else {
+                            remaining.push(notif);
+                        }
                     }
-                }
-                self.notifications = remaining;
-                if self.notifications.is_empty() {
-                    self.destroy_surface();
+                    self.notifications = remaining;
+                    if self.notifications.is_empty() {
+                        self.destroy_surface();
+                    } else {
+                        let metrics = self.renderer.compute_layout(&mut self.notifications);
+                        self.width = metrics.total_width.ceil() as u32;
+                        self.height = metrics.total_height.ceil() as u32;
+                        self.paint_surface(qh);
+                    }
                 } else {
-                    let metrics = self.renderer.compute_layout(&mut self.notifications);
-                    self.width = metrics.total_width.ceil() as u32;
-                    self.height = metrics.total_height.ceil() as u32;
+                    for notif in &mut self.notifications {
+                        if notif.app_name == app && !notif.is_closing() {
+                            notif.anim_state = AnimState::Closing {
+                                start: Instant::now(),
+                                reason: 2,
+                            };
+                            notif.is_hovered = false;
+                            notif.hovered_action = None;
+                        }
+                    }
                     self.paint_surface(qh);
                 }
             }
@@ -328,6 +389,15 @@ impl WaylandState {
         let mut needs_repaint = false;
 
         for notif in &mut self.notifications {
+            if notif.is_closing() {
+                if notif.is_hovered || notif.hovered_action.is_some() {
+                    notif.is_hovered = false;
+                    notif.hovered_action = None;
+                    needs_repaint = true;
+                }
+                continue;
+            }
+
             let was_hovered = notif.is_hovered;
             let is_hovered = notif.card_bounds.contains(px, py);
             if was_hovered != is_hovered {

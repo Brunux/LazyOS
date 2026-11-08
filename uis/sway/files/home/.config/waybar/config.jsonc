@@ -159,17 +159,17 @@
     },
     "network": {
         "interval": 10,
-        "format-wifi": "<span font_desc='JetBrains Mono 13'>\uf1eb</span>  {signalStrength}%",
+        "format-wifi": "<span font_desc='JetBrains Mono 13'>\uf1eb</span>",
         "format-ethernet": "<span font_desc='JetBrains Mono 13'>\uf233</span>  Ethernet",
         "format-linked": "<span font_desc='JetBrains Mono 13'>\uf1e6</span>  {ifname}",
         "format-disconnected": "<span font_desc='JetBrains Mono 13'>\uf05e</span>  Offline",
-        "tooltip-format-wifi": "{essid}\n{ifname}: {ipaddr}\nGateway: {gwaddr}\nClick to pick a network",
+        "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ifname}: {ipaddr}\nGateway: {gwaddr}\nClick to pick a network",
         "tooltip-format-ethernet": "{ifname}: {ipaddr}\nGateway: {gwaddr}",
         "on-click": "~/.config/bin/bar-net",
         "on-click-right": "foot --app-id=popup nmtui"
     },
     "pulseaudio": {
-        "format": "<span font_desc='JetBrains Mono 13'>{icon}</span>  {volume}%",
+        "format": "<span font_desc='JetBrains Mono 13'>{icon}</span>",
         "format-muted": "<span font_desc='JetBrains Mono 13'>\uf026</span>  muted",
         "format-icons": {
             "default": [
@@ -178,15 +178,16 @@
                 "\uf028"
             ]
         },
-        "tooltip-format": "{desc}",
+        "tooltip-format": "{desc} ({volume}%)",
         "scroll-step": 5,
+        "max-volume": 100,
         "on-click": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
         "on-click-right": "~/.config/bin/bar-audio"
     },
     "backlight": {
         "device": "backlight-lcd0",
-        "format": "<span font_desc='JetBrains Mono 13'>\uf185</span>  {percent}%",
-        "tooltip": false,
+        "format": "<span font_desc='JetBrains Mono 13'>\uf185</span>",
+        "tooltip-format": "Brightness {percent}%",
         "interval": 5,
         "on-scroll-up": "brightnessctl set 5%+",
         "on-scroll-down": "brightnessctl set 5%-"
@@ -220,10 +221,10 @@
             "warning": 30,
             "critical": 15
         },
-        "format": "<span font_desc='JetBrains Mono 13'>{icon}</span>  {capacity}%",
-        "format-charging": "<span font_desc='JetBrains Mono 13'>\uf0e7</span>  {capacity}%",
-        "format-plugged": "<span font_desc='JetBrains Mono 13'>\uf1e6</span>  {capacity}%",
-        "format-full": "<span font_desc='JetBrains Mono 13'>\uf240</span>  {capacity}%",
+        "format": "<span font_desc='JetBrains Mono 13'>{icon}</span>",
+        "format-charging": "<span font_desc='JetBrains Mono 13'>\uf0e7</span>",
+        "format-plugged": "<span font_desc='JetBrains Mono 13'>\uf1e6</span>",
+        "format-full": "<span font_desc='JetBrains Mono 13'>\uf240</span>",
         "format-icons": [
             "\uf244",
             "\uf243",

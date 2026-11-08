@@ -122,7 +122,7 @@ pub fn color(rgb: Rgb) -> Color {
 }
 
 /// The palette plus the decisions derived from it.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Design {
     palette: Palette,
     density: Density,

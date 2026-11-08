@@ -20,6 +20,7 @@ use zbus::blocking::connection::Builder;
 
 use crate::dbus::{DbusCommand, NotificationServer};
 use crate::history::{append_record, record_from_notification};
+use crate::model::{ANIM_DURATION, AnimState};
 use crate::render::CardTheme;
 use crate::wayland::{UiEvent, WaylandState};
 
@@ -168,6 +169,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             existing.urgency = notif.urgency;
                             existing.created_at = Instant::now();
                             existing.timeout = notif.timeout;
+                            existing.anim_state = AnimState::Active;
                             replaced = true;
                             dirty = true;
                             break;
@@ -180,32 +182,87 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 DbusCommand::Close(id) => {
-                    let before = state.notifications.len();
-                    state.notifications.retain(|n| n.id != id);
-                    if state.notifications.len() != before {
-                        dirty = true;
-                        let _ = ui_tx.send(UiEvent::NotificationClosed(id, 2));
+                    let reduced = std::env::var("LAZYOS_REDUCED_MOTION").is_ok();
+                    if reduced {
+                        let before = state.notifications.len();
+                        state.notifications.retain(|n| n.id != id);
+                        if state.notifications.len() != before {
+                            dirty = true;
+                            let _ = ui_tx.send(UiEvent::NotificationClosed(id, 2));
+                        }
+                    } else {
+                        for n in &mut state.notifications {
+                            if n.id == id && !n.is_closing() {
+                                n.anim_state = AnimState::Closing {
+                                    start: Instant::now(),
+                                    reason: 2,
+                                };
+                                dirty = true;
+                                break;
+                            }
+                        }
                     }
                 }
             }
         }
 
-        // Timeout check (every 50 ms)
+        // Expiry check (every 50 ms)
         if last_check.elapsed() >= Duration::from_millis(50) {
             last_check = Instant::now();
-            let mut expired = Vec::new();
-            state.notifications.retain(|n| {
-                if n.is_expired() {
-                    expired.push(n.id);
-                    false
-                } else {
-                    true
+            let reduced = std::env::var("LAZYOS_REDUCED_MOTION").is_ok();
+            for n in &mut state.notifications {
+                if n.is_expired() && !n.is_closing() {
+                    if reduced {
+                        n.anim_state = AnimState::Closing {
+                            start: Instant::now() - ANIM_DURATION,
+                            reason: 1,
+                        };
+                    } else {
+                        n.anim_state = AnimState::Closing {
+                            start: Instant::now(),
+                            reason: 1,
+                        };
+                    }
+                    dirty = true;
                 }
-            });
-            for id in expired {
-                let _ = ui_tx.send(UiEvent::NotificationClosed(id, 1));
-                dirty = true;
             }
+        }
+
+        // Animation state transitions
+        let mut closed = Vec::new();
+        let mut is_animating = false;
+
+        for n in &mut state.notifications {
+            match n.anim_state {
+                AnimState::Opening { start } => {
+                    if start.elapsed() >= ANIM_DURATION {
+                        n.anim_state = AnimState::Active;
+                        dirty = true;
+                    } else {
+                        is_animating = true;
+                        dirty = true;
+                    }
+                }
+                AnimState::Active => {}
+                AnimState::Closing { start, reason } => {
+                    if start.elapsed() >= ANIM_DURATION {
+                        closed.push((n.id, reason));
+                    } else {
+                        is_animating = true;
+                        dirty = true;
+                    }
+                }
+            }
+        }
+
+        if !closed.is_empty() {
+            state
+                .notifications
+                .retain(|n| !closed.iter().any(|(id, _)| *id == n.id));
+            for (id, reason) in closed {
+                let _ = ui_tx.send(UiEvent::NotificationClosed(id, reason));
+            }
+            dirty = true;
         }
 
         if dirty {
@@ -257,6 +314,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let timeout = if state.notifications.is_empty() {
                 -1 // Idle poll: wait indefinitely for wake_fd or Wayland event
+            } else if is_animating {
+                16 // 60 fps animation loop (16 ms)
             } else {
                 50 // Active animation/timer poll
             };

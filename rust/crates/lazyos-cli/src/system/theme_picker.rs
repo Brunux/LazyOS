@@ -187,6 +187,9 @@ pub struct ThemePickerScreen {
     pub list: ListState,
     pub active_slug: String,
     pub original_slug: String,
+    pub original_theme: Theme,
+    pub live_design: Design,
+    pub committed: bool,
     pub peeking: bool,
     pub header: Header,
     pub keybar: Vec<KeyHint>,
@@ -197,6 +200,10 @@ pub struct ThemePickerScreen {
 
 impl ThemePickerScreen {
     pub fn new() -> Self {
+        Self::with_design(&Design::for_session(None))
+    }
+
+    pub fn with_design(design: &Design) -> Self {
         let p = paths();
         let active = store::active(&p).unwrap_or_else(|| "solarized".to_string());
         let original_slug = active.clone();
@@ -207,9 +214,13 @@ impl ThemePickerScreen {
 
         let mut entries = Vec::new();
         let mut rows = Vec::new();
+        let mut original_theme_opt = None;
 
         for (slug, toml) in builtin::ALL {
             if let Ok(mut theme) = Theme::parse(toml) {
+                if slug == active {
+                    original_theme_opt = Some(theme.clone());
+                }
                 // If there is an active wallpaper matching this theme, rotate it to the front
                 if let Some(current_wp) = &state_wp {
                     if let Some(pos) = theme.wallpapers.iter().position(|w| w == current_wp) {
@@ -247,6 +258,10 @@ impl ThemePickerScreen {
             }
         }
 
+        let original_theme = original_theme_opt
+            .or_else(|| entries.first().map(|e| e.theme.clone()))
+            .unwrap_or_else(|| Theme::parse(builtin::SOLARIZED).expect("solarized builtin"));
+
         let mut list = ListState::new().with_empty("no matching themes found");
         list.set_rows(rows);
 
@@ -255,24 +270,57 @@ impl ThemePickerScreen {
             list.set_cursor(pos);
         }
 
-        Self {
+        let live_design = if let Some(selected) = entries.iter().find(|e| e.slug == active) {
+            design.clone().with_palette(selected.theme.palette())
+        } else {
+            design.clone()
+        };
+
+        let mut picker = Self {
             entries,
             list,
             active_slug: active,
             original_slug,
+            original_theme,
+            live_design,
+            committed: false,
             peeking: false,
             header: Header::new("LazyOS").subtitle("Theme & Appearance"),
             keybar: vec![
                 KeyHint::new("Enter", "apply"),
-                KeyHint::new("\u{2191}\u{2193}", "navigate"),
+                KeyHint::new("\u{2191}\u{2193}", "preview"),
                 KeyHint::new("w", "wallpaper"),
-                KeyHint::new("p/Space", "peek"),
+                KeyHint::new("p/Space", "peek desktop"),
                 KeyHint::new("Esc", "close"),
             ],
             rows_height: Cell::new(20),
             status_msg: None,
             wallpaper_cache: RefCell::new(HashMap::new()),
+        };
+
+        picker.sync_live_preview();
+        picker
+    }
+
+    fn sync_live_preview(&mut self) {
+        let update = self
+            .selected_entry()
+            .map(|e| (e.theme.palette(), e.theme.osc_sequences()));
+        if let Some((palette, osc)) = update {
+            self.live_design = self.live_design.clone().with_palette(palette);
+            use std::io::Write;
+            let mut out = std::io::stdout();
+            let _ = out.write_all(osc.as_bytes());
+            let _ = out.flush();
         }
+    }
+
+    fn restore_original_terminal(&mut self) {
+        use std::io::Write;
+        let mut out = std::io::stdout();
+        let _ = out.write_all(self.original_theme.osc_sequences().as_bytes());
+        let _ = out.write_all(b"\x1b]110\x1b\\\x1b]111\x1b\\\x1b]112\x1b\\\x1b]104\x1b\\");
+        let _ = out.flush();
     }
 
     fn selected_entry(&self) -> Option<&ThemeEntry> {
@@ -304,6 +352,27 @@ impl Screen for ThemePickerScreen {
 
     fn keybar(&self) -> Option<&[KeyHint]> {
         Some(&self.keybar)
+    }
+
+    fn design(&self) -> Option<Design> {
+        Some(self.live_design.clone())
+    }
+
+    fn click(&mut self, row: Option<usize>) -> Outcome {
+        if let Some(visible) = row {
+            let old_idx = self.list.selected_index();
+            self.list.set_cursor(visible);
+            if self.list.selected_index() != old_idx {
+                self.sync_live_preview();
+            }
+        }
+        Outcome::Continue
+    }
+
+    fn hit(&self, area: Rect, x: u16, y: u16, design: &Design) -> Option<usize> {
+        let left_w = ((area.width as u32 * 34) / 100).clamp(28, 38) as u16;
+        let left_rect = Rect::new(area.x, area.y, left_w, area.height);
+        self.list.hit_row(left_rect, x, y, design)
     }
 
     fn draw(&mut self, ctx: &mut BodyCtx) {
@@ -696,6 +765,8 @@ impl Screen for ThemePickerScreen {
         match key.code {
             // Cancel / Exit
             KeyCode::Esc | KeyCode::Char('q') => {
+                // Restore original terminal palette
+                self.restore_original_terminal();
                 // If we were peeking, restore the original theme before exiting!
                 if self.peeking {
                     let _ = apply_theme(&p, &self.original_slug, true, false);
@@ -710,7 +781,15 @@ impl Screen for ThemePickerScreen {
                     match apply_theme(&p, &slug, true, false) {
                         Ok(_) => {
                             self.active_slug = slug.clone();
+                            self.committed = true;
                             self.peeking = false;
+                            // Clear dynamic OSC overrides so terminal follows new foot.ini
+                            use std::io::Write;
+                            let mut out = std::io::stdout();
+                            let _ = out.write_all(
+                                b"\x1b]110\x1b\\\x1b]111\x1b\\\x1b]112\x1b\\\x1b]104\x1b\\",
+                            );
+                            let _ = out.flush();
                             Outcome::Done(lazyos_ui::app::exit::OK)
                         }
                         Err(e) => {
@@ -758,19 +837,20 @@ impl Screen for ThemePickerScreen {
                 if self.peeking && target_slug == self.original_slug {
                     // Already back to original
                     self.peeking = false;
-                    self.status_msg = Some("Peeking stopped. Active theme intact.".to_string());
+                    self.status_msg =
+                        Some("Desktop peeking stopped. Active theme intact.".to_string());
                 } else if self.peeking {
                     // Switch peek to this new theme
                     let _ = apply_theme(&p, &target_slug, true, false);
                     self.status_msg = Some(format!(
-                        "Peeking '{theme_name}'! Press Enter to keep, Esc to revert."
+                        "Peeking desktop '{theme_name}'! Press Enter to keep, Esc to revert."
                     ));
                 } else {
                     // Start peeking
                     let _ = apply_theme(&p, &target_slug, true, false);
                     self.peeking = true;
                     self.status_msg = Some(format!(
-                        "Peeking '{theme_name}'! Press Enter to keep, Esc to revert."
+                        "Peeking desktop '{theme_name}'! Press Enter to keep, Esc to revert."
                     ));
                 }
                 Outcome::Consumed
@@ -785,17 +865,21 @@ impl Screen for ThemePickerScreen {
             | KeyCode::End
             | KeyCode::Char('j')
             | KeyCode::Char('k') => {
+                let old_idx = self.list.selected_index();
                 let action = self.list.handle(key, self.rows_height.get(), design);
-                if action == ListAction::Moved && self.peeking {
-                    // Update live desktop peek to the newly highlighted theme!
-                    if let Some((target_slug, theme_name)) = self
-                        .selected_entry()
-                        .map(|s| (s.slug.clone(), s.theme.name.clone()))
-                    {
-                        let _ = apply_theme(&p, &target_slug, true, false);
-                        self.status_msg = Some(format!(
-                            "Peeking '{theme_name}'! Press Enter to keep, Esc to revert."
-                        ));
+                if action == ListAction::Moved || self.list.selected_index() != old_idx {
+                    self.sync_live_preview();
+                    if self.peeking {
+                        // Update live desktop peek to the newly highlighted theme!
+                        if let Some((target_slug, theme_name)) = self
+                            .selected_entry()
+                            .map(|s| (s.slug.clone(), s.theme.name.clone()))
+                        {
+                            let _ = apply_theme(&p, &target_slug, true, false);
+                            self.status_msg = Some(format!(
+                                "Peeking desktop '{theme_name}'! Press Enter to keep, Esc to revert."
+                            ));
+                        }
                     }
                 }
                 Outcome::Consumed
@@ -803,7 +887,11 @@ impl Screen for ThemePickerScreen {
 
             // Real-time case-folded filtering as you type
             KeyCode::Backspace | KeyCode::Char(_) => {
+                let old_idx = self.list.selected_index();
                 if self.list.type_filter(key) {
+                    if self.list.selected_index() != old_idx {
+                        self.sync_live_preview();
+                    }
                     Outcome::Consumed
                 } else {
                     Outcome::Continue
@@ -812,6 +900,18 @@ impl Screen for ThemePickerScreen {
 
             _ => Outcome::Continue,
         }
+    }
+}
+
+impl Drop for ThemePickerScreen {
+    fn drop(&mut self) {
+        use std::io::Write;
+        let mut out = std::io::stdout();
+        if !self.committed {
+            let _ = out.write_all(self.original_theme.osc_sequences().as_bytes());
+        }
+        let _ = out.write_all(b"\x1b]110\x1b\\\x1b]111\x1b\\\x1b]112\x1b\\\x1b]104\x1b\\");
+        let _ = out.flush();
     }
 }
 
@@ -857,7 +957,7 @@ pub fn menu(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     design: &Design,
 ) -> Result<i32, Failure> {
-    let mut screen = ThemePickerScreen::new();
+    let mut screen = ThemePickerScreen::with_design(design);
     let mut app = lazyos_ui::App::new(Header::new("LazyOS").subtitle("Theme & Appearance"))
         .design(design.clone())
         .screen(&mut screen);
