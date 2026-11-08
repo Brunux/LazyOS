@@ -926,6 +926,18 @@ pub fn rows() -> Vec<(&'static str, &'static str, &'static str)> {
         ("gruvbox", "Gruvbox Dark", "built-in morhetz"),
         ("everforest", "Everforest Dark", "built-in sainnhe"),
         ("kanagawa", "Kanagawa", "built-in rebelot"),
+        ("dracula", "Dracula", "built-in Zeno Rocha"),
+        (
+            "catppuccin-latte",
+            "Catppuccin Latte",
+            "built-in Catppuccin Org",
+        ),
+        ("hackerman", "Hackerman", "built-in Omarchy"),
+        ("lumon", "Lumon", "built-in Omarchy"),
+        ("matte-black", "Matte Black", "built-in Omarchy"),
+        ("omacon", "Omacon", "built-in Omarchy"),
+        ("flexoki-light", "Flexoki Light", "built-in Steph Ango"),
+        ("one-dark", "One Dark", "built-in Atom / GitHub"),
     ]
 }
 

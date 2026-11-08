@@ -421,7 +421,7 @@ mod tests {
                 "built-in `{slug}` has no wallpaper: `theme set` would leave the old one"
             );
         }
-        assert_eq!(crate::builtin::ALL.len(), 8, "the plan's eight themes");
+        assert_eq!(crate::builtin::ALL.len(), 16, "the sixteen built-in themes");
     }
 
     #[test]

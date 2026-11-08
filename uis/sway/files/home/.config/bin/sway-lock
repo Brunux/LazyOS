@@ -35,9 +35,9 @@ WALLPAPER="$HOME/Pictures/Wallpapers/mountains.jpg"
 # Solarized base03, the same backdrop as the terminal and the bar.
 BACKDROP="002b36"
 
-wait_secs=2
+wait_secs=3
 case "${1:-}" in
---wait) wait_secs=4 ;;
+--wait) wait_secs=5 ;;
 --*)
 	printf 'sway-lock: unknown option %s\n' "$1" >&2
 	exit 2
@@ -77,7 +77,7 @@ fifo="$runtime/sway-lock.$$"
 
 if mkfifo "$fifo" 2>/dev/null && exec 3<>"$fifo"; then
 	rm -f "$fifo"
-	swaylock -f "${args[@]}" -R 3
+	setsid swaylock -f "${args[@]}" -R 3
 	if read -t "$wait_secs" -r -u 3 _; then
 		exec 3>&-
 		exit 0
@@ -94,4 +94,4 @@ fi
 
 # No fifo available (unwritable runtime directory): lock the old way, without
 # the readiness guarantee.
-swaylock -f "${args[@]}"
+setsid swaylock -f "${args[@]}"

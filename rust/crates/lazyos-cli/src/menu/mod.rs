@@ -303,14 +303,25 @@ pub fn run_session(action: SessionAction) -> bool {
 
 /// One command, its own process group's business, its answer as a bool.
 fn run_one(argv: &[&str]) -> bool {
+    use std::os::unix::process::CommandExt;
     let Some((program, args)) = argv.split_first() else {
         return false;
     };
-    Command::new(program)
+    let mut command = Command::new(program);
+    command
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::null());
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() < 0 {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    command
         .status()
         .map(|status| status.success())
         .unwrap_or(false)

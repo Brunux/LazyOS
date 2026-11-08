@@ -221,10 +221,10 @@
             "warning": 30,
             "critical": 15
         },
-        "format": "<span font_desc='JetBrains Mono 13'>{icon}</span>",
-        "format-charging": "<span font_desc='JetBrains Mono 13'>\uf0e7</span>",
-        "format-plugged": "<span font_desc='JetBrains Mono 13'>\uf1e6</span>",
-        "format-full": "<span font_desc='JetBrains Mono 13'>\uf240</span>",
+        "format": "<span font_desc='JetBrains Mono 13'>{icon}</span>  {capacity}%",
+        "format-charging": "<span font_desc='JetBrains Mono 13'>\uf0e7</span>  {capacity}%",
+        "format-plugged": "<span font_desc='JetBrains Mono 13'>\uf1e6</span>  {capacity}%",
+        "format-full": "<span font_desc='JetBrains Mono 13'>\uf240</span>  {capacity}%",
         "format-icons": [
             "\uf244",
             "\uf243",

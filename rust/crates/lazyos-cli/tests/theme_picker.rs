@@ -17,7 +17,11 @@ fn press(code: KeyCode) -> KeyEvent {
 #[test]
 fn theme_picker_screen_initializes_with_all_builtins() {
     let screen = ThemePickerScreen::new();
-    assert_eq!(screen.entries.len(), 8, "all 8 built-in themes are loaded");
+    assert_eq!(
+        screen.entries.len(),
+        16,
+        "all 16 built-in themes are loaded"
+    );
     assert!(!screen.active_slug.is_empty(), "active slug is present");
     assert!(!screen.original_slug.is_empty(), "original slug is present");
 
@@ -40,15 +44,17 @@ fn theme_picker_screen_initializes_with_all_builtins() {
 }
 
 #[test]
-fn theme_picker_headless_rows_has_eight_entries() {
+fn theme_picker_headless_rows_has_all_entries() {
     let r = rows();
-    assert_eq!(r.len(), 8);
+    assert_eq!(r.len(), 16);
     let slugs: Vec<&str> = r.iter().map(|(s, _, _)| *s).collect();
     assert!(slugs.contains(&"solarized"));
     assert!(slugs.contains(&"tokyo-night"));
     assert!(slugs.contains(&"catppuccin"));
     assert!(slugs.contains(&"nord"));
     assert!(slugs.contains(&"gruvbox"));
+    assert!(slugs.contains(&"dracula"));
+    assert!(slugs.contains(&"one-dark"));
 }
 
 #[test]

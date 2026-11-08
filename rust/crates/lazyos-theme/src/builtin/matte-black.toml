@@ -1,0 +1,36 @@
+# Matte Black - https://omarchy.org
+#
+# Ultra-minimalist pure dark palette: deep charcoal-black background with subtle
+# neutral accents for distraction-free focus.
+name = "Matte Black"
+author = "Omarchy"
+source = "https://omarchy.org"
+
+wallpapers = ["matte-black-minimal.jpg"]
+motion = "full"
+
+[colors]
+background = "#0e0e10"
+foreground = "#e4e4e7"
+regular0 = "#1f1f23"
+regular1 = "#ef4444"
+regular2 = "#22c55e"
+regular3 = "#eab308"
+regular4 = "#60a5fa"
+regular5 = "#a855f7"
+regular6 = "#38bdf8"
+regular7 = "#e4e4e7"
+bright0 = "#52525b"
+bright1 = "#f87171"
+bright2 = "#4ade80"
+bright3 = "#fde047"
+bright4 = "#93c5fd"
+bright5 = "#c084fc"
+bright6 = "#7dd3fc"
+bright7 = "#ffffff"
+
+[roles]
+accent = "#a1a1aa"
+accent_alt = "#60a5fa"
+surface = "#18181b"
+selection = "#27272a"
