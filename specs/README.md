@@ -208,12 +208,12 @@ specs.
 | 011 | [`011-media-pickers.md`](011-media-pickers.md) — media and utilities | 3 | in progress |
 | 012 | [`012-launcher-reference.md`](012-launcher-reference.md) — launcher, window, run, reference | 4 | in progress |
 | 013 | [`013-themes-greeter.md`](013-themes-greeter.md) — 7 themes, wallpapers, greeter | 5 | in progress |
-| 014 | [`014-perf-witnesses.md`](014-perf-witnesses.md) — budget, ledger, closure | 5 | draft |
+| 014 | [`014-perf-witnesses.md`](014-perf-witnesses.md) — budget, ledger, closure | 5 | in progress |
 | 015 | [`015-browser-bar.md`](015-browser-bar.md) — browser chrome optimization: vertical tabs and compact density | - | in progress |
 | 016 | [`016-local-models.md`](016-local-models.md) — a local model, measured and pinned | - | merged |
-| 017 | [`017-remaining-surfaces.md`](017-remaining-surfaces.md) — remaining interactive surfaces: network, places, clean, agents, and utilities | 4 | in progress |
-| 018 | [`018-tui-installer.md`](018-tui-installer.md) — full TUI installer: user setup, timezone, disk safety, progress | 4-5 | in progress |
-| 019 | [`019-notification-daemon.md`](019-notification-daemon.md) — eye-candy layer-shell notification daemon, actions, progress | 5 | in progress |
+| 017 | [`017-remaining-surfaces.md`](017-remaining-surfaces.md) — remaining interactive surfaces: network, places, clean, agents, and utilities | 4 | merged |
+| 018 | [`018-tui-installer.md`](018-tui-installer.md) — full TUI installer: user setup, timezone, disk safety, progress | 4-5 | merged |
+| 019 | [`019-notification-daemon.md`](019-notification-daemon.md) — eye-candy layer-shell notification daemon, actions, progress | 5 | merged |
 
 The status column is the word that opens each file's `**Status**` line, and CI fails when the two
 disagree (`The index status is the spec's status`, `.github/workflows/specs.yml`). `merged` means

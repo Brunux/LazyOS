@@ -1,6 +1,6 @@
 # Spec 017 — Remaining Interactive Surfaces: Network, Places, Cleaner, Agents, and Utilities
 
-- **Status**: in progress
+- **Status**: merged (PR #43; all 10 surfaces migrated to native lazyos subcommands)
 - **Phase**: 4
 - **Depends on**: 007, 010, 012
 - **Model**: `claude-sonnet-5-5` (effort `high`) — multi-surface interactive port covering NetworkManager IPC/nmcli, process signals, safety confirmations, disk reclamation, and agent model switching. Fallback `claude-opus-5-5`.

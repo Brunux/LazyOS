@@ -6,9 +6,10 @@
 > device work is [`optimization.md`](optimization.md); the boot chain and the gotchas are
 > [`AGENTS.md`](../AGENTS.md).
 
-**Status: v0.3.1.** The image boots from microSD on the Hayato, the eMMC install works, the
-running system can be backed up and restored, and the session is documented and measured. The next
-release is **v0.4.0, the Rust installer**.
+**Status: v0.4.2.** The image boots from microSD on the Hayato, the eMMC install works via
+the native TUI wizard (`lazyos installer`), the session UI is 100% migrated to the Rust multi-call
+binary `lazyos`, 16 themes are driven by `lazyos-theme`, `lazyos-notify` serves layer-shell
+cards, and `rofi` / `lib-rofi.sh` / `bar-pick` are retired.
 
 ---
 
@@ -18,11 +19,11 @@ release is **v0.4.0, the Rust installer**.
 |---|---|
 | Debian forky arm64 on the Hayato (MT8192 / `google-asurada`) | working, validated on hardware |
 | Boot chain: stock depthcharge, signed FIT kpart in `p1`, `/boot` in `p2`, root in `p3` | working, reproduced with `cgpt` + `depthchargectl` |
-| swayfx session, rofi, waybar, foot, mako, the manual, capture/download/dictation/agents/tablet | working, 51 OK in the last report |
-| eMMC install | `scripts/install-emmc.sh`, proven on hardware |
-| Backup / restore | `scripts/backup-system.sh`, `scripts/restore-system.sh` |
-| Installer with a UI | **next**: `lazyos-installer` + `lazyos-install`, Rust end to end |
-| Rust migration of the shipped tools | **next, in tiers** (this file, §5) |
+| swayfx session, lazyos framework, waybar, foot, lazyos-notify, manual | working, 424+ OK in check-system report |
+| eMMC install | `lazyos installer` (spec 018), proven on hardware |
+| Backup / restore | `lazyos-profile export/import`, `scripts/backup-system.sh` |
+| Installer with a UI | **completed**: `lazyos installer`, Rust end to end |
+| Rust migration of the shipped tools | **completed**: 45+ subcommands in `lazyos`, rofi retired (spec 014) |
 
 The reference machine is the one being ported; see [`recon.md`](recon.md) for the hardware table
 and [`reports/`](../reports/) for the evidence.

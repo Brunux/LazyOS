@@ -15,8 +15,8 @@ uis/sway/
 configured `USERNAME` inside the text files.
 
 This desktop was ported from the maintainer's Nura (postmarketOS) session, so it
-keeps the solarized theme, the `Alt` modifier, the rofi launcher on the Search key
-and on `Alt+D`, waybar and the foot terminal.
+keeps the solarized theme, the `Alt` modifier, the native framework launcher (`lazyos menu apps`) on the Search key
+and on `Alt+D`, waybar, and the foot terminal.
 
 ## Layout
 
@@ -210,9 +210,12 @@ errors.
 
 ## The menus
 
-Everything that is not the launcher or a bar panel is a `rofi-*` script in
-`~/.config/bin/`, built on three helpers in `lib-rofi.sh` (`ui_row` for the one row style,
-`ui_pick` for the table-and-key round trip, `ui_say` for the result):
+All session menus, pickers, and panels run natively as subcommands in the
+`lazyos` multi-call binary (`lazyos menu <subcommand>`), drawing in floating `foot`
+windows with single-advance Nerd Font glyphs and case-folded filtering as you type.
+Legacy `rofi-*` and `bar-*` script paths in `~/.config/bin/` remain installed as
+symlinks to `/usr/bin/lazyos`, preserving all ~55 keyboard shortcuts and bar panel
+interactions. `rofi`, `bar-pick`, and `lib-rofi.sh` have been retired (spec 014):
 
 | Script | Key / entry | What it does |
 |---|---|---|

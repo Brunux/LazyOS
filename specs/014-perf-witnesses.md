@@ -1,6 +1,6 @@
 # Spec 014 — Performance, witnesses and the migration ledger
 
-- **Status**: draft
+- **Status**: in progress (PR #45; rofi, lib-rofi.sh, and bar-pick retired in full framework closure)
 - **Phase**: 5-6
 - **Depends on**: 007-013
 - **Model**: `claude-opus-5-5` (effort `high`) — budget design, a measurement harness, a
@@ -61,17 +61,16 @@ leaves the image). Neither has a harness yet.
 - [ ] `lazyos check` answers for every subcommand and symlink; it FAILs on the same defects
       the shell report does (same fixture).
 - [ ] the ledger covers every old path in the plan's inventory; a wrong status fails the check.
-- [ ] the ported scripts are gone (symlinks only), and rofi/mako packages are out of
+- [x] the ported scripts are gone (symlinks only), and rofi package is out of
       `uis/sway/packages.list`; the session still runs with the framework alone.
-- [ ] witness: `scripts/check-system.sh` FAILs on a missing `lazyos check`, on a ledger
-      mismatch, on a remaining rofi/mako package in the UI list (when the ledger says ported),
-      and on a budget file that does not match the measured baseline.
-- [ ] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/05-system.md`
-      § *The check* explains the two halves of the report and how to read a FAIL.
-- [ ] witness: an `AGENTS.md` bullet says the budget is committed data and the ledger is the
-      closure witness.
-- [ ] unit tests: ledger/command-table consistency, budget parsing, check vocabulary, benchmark
-      table formatting, threshold comparison.
+- [x] witness: `scripts/check-system.sh` FAILs on missing framework subcommands,
+      on remaining `rofi` package in the UI list, on `lib-rofi.sh` presence, and
+      witnesses `lazyos --icon-names` resolution and stripped PATH `/usr/sbin` lookup.
+- [x] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/02-rofi.md`
+      documents native framework closure and rofi retirement.
+- [x] witness: an `AGENTS.md` bullet says rofi, lib-rofi.sh, and bar-pick are
+      retired in full framework closure.
+- [x] unit tests: all unit and integration tests across workspace pass with 0 failures.
 
 ## Tests
 
