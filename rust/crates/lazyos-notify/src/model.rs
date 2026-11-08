@@ -199,8 +199,8 @@ mod tests {
         assert!(!n.is_closing());
         assert!(n.is_animating());
         let (scale, alpha) = n.animation_factors();
-        assert!(scale >= 0.85 && scale <= 0.87);
-        assert!(alpha >= 0.0 && alpha <= 0.05);
+        assert!((0.85..=0.87).contains(&scale));
+        assert!((0.0..=0.05).contains(&alpha));
 
         // Finished opening
         let past = Instant::now() - Duration::from_millis(200);
@@ -222,8 +222,8 @@ mod tests {
         assert!(!n.is_opening());
         assert!(n.is_animating());
         let (scale, alpha) = n.animation_factors();
-        assert!(scale >= 0.98 && scale <= 1.0);
-        assert!(alpha >= 0.95 && alpha <= 1.0);
+        assert!((0.98..=1.0).contains(&scale));
+        assert!((0.95..=1.0).contains(&alpha));
 
         // Finished closing
         let past = Instant::now() - Duration::from_millis(200);
