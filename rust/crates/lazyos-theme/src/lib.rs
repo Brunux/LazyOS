@@ -85,6 +85,18 @@ impl Palette {
             selection: BASE02,
         }
     }
+
+    /// The session's active palette: reads the active theme slug from state
+    /// and parses its definition from built-ins (or solarized_dark fallback).
+    pub fn for_session(paths: &Paths) -> Self {
+        if let Some(slug) = store::active(paths)
+            && let Some(text) = builtin::get(&slug)
+            && let Ok(theme) = Theme::parse(text)
+        {
+            return theme.palette();
+        }
+        Self::solarized_dark()
+    }
 }
 
 impl Default for Palette {

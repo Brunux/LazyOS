@@ -7,7 +7,7 @@ name = "Gruvbox Dark"
 author = "Pavel Pertsev"
 source = "https://github.com/morhetz/gruvbox"
 
-wallpapers = ["lazyos.png"]
+wallpapers = ["gruvbox-the-backwater.jpg", "gruvbox-village-square.jpg", "gruvbox-flower-basket.jpg", "gruvbox-leaves.jpg"]
 motion = "full"
 
 [colors]

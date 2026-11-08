@@ -585,6 +585,7 @@ from it — foot, waybar, mako, rofi, btop, lazygit, nvim, fzf, the lock screen,
 the prompt (starship), the greeter, the window frame sway uses, and the wallpaper.
 
 ```
+lazyos menu theme           # interactive visual theme selector (Alt+Shift+C / rofi-theme)
 lazyos theme list           # every theme, the active one marked *
 lazyos theme set gruvbox    # regenerate everything and reload the session
 lazyos theme next           # the next one in the cycle      (Alt+Shift+T)
@@ -595,6 +596,12 @@ lazyos theme diff           # is every file still what the theme says?
 
 Solarized Dark is the default and the brand; the others are Catppuccin Mocha,
 Tokyo Night, Rose Pine, Nord, Gruvbox, Everforest Dark and Kanagawa.
+
+**The Visual Theme Selector (`lazyos menu theme` / `Alt+Shift+C` / `rofi-theme`).**
+An interactive, dual-pane Ratatui surface for exploring themes with zero friction:
+* **Left pane:** lists all installed themes with search-as-you-type filtering, active session markers (`●`/`○`), and accent badges.
+* **Right pane:** real-time eye-candy preview canvas showing the 16 ANSI truecolor terminal swatches, semantic roles (surface, accent, ok, warn, danger), simulated LazyOS desktop mockups (mini Waybar status strip, floating notification card, Starship shell prompt), WCAG 2.1 contrast ratio verification, and wallpaper info.
+* **Zero friction:** press **Enter** to apply, **w** to cycle wallpapers, and **p** (or **Space**) to toggle **live desktop peek** (temporarily previews the theme across all your real windows and workspace, automatically reverting on **Esc** or committing on **Enter**).
 
 **Every theme carries its own wallpaper.** The wallpaper is a gradient
 composition generated from the theme's palette with the LazyOS wordmark

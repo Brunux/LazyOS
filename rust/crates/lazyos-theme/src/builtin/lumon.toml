@@ -1,0 +1,36 @@
+# Lumon - https://github.com/OldJobobo/omarchy-lumon-theme
+#
+# Severance-inspired corporate terminal aesthetic: deep cold navy void with
+# fluorescent cyan and teal highlights.
+name = "Lumon"
+author = "OldJobobo"
+source = "https://github.com/OldJobobo/omarchy-lumon-theme"
+
+wallpapers = ["lumon-severance.jpg"]
+motion = "full"
+
+[colors]
+background = "#16242d"
+foreground = "#d9eef7"
+regular0 = "#1b2d40"
+regular1 = "#e06c75"
+regular2 = "#6fb8e3"
+regular3 = "#e5c07b"
+regular4 = "#4d9ed3"
+regular5 = "#8bc9eb"
+regular6 = "#b4e4f6"
+regular7 = "#d9eef7"
+bright0 = "#2c465e"
+bright1 = "#e06c75"
+bright2 = "#6fb8e3"
+bright3 = "#e5c07b"
+bright4 = "#4d9ed3"
+bright5 = "#8bc9eb"
+bright6 = "#b4e4f6"
+bright7 = "#ffffff"
+
+[roles]
+accent = "#8bc9eb"
+accent_alt = "#4d9ed3"
+surface = "#1b2d40"
+selection = "#28425d"

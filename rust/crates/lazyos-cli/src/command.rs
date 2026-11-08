@@ -527,6 +527,14 @@ pub const COMMANDS: &[CommandSpec] = &[
         installed: &["dictate"],
     },
     CommandSpec {
+        // Interactive theme and appearance selector (rofi-theme).
+        path: "menu theme",
+        summary: "interactive theme and appearance selector with live preview",
+        shape: Shape::Task,
+        symlinks: &["rofi-theme", "lazyos-theme-picker"],
+        installed: &["rofi-theme"],
+    },
+    CommandSpec {
         // `lazyos installer`: the full TUI installer wizard (spec 018).
         // Replaces `rofi-install`, `lazyos-install-run`, and `lazyos-install-log`.
         path: "installer",

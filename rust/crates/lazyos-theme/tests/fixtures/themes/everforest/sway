@@ -5,7 +5,7 @@
 # It is a user drop-in because ~/.config/sway/config includes
 # ~/.config/sway/config.d/*.conf after /etc/sway/config - the last `output bg`
 # wins, and the client colours here replace the ones /etc used to pin.
-output * bg /home/lazy/Pictures/Wallpapers/lazyos.png fill
+output * bg /home/lazy/Pictures/Wallpapers/everforest-tree-tops.jpg fill
 
 # client.focused <border> <background> <text> <indicator> <child-border>
 client.focused          #a7c080 #343f44 #d3c6aa #dbbc7f #a7c080

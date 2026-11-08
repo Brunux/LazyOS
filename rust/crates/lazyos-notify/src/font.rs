@@ -10,6 +10,9 @@ pub struct FontRenderer {
 impl FontRenderer {
     pub fn new() -> Self {
         let regular = Self::load_font(&[
+            "/usr/share/fonts/truetype/jetbrains-mono/JetBrainsMono-SemiBold.ttf",
+            "/usr/share/fonts/truetype/jetbrains-mono/JetBrainsMono-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/adwaita/AdwaitaSans-Regular.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
@@ -17,6 +20,9 @@ impl FontRenderer {
         ]);
 
         let bold = Self::load_font(&[
+            "/usr/share/fonts/truetype/jetbrains-mono/JetBrainsMono-Bold.ttf",
+            "/usr/share/fonts/truetype/jetbrains-mono/JetBrainsMono-SemiBold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/adwaita/AdwaitaSans-Regular.ttf",
             "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
@@ -39,6 +45,8 @@ impl FontRenderer {
         for path in paths {
             if let Ok(bytes) = std::fs::read(path) {
                 if let Ok(font) = Font::from_bytes(bytes, FontSettings::default()) {
+                    #[cfg(test)]
+                    println!("Successfully loaded font from: {path}");
                     return Some(font);
                 }
             }
@@ -47,13 +55,16 @@ impl FontRenderer {
     }
 
     pub fn pick_font(&self, ch: char, bold: bool) -> Option<&Font> {
-        if self
-            .symbols
-            .as_ref()
-            .is_some_and(|f| f.lookup_glyph_index(ch) != 0)
-        {
-            return self.symbols.as_ref();
+        // For private-use codepoints (Nerd Font icon symbols), check symbol font first
+        if ch >= '\u{e000}' {
+            if let Some(ref f) = self.symbols {
+                if f.lookup_glyph_index(ch) != 0 {
+                    return Some(f);
+                }
+            }
         }
+
+        // For console text characters, use JetBrains Mono (bold or regular)
         if bold {
             if let Some(ref f) = self.bold {
                 if f.lookup_glyph_index(ch) != 0 {
@@ -66,9 +77,16 @@ impl FontRenderer {
                 return Some(f);
             }
         }
-        self.bold
+
+        if let Some(ref f) = self.symbols {
+            if f.lookup_glyph_index(ch) != 0 {
+                return Some(f);
+            }
+        }
+
+        self.regular
             .as_ref()
-            .or(self.regular.as_ref())
+            .or(self.bold.as_ref())
             .or(self.symbols.as_ref())
     }
 
@@ -213,5 +231,34 @@ impl FontRenderer {
         }
 
         cur_x
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_font_picking() {
+        let renderer = FontRenderer::new();
+
+        // If system fonts are present in the environment (e.g. on the LazyOS target device),
+        // verify regular, bold, and symbol font picking. In minimal CI runner environments
+        // lacking these specific font packages, verify that picking and measuring fall back
+        // gracefully without panicking.
+        if let Some(ref reg) = renderer.regular {
+            let font_a = renderer.pick_font('A', false);
+            assert!(font_a.is_some());
+            assert_ne!(reg.lookup_glyph_index('A'), 0);
+        }
+
+        if renderer.symbols.is_some() {
+            let icon_font = renderer.pick_font('\u{eb75}', false);
+            assert!(icon_font.is_some());
+        }
+
+        // Measure width and font picking must always succeed without panicking
+        let width = renderer.measure_width("LazyOS Notification", 12.0, false);
+        assert!(width > 0.0);
     }
 }

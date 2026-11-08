@@ -1,0 +1,35 @@
+# Hackerman - https://omarchy.org
+#
+# Cyberpunk aesthetic: pitch-black background with vibrant hacker-green accents.
+name = "Hackerman"
+author = "Omarchy"
+source = "https://omarchy.org"
+
+wallpapers = ["hackerman-matrix.jpg"]
+motion = "full"
+
+[colors]
+background = "#0b0c16"
+foreground = "#ddf7ff"
+regular0 = "#1b1d2e"
+regular1 = "#ff5c57"
+regular2 = "#82fb9c"
+regular3 = "#f3f99d"
+regular4 = "#57c7ff"
+regular5 = "#ff6ac1"
+regular6 = "#9aedfe"
+regular7 = "#ddf7ff"
+bright0 = "#464b6e"
+bright1 = "#ff5c57"
+bright2 = "#82fb9c"
+bright3 = "#f3f99d"
+bright4 = "#57c7ff"
+bright5 = "#ff6ac1"
+bright6 = "#9aedfe"
+bright7 = "#ffffff"
+
+[roles]
+accent = "#82fb9c"
+accent_alt = "#57c7ff"
+surface = "#151828"
+selection = "#262a45"

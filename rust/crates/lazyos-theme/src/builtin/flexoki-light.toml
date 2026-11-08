@@ -1,0 +1,35 @@
+# Flexoki Light - https://stephango.com/flexoki
+#
+# An inking palette for reading and writing: warm paper tones designed by Steph Ango.
+name = "Flexoki Light"
+author = "Steph Ango"
+source = "https://stephango.com/flexoki"
+
+wallpapers = ["flexoki-light-paper.jpg"]
+motion = "full"
+
+[colors]
+background = "#fffcf0"
+foreground = "#100f0f"
+regular0 = "#e6e4d9"
+regular1 = "#af3029"
+regular2 = "#4b6600"
+regular3 = "#916700"
+regular4 = "#205ea6"
+regular5 = "#5e409d"
+regular6 = "#24837b"
+regular7 = "#6f6e69"
+bright0 = "#b7b5ac"
+bright1 = "#af3029"
+bright2 = "#4b6600"
+bright3 = "#916700"
+bright4 = "#205ea6"
+bright5 = "#5e409d"
+bright6 = "#24837b"
+bright7 = "#100f0f"
+
+[roles]
+accent = "#205ea6"
+accent_alt = "#24837b"
+surface = "#f2f0e5"
+selection = "#e6e4d9"

@@ -35,12 +35,7 @@ const EXIT_FAILED: i32 = 3;
 /// The paths this command owns: `$HOME`, and the state directory the XDG spec
 /// names (`$XDG_STATE_HOME/lazyos/theme`).
 pub fn paths() -> Paths {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let state = match std::env::var("XDG_STATE_HOME") {
-        Ok(dir) if !dir.is_empty() => PathBuf::from(dir).join("lazyos/theme"),
-        _ => PathBuf::from(&home).join(".local/state/lazyos/theme"),
-    };
-    Paths::new(home, state)
+    Paths::from_env()
 }
 
 pub fn run(resolved: &Resolved) -> i32 {
@@ -87,7 +82,7 @@ fn usage() -> i32 {
     EXIT_USAGE
 }
 
-fn theme(slug: &str) -> Result<Theme, String> {
+pub fn theme(slug: &str) -> Result<Theme, String> {
     let text = builtin::get(slug).ok_or_else(|| {
         format!(
             "'{slug}' is not a theme: {}",
@@ -253,21 +248,23 @@ fn next(paths: &Paths, rest: &[&str]) -> i32 {
     set(paths, &args)
 }
 
-fn set(paths: &Paths, args: &[&str]) -> i32 {
-    let force = args.contains(&"--force");
-    let headless = args.contains(&"--headless");
-    let Some(slug) = args.iter().find(|arg| !arg.starts_with("--")) else {
-        eprintln!("lazyos theme set: which theme?");
-        return usage();
-    };
-    let slug = *slug;
-    let theme = match theme(slug) {
-        Ok(theme) => theme,
-        Err(error) => {
-            eprintln!("lazyos theme set: {error}");
-            return EXIT_USAGE;
-        }
-    };
+pub fn apply_theme(
+    paths: &Paths,
+    slug: &str,
+    force: bool,
+    headless: bool,
+) -> Result<(Theme, usize, usize), String> {
+    let mut theme = theme(slug)?;
+
+    // Keep active wallpaper if it belongs to this theme, or record the theme's default.
+    let state = paths.state.join("wallpaper");
+    let current_wp = std::fs::read_to_string(&state).unwrap_or_default();
+    let current_wp = current_wp.trim();
+    if let Some(pos) = theme.wallpapers.iter().position(|w| w == current_wp) {
+        theme.wallpapers.rotate_left(pos);
+    } else if let Some(wp) = theme.wallpapers.first() {
+        let _ = std::fs::write(&state, wp);
+    }
 
     // Generate the wallpaper and thumbnail for the theme (spec 013).
     let _ = wallpaper::get_or_generate(
@@ -306,28 +303,51 @@ fn set(paths: &Paths, args: &[&str]) -> i32 {
         }
     }
     if failed > 0 {
-        return EXIT_FAILED;
+        return Err("one or more surfaces failed to install".to_string());
     }
     if !edited.is_empty() {
-        eprintln!(
-            "lazyos theme: {} file(s) left alone: {}. Re-run with --force to replace them.",
+        return Err(format!(
+            "{} file(s) left alone: {}. Re-run with --force to replace them.",
             edited.len(),
             edited.join(", ")
-        );
-        return EXIT_NOTHING;
+        ));
     }
     if let Err(error) = store::set_active(paths, slug) {
-        eprintln!("lazyos theme: {error}");
-        return EXIT_FAILED;
+        return Err(error);
     }
-    say!(
-        "{slug}\t{}\t{written} written, {unchanged} unchanged",
-        theme.name
-    );
     if !headless {
         reload();
+        reload_terminals(&theme);
     }
-    EXIT_OK
+    Ok((theme, written, unchanged))
+}
+
+fn set(paths: &Paths, args: &[&str]) -> i32 {
+    let force = args.contains(&"--force");
+    let headless = args.contains(&"--headless");
+    let Some(slug) = args.iter().find(|arg| !arg.starts_with("--")) else {
+        eprintln!("lazyos theme set: which theme?");
+        return usage();
+    };
+    let slug = *slug;
+    match apply_theme(paths, slug, force, headless) {
+        Ok((theme, written, unchanged)) => {
+            say!(
+                "{slug}\t{}\t{written} written, {unchanged} unchanged",
+                theme.name
+            );
+            EXIT_OK
+        }
+        Err(error) => {
+            if error.contains("file(s) left alone") {
+                eprintln!("lazyos theme: {error}");
+                EXIT_NOTHING
+            } else {
+                eprintln!("lazyos theme set: {error}");
+                EXIT_FAILED
+            }
+        }
+    }
 }
 
 /// Asks the session to pick the new files up.
@@ -336,7 +356,7 @@ fn set(paths: &Paths, args: &[&str]) -> i32 {
 /// re-runs the `exec` lines that read a palette), waybar re-reads its stylesheet
 /// on SIGUSR2 and mako on `makoctl reload`. A missing program is a line, not a
 /// failure - a theme set over ssh has nothing to reload.
-fn reload() {
+pub fn reload() {
     if std::env::var("WAYLAND_DISPLAY").is_err() {
         return;
     }
@@ -344,6 +364,7 @@ fn reload() {
         ("swaymsg", vec!["reload"]),
         ("makoctl", vec!["reload"]),
         ("pkill", vec!["-USR2", "-x", "waybar"]),
+        ("pkill", vec!["-USR1", "-x", "lazyos-notify"]),
     ] {
         match std::process::Command::new(program).args(&args).output() {
             Ok(output) if output.status.success() => {}
@@ -355,6 +376,100 @@ fn reload() {
             Err(error) => eprintln!("lazyos theme: cannot run {program}: {error}"),
         }
     }
+}
+
+/// Broadcasts the theme's colors to all active foot terminal windows via PTY OSC sequences.
+pub fn reload_terminals(theme: &Theme) {
+    let osc = theme.osc_sequences();
+    let ptys = discover_foot_ptys();
+    for pty in ptys {
+        if let Ok(mut file) = std::fs::OpenOptions::new().write(true).open(&pty) {
+            use std::io::Write as _;
+            let _ = file.write_all(osc.as_bytes());
+            let _ = file.flush();
+        }
+    }
+}
+
+/// Discovers the PTY paths of all currently active foot terminal emulator windows.
+fn discover_foot_ptys() -> std::collections::BTreeSet<PathBuf> {
+    let mut ptys = std::collections::BTreeSet::new();
+    let Ok(proc_dir) = std::fs::read_dir("/proc") else {
+        return ptys;
+    };
+
+    let mut foot_pids = std::collections::HashSet::new();
+    for entry in proc_dir.flatten() {
+        let name = entry.file_name();
+        let Some(name_str) = name.to_str() else {
+            continue;
+        };
+        let Ok(pid) = name_str.parse::<u32>() else {
+            continue;
+        };
+
+        let comm_path = entry.path().join("comm");
+        if let Ok(comm) = std::fs::read_to_string(&comm_path) {
+            let comm = comm.trim();
+            if comm == "foot" || comm == "footclient" || comm == "foot-server" {
+                foot_pids.insert(pid);
+            }
+        }
+    }
+
+    if foot_pids.is_empty() {
+        return ptys;
+    }
+
+    let Ok(proc_dir) = std::fs::read_dir("/proc") else {
+        return ptys;
+    };
+
+    for entry in proc_dir.flatten() {
+        let name = entry.file_name();
+        let Some(name_str) = name.to_str() else {
+            continue;
+        };
+        let Ok(pid) = name_str.parse::<u32>() else {
+            continue;
+        };
+
+        let stat_path = entry.path().join("stat");
+        let is_foot_child = if let Ok(stat) = std::fs::read_to_string(&stat_path) {
+            if let Some(idx) = stat.rfind(')') {
+                let rest = &stat[idx + 1..];
+                let mut parts = rest.split_whitespace();
+                let _state = parts.next();
+                let ppid = parts.next().and_then(|p| p.parse::<u32>().ok());
+                ppid.is_some_and(|p| foot_pids.contains(&p))
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if is_foot_child || foot_pids.contains(&pid) {
+            let fd_dir = entry.path().join("fd");
+            if let Ok(fds) = std::fs::read_dir(fd_dir) {
+                for fd in fds.flatten() {
+                    if let Ok(target) = std::fs::read_link(fd.path()) {
+                        let target_str = target.to_string_lossy();
+                        if target_str.starts_with("/dev/pts/")
+                            && target_str
+                                .trim_start_matches("/dev/pts/")
+                                .chars()
+                                .all(|c| c.is_ascii_digit())
+                        {
+                            ptys.insert(target);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ptys
 }
 
 /// The idempotence witness: render every surface again and compare it with what
@@ -371,6 +486,13 @@ fn diff(paths: &Paths, args: &[&str]) -> i32 {
         eprintln!("lazyos theme: the active theme `{slug}` is not built in");
         return EXIT_FAILED;
     };
+    let mut theme = theme;
+    let state = paths.state.join("wallpaper");
+    let current_wp = std::fs::read_to_string(&state).unwrap_or_default();
+    let current_wp = current_wp.trim();
+    if let Some(pos) = theme.wallpapers.iter().position(|w| w == current_wp) {
+        theme.wallpapers.rotate_left(pos);
+    }
     let home = paths.home.to_string_lossy().to_string();
     let mut differing = Vec::new();
     for surface in &SURFACES {
@@ -443,26 +565,21 @@ fn render_into(args: &[&str]) -> i32 {
     EXIT_OK
 }
 
-/// The wallpaper half of `Alt+Shift+W`: the next name in the active theme's
-/// list, written through the same surface so it is regenerated and recorded.
-pub fn wallpaper_next(paths: &Paths) -> i32 {
-    let Some(slug) = store::active(paths) else {
-        eprintln!("lazyos theme: no theme is active");
-        return EXIT_NOTHING;
+/// Cycle the wallpaper for `for_slug` (or active theme if None).
+pub fn cycle_wallpaper_for(
+    paths: &Paths,
+    for_slug: Option<&str>,
+) -> Result<(String, &'static str), String> {
+    let slug = match for_slug {
+        Some(s) => s.to_string(),
+        None => store::active(paths).ok_or_else(|| "no theme is active".to_string())?,
     };
-    let theme = match theme(&slug) {
-        Ok(theme) => theme,
-        Err(error) => {
-            eprintln!("lazyos theme: {error}");
-            return EXIT_FAILED;
-        }
-    };
+    let theme = theme(&slug)?;
     if theme.wallpapers.len() < 2 {
-        eprintln!(
-            "lazyos theme: {} names one wallpaper, so there is nothing to cycle",
+        return Err(format!(
+            "{} names one wallpaper, so there is nothing to cycle",
             theme.name
-        );
-        return EXIT_NOTHING;
+        ));
     }
     let state = paths.state.join("wallpaper");
     let current = std::fs::read_to_string(&state).unwrap_or_default();
@@ -483,15 +600,27 @@ pub fn wallpaper_next(paths: &Paths) -> i32 {
         .iter()
         .find(|surface| surface.name == "sway")
         .expect("the wallpaper surface is in the table");
-    match store::install(paths, surface, &theme, &slug, true) {
-        Ok(_) => {}
+    store::install(paths, surface, &theme, &slug, true)?;
+    let _ = std::fs::write(&state, &theme.wallpapers[0]);
+    reload();
+    Ok((theme.wallpapers[0].clone(), surface.name))
+}
+
+/// The wallpaper half of `Alt+Shift+W`: the next name in the active theme's
+/// list, written through the same surface so it is regenerated and recorded.
+pub fn wallpaper_next(paths: &Paths) -> i32 {
+    match cycle_wallpaper_for(paths, None) {
+        Ok((wp, surf)) => {
+            say!("{wp}\t{surf}");
+            EXIT_OK
+        }
         Err(error) => {
             eprintln!("lazyos theme: {error}");
-            return EXIT_FAILED;
+            if error.contains("no theme is active") || error.contains("names one wallpaper") {
+                EXIT_NOTHING
+            } else {
+                EXIT_FAILED
+            }
         }
     }
-    let _ = std::fs::write(&state, &theme.wallpapers[0]);
-    say!("{}\t{}", theme.wallpapers[0], surface.name);
-    reload();
-    EXIT_OK
 }

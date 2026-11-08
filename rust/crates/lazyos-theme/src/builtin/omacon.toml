@@ -1,0 +1,36 @@
+# Omacon - https://github.com/Eidan78/omarchy-omacon-theme
+#
+# Omacon celebration aesthetic: deep cosmic violet background with electric
+# neon magenta pulses and lavender highlights.
+name = "Omacon"
+author = "Eidan78"
+source = "https://github.com/Eidan78/omarchy-omacon-theme"
+
+wallpapers = ["omacon-cosmic.jpg"]
+motion = "full"
+
+[colors]
+background = "#130c2b"
+foreground = "#f5caff"
+regular0 = "#26184d"
+regular1 = "#ff5588"
+regular2 = "#00ffaa"
+regular3 = "#ffd700"
+regular4 = "#a64dff"
+regular5 = "#ff66ff"
+regular6 = "#00ffff"
+regular7 = "#f5caff"
+bright0 = "#452c80"
+bright1 = "#ff77aa"
+bright2 = "#55ffcc"
+bright3 = "#ffe066"
+bright4 = "#c480ff"
+bright5 = "#ff99ff"
+bright6 = "#80ffff"
+bright7 = "#ffffff"
+
+[roles]
+accent = "#ff66ff"
+accent_alt = "#a64dff"
+surface = "#20153f"
+selection = "#3a2266"

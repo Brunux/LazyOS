@@ -1,0 +1,35 @@
+# Catppuccin Latte - https://github.com/catppuccin/catppuccin
+#
+# Soothing light pastel palette: warm creamy background with serene blue accent.
+name = "Catppuccin Latte"
+author = "Catppuccin"
+source = "https://github.com/catppuccin/catppuccin"
+
+wallpapers = ["catppuccin-latte-meadow.jpg"]
+motion = "full"
+
+[colors]
+background = "#eff1f5"
+foreground = "#4c4f69"
+regular0 = "#5c5f77"
+regular1 = "#d20f39"
+regular2 = "#2d7a1e"
+regular3 = "#bc6b00"
+regular4 = "#1e66f5"
+regular5 = "#8839ef"
+regular6 = "#179299"
+regular7 = "#acb0be"
+bright0 = "#6c6f85"
+bright1 = "#d20f39"
+bright2 = "#2d7a1e"
+bright3 = "#bc6b00"
+bright4 = "#1e66f5"
+bright5 = "#8839ef"
+bright6 = "#179299"
+bright7 = "#bcc0cc"
+
+[roles]
+accent = "#1e66f5"
+accent_alt = "#8839ef"
+surface = "#e6e9ef"
+selection = "#ccd0da"

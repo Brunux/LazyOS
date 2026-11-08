@@ -341,6 +341,27 @@ impl Theme {
             selection: roles.selection.0,
         }
     }
+
+    /// Terminal OSC sequences for setting palette colors dynamically on active terminals.
+    ///
+    /// Formats OSC 10 (foreground), OSC 11 (background), OSC 12 (cursor / accent),
+    /// and OSC 4;0..15 (16 ANSI colors) with string terminators (`\x1b\\`).
+    pub fn osc_sequences(&self) -> String {
+        let c = &self.colors;
+        let mut s = String::with_capacity(512);
+        s.push_str(&format!("\x1b]10;{}\x1b\\", c.foreground.hashed()));
+        s.push_str(&format!("\x1b]11;{}\x1b\\", c.background.hashed()));
+        s.push_str(&format!("\x1b]12;{}\x1b\\", self.roles().accent.hashed()));
+        let ansi = [
+            c.regular0, c.regular1, c.regular2, c.regular3, c.regular4, c.regular5, c.regular6,
+            c.regular7, c.bright0, c.bright1, c.bright2, c.bright3, c.bright4, c.bright5,
+            c.bright6, c.bright7,
+        ];
+        for (idx, col) in ansi.iter().enumerate() {
+            s.push_str(&format!("\x1b]4;{idx};{}\x1b\\", col.hashed()));
+        }
+        s
+    }
 }
 
 #[cfg(test)]
@@ -400,7 +421,7 @@ mod tests {
                 "built-in `{slug}` has no wallpaper: `theme set` would leave the old one"
             );
         }
-        assert_eq!(crate::builtin::ALL.len(), 8, "the plan's eight themes");
+        assert_eq!(crate::builtin::ALL.len(), 16, "the sixteen built-in themes");
     }
 
     #[test]
@@ -454,5 +475,16 @@ mod tests {
         assert_eq!(roles.danger, theme.colors.regular1);
         assert_eq!(roles.surface, theme.colors.regular0);
         assert_ne!(roles.dim, roles.text, "dim is secondary, not the text");
+    }
+
+    #[test]
+    fn osc_sequences_format_foreground_background_and_palette() {
+        let theme = solarized();
+        let osc = theme.osc_sequences();
+        assert!(osc.contains("\x1b]10;#93a1a1\x1b\\"));
+        assert!(osc.contains("\x1b]11;#002b36\x1b\\"));
+        assert!(osc.contains("\x1b]12;#2aa198\x1b\\"));
+        assert!(osc.contains("\x1b]4;0;#073642\x1b\\"));
+        assert!(osc.contains("\x1b]4;15;#fdf6e3\x1b\\"));
     }
 }

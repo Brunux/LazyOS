@@ -64,8 +64,26 @@ volume_icon() { # PCT
 case ${1:-} in
 volume)
 	case ${2:-} in
-	up) pactl set-sink-volume "$sink" +5% >/dev/null 2>&1 || true ;;
-	down) pactl set-sink-volume "$sink" -5% >/dev/null 2>&1 || true ;;
+	up)
+		cur=$(sink_pct || true)
+		case ${cur:-} in '' | *[!0-9]*) cur=0 ;; esac
+		if [ "$cur" -ge 100 ]; then
+			pactl set-sink-volume "$sink" 100% >/dev/null 2>&1 || true
+		else
+			new=$((cur + 5))
+			[ "$new" -le 100 ] || new=100
+			pactl set-sink-volume "$sink" "${new}%" >/dev/null 2>&1 || true
+		fi
+		;;
+	down)
+		cur=$(sink_pct || true)
+		case ${cur:-} in '' | *[!0-9]*) cur=0 ;; esac
+		if [ "$cur" -gt 100 ]; then
+			pactl set-sink-volume "$sink" 95% >/dev/null 2>&1 || true
+		else
+			pactl set-sink-volume "$sink" -5% >/dev/null 2>&1 || true
+		fi
+		;;
 	mute) pactl set-sink-mute "$sink" toggle >/dev/null 2>&1 || true ;;
 	*) usage ;;
 	esac

@@ -117,6 +117,13 @@ pub trait Screen {
     fn tick(&mut self) -> Outcome {
         Outcome::Continue
     }
+
+    /// Dynamic design override for screens that change their palette live (e.g. theme picker).
+    /// If `Some(design)` is returned, the window shell's background, header, and keybar
+    /// adapt to it dynamically.
+    fn design(&self) -> Option<Design> {
+        None
+    }
 }
 
 /// How long an opening animation may run.
@@ -230,17 +237,23 @@ impl<'a> App<'a> {
     /// the three bands are the same in every window.
     pub fn render(&mut self, frame: &mut Frame) {
         let area = frame.area();
+        let design = self
+            .screen
+            .as_ref()
+            .and_then(|s| s.design())
+            .unwrap_or_else(|| self.design.clone());
+
         frame.render_widget(
             ratatui::widgets::Block::default().style(
                 Style::default()
-                    .bg(self.design.color(ColorRole::Bg))
-                    .fg(self.design.color(ColorRole::Text)),
+                    .bg(design.color(ColorRole::Bg))
+                    .fg(design.color(ColorRole::Text)),
             ),
             area,
         );
         // Three bands, computed rather than solved: a `Layout` allocation per
         // frame is exactly the kind of quiet cost the budget test watches.
-        let header_height = self.design.header_height().min(area.height);
+        let header_height = design.header_height().min(area.height);
         let keybar_height = 1.min(area.height.saturating_sub(header_height));
         let body_height = area
             .height
@@ -269,13 +282,13 @@ impl<'a> App<'a> {
             .as_ref()
             .and_then(|s| s.header())
             .unwrap_or(&self.header);
-        draw_header(frame.buffer_mut(), header, &self.design, band);
+        draw_header(frame.buffer_mut(), header, &design, band);
         self.body_area = body;
         if let Some(screen) = self.screen.as_mut() {
             let mut ctx = BodyCtx {
                 area: body,
                 buf: frame.buffer_mut(),
-                design: &self.design,
+                design: &design,
             };
             screen.draw(&mut ctx);
         }
@@ -285,19 +298,33 @@ impl<'a> App<'a> {
             .and_then(|s| s.keybar())
             .filter(|h| !h.is_empty())
             .unwrap_or(&self.keybar);
-        draw_keybar(frame.buffer_mut(), keybar, &self.design, hints);
+        draw_keybar(frame.buffer_mut(), keybar, &design, hints);
         self.motion.apply(frame.buffer_mut(), body);
     }
 
     /// The screen sees the key first; Escape and Ctrl-C are the shell's only
     /// when it does not use them.
     pub fn handle(&mut self, event: Event) -> Outcome {
+        let design = self
+            .screen
+            .as_ref()
+            .and_then(|s| s.design())
+            .unwrap_or_else(|| self.design.clone());
+
         match event {
             Event::Key(key) if key.kind == KeyEventKind::Press => {
                 if let Some(screen) = self.screen.as_mut() {
-                    match screen.key(key, &self.design) {
+                    match screen.key(key, &design) {
                         Outcome::Continue => {}
-                        Outcome::Consumed => return Outcome::Continue,
+                        Outcome::Consumed => {
+                            let current = Design::for_session(
+                                std::env::var("XDG_RUNTIME_DIR").ok().as_deref(),
+                            );
+                            if current.palette() != self.design.palette() {
+                                self.design = current;
+                            }
+                            return Outcome::Continue;
+                        }
                         done => return done,
                     }
                 }
@@ -311,12 +338,21 @@ impl<'a> App<'a> {
             }
             Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left) => {
                 let row = self.screen.as_ref().and_then(|screen| {
-                    screen.hit(self.body_area, mouse.column, mouse.row, &self.design)
+                    screen.hit(self.body_area, mouse.column, mouse.row, &design)
                 });
-                match self.screen.as_mut() {
+                let outcome = match self.screen.as_mut() {
                     Some(screen) => screen.click(row),
                     None => Outcome::Continue,
+                };
+                if outcome == Outcome::Consumed {
+                    let current =
+                        Design::for_session(std::env::var("XDG_RUNTIME_DIR").ok().as_deref());
+                    if current.palette() != self.design.palette() {
+                        self.design = current;
+                    }
+                    return Outcome::Continue;
                 }
+                outcome
             }
             _ => Outcome::Continue,
         }

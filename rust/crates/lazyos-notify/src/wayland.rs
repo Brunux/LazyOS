@@ -1,6 +1,7 @@
 use std::os::fd::AsFd;
 use std::os::unix::fs::FileExt;
 use std::sync::mpsc::Sender;
+use std::time::Instant;
 
 use wayland_client::protocol::{
     wl_buffer, wl_compositor, wl_pointer, wl_region, wl_registry, wl_seat, wl_shm, wl_shm_pool,
@@ -9,7 +10,7 @@ use wayland_client::protocol::{
 use wayland_client::{Connection, Dispatch, QueueHandle};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
-use crate::model::Notification;
+use crate::model::{AnimState, Notification};
 use crate::render::Renderer;
 
 pub enum UiEvent {
@@ -59,7 +60,7 @@ impl WaylandState {
         }
     }
 
-    pub fn setup_layer_surface(&mut self, qh: &QueueHandle<Self>) {
+    pub fn setup_layer_surface(&mut self, qh: &QueueHandle<Self>, w: u32, h: u32) {
         if self.surface.is_some() {
             return;
         }
@@ -83,26 +84,41 @@ impl WaylandState {
 
         layer_surface
             .set_anchor(zwlr_layer_surface_v1::Anchor::Top | zwlr_layer_surface_v1::Anchor::Right);
-        layer_surface.set_margin(36, 12, 0, 0);
+        // Waybar exclusive zone is 34px. Margin top 12px places the notification at y = 46px
+        // (aligning exactly with the Sway terminal window top border at y = 46px), and margin right 12px
+        // places it at right = 12px, aligning with the Sway window right border.
+        layer_surface.set_margin(12, 12, 0, 0);
         layer_surface
             .set_keyboard_interactivity(zwlr_layer_surface_v1::KeyboardInteractivity::None);
-        layer_surface.set_size(1, 1);
+        layer_surface.set_size(w, h);
 
         surface.commit();
 
         self.surface = Some(surface);
         self.layer_surface = Some(layer_surface);
+        self.width = w;
+        self.height = h;
+        self.configured = false;
     }
 
-    pub fn update_surface(&mut self, qh: &QueueHandle<Self>) {
-        if !self.configured {
+    pub fn destroy_surface(&mut self) {
+        if let Some(ls) = self.layer_surface.take() {
+            ls.destroy();
+        }
+        if let Some(s) = self.surface.take() {
+            s.destroy();
+        }
+        self.width = 0;
+        self.height = 0;
+        self.configured = false;
+    }
+
+    pub fn paint_surface(&mut self, qh: &QueueHandle<Self>) {
+        if !self.configured || self.notifications.is_empty() {
             return;
         }
 
         let Some(ref surface) = self.surface else {
-            return;
-        };
-        let Some(ref layer_surface) = self.layer_surface else {
             return;
         };
         let Some(ref shm) = self.shm else {
@@ -112,26 +128,10 @@ impl WaylandState {
             return;
         };
 
-        if self.notifications.is_empty() {
-            layer_surface.set_size(1, 1);
-            let empty_region = compositor.create_region(qh, ());
-            surface.set_input_region(Some(&empty_region));
-            surface.attach(None, 0, 0);
-            surface.commit();
-            self.width = 0;
-            self.height = 0;
+        let target_w = self.width;
+        let target_h = self.height;
+        if target_w == 0 || target_h == 0 {
             return;
-        }
-
-        let metrics = self.renderer.compute_layout(&mut self.notifications);
-        let target_w = metrics.total_width.ceil() as u32;
-        let target_h = metrics.total_height.ceil() as u32;
-
-        if target_w != self.width || target_h != self.height {
-            self.width = target_w;
-            self.height = target_h;
-            layer_surface.set_size(target_w, target_h);
-            surface.commit();
         }
 
         // Allocate buffer and paint
@@ -158,6 +158,12 @@ impl WaylandState {
         let mut data = vec![0u8; size];
         if let Some(mut pixmap) = tiny_skia::PixmapMut::from_bytes(&mut data, target_w, target_h) {
             self.renderer.render(&mut pixmap, &mut self.notifications);
+        }
+
+        // tiny-skia outputs RGBA in memory. Wayland wl_shm::Format::Argb8888 on little-endian
+        // is BGRA in memory. Swap Red (byte 0) and Blue (byte 2) so displayed colors match exactly.
+        for pixel in data.chunks_exact_mut(4) {
+            pixel.swap(0, 2);
         }
 
         let _ = file.write_all_at(&data, 0);
@@ -198,6 +204,9 @@ impl WaylandState {
         let mut clicked_close = false;
 
         for (i, notif) in self.notifications.iter().enumerate() {
+            if notif.is_closing() {
+                continue;
+            }
             if notif.card_bounds.contains(px, py) {
                 clicked_index = Some(i);
 
@@ -224,20 +233,56 @@ impl WaylandState {
             return;
         };
 
+        let reduced = std::env::var("LAZYOS_REDUCED_MOTION").is_ok();
+
         match button {
             0x110 => {
                 // Left click
                 if clicked_close {
                     let id = self.notifications[idx].id;
-                    self.notifications.remove(idx);
-                    let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                    self.update_surface(qh);
+                    if reduced {
+                        self.notifications.remove(idx);
+                        let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
+                        if self.notifications.is_empty() {
+                            self.destroy_surface();
+                        } else {
+                            let metrics = self.renderer.compute_layout(&mut self.notifications);
+                            self.width = metrics.total_width.ceil() as u32;
+                            self.height = metrics.total_height.ceil() as u32;
+                            self.paint_surface(qh);
+                        }
+                    } else {
+                        self.notifications[idx].anim_state = AnimState::Closing {
+                            start: Instant::now(),
+                            reason: 2,
+                        };
+                        self.notifications[idx].is_hovered = false;
+                        self.notifications[idx].hovered_action = None;
+                        self.paint_surface(qh);
+                    }
                 } else if let Some(action_key) = clicked_action {
                     let id = self.notifications[idx].id;
                     let _ = self.event_tx.send(UiEvent::ActionInvoked(id, action_key));
-                    self.notifications.remove(idx);
-                    let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                    self.update_surface(qh);
+                    if reduced {
+                        self.notifications.remove(idx);
+                        let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
+                        if self.notifications.is_empty() {
+                            self.destroy_surface();
+                        } else {
+                            let metrics = self.renderer.compute_layout(&mut self.notifications);
+                            self.width = metrics.total_width.ceil() as u32;
+                            self.height = metrics.total_height.ceil() as u32;
+                            self.paint_surface(qh);
+                        }
+                    } else {
+                        self.notifications[idx].anim_state = AnimState::Closing {
+                            start: Instant::now(),
+                            reason: 2,
+                        };
+                        self.notifications[idx].is_hovered = false;
+                        self.notifications[idx].hovered_action = None;
+                        self.paint_surface(qh);
+                    }
                 } else {
                     // Click on card body: invoke "default" action if present, or dismiss
                     let id = self.notifications[idx].id;
@@ -250,31 +295,86 @@ impl WaylandState {
                             .event_tx
                             .send(UiEvent::ActionInvoked(id, "default".to_string()));
                     }
-                    self.notifications.remove(idx);
-                    let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                    self.update_surface(qh);
+                    if reduced {
+                        self.notifications.remove(idx);
+                        let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
+                        if self.notifications.is_empty() {
+                            self.destroy_surface();
+                        } else {
+                            let metrics = self.renderer.compute_layout(&mut self.notifications);
+                            self.width = metrics.total_width.ceil() as u32;
+                            self.height = metrics.total_height.ceil() as u32;
+                            self.paint_surface(qh);
+                        }
+                    } else {
+                        self.notifications[idx].anim_state = AnimState::Closing {
+                            start: Instant::now(),
+                            reason: 2,
+                        };
+                        self.notifications[idx].is_hovered = false;
+                        self.notifications[idx].hovered_action = None;
+                        self.paint_surface(qh);
+                    }
                 }
             }
             0x111 => {
                 // Right click: dismiss card
                 let id = self.notifications[idx].id;
-                self.notifications.remove(idx);
-                let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
-                self.update_surface(qh);
+                if reduced {
+                    self.notifications.remove(idx);
+                    let _ = self.event_tx.send(UiEvent::NotificationClosed(id, 2));
+                    if self.notifications.is_empty() {
+                        self.destroy_surface();
+                    } else {
+                        let metrics = self.renderer.compute_layout(&mut self.notifications);
+                        self.width = metrics.total_width.ceil() as u32;
+                        self.height = metrics.total_height.ceil() as u32;
+                        self.paint_surface(qh);
+                    }
+                } else {
+                    self.notifications[idx].anim_state = AnimState::Closing {
+                        start: Instant::now(),
+                        reason: 2,
+                    };
+                    self.notifications[idx].is_hovered = false;
+                    self.notifications[idx].hovered_action = None;
+                    self.paint_surface(qh);
+                }
             }
             0x112 => {
                 // Middle click: dismiss all from this app
                 let app = self.notifications[idx].app_name.clone();
-                let mut remaining = Vec::new();
-                for notif in self.notifications.drain(..) {
-                    if notif.app_name == app {
-                        let _ = self.event_tx.send(UiEvent::NotificationClosed(notif.id, 2));
-                    } else {
-                        remaining.push(notif);
+                if reduced {
+                    let mut remaining = Vec::new();
+                    for notif in self.notifications.drain(..) {
+                        if notif.app_name == app {
+                            let _ = self.event_tx.send(UiEvent::NotificationClosed(notif.id, 2));
+                        } else {
+                            remaining.push(notif);
+                        }
                     }
+                    self.notifications = remaining;
+                    if self.notifications.is_empty() {
+                        self.destroy_surface();
+                    } else {
+                        let metrics = self.renderer.compute_layout(&mut self.notifications);
+                        self.width = metrics.total_width.ceil() as u32;
+                        self.height = metrics.total_height.ceil() as u32;
+                        self.paint_surface(qh);
+                    }
+                } else {
+                    for notif in &mut self.notifications {
+                        if notif.app_name == app && !notif.is_closing() {
+                            notif.anim_state = AnimState::Closing {
+                                start: Instant::now(),
+                                reason: 2,
+                            };
+                            notif.is_hovered = false;
+                            notif.hovered_action = None;
+                        }
+                    }
+                    self.paint_surface(qh);
                 }
-                self.notifications = remaining;
-                self.update_surface(qh);
             }
             _ => {}
         }
@@ -289,6 +389,15 @@ impl WaylandState {
         let mut needs_repaint = false;
 
         for notif in &mut self.notifications {
+            if notif.is_closing() {
+                if notif.is_hovered || notif.hovered_action.is_some() {
+                    notif.is_hovered = false;
+                    notif.hovered_action = None;
+                    needs_repaint = true;
+                }
+                continue;
+            }
+
             let was_hovered = notif.is_hovered;
             let is_hovered = notif.card_bounds.contains(px, py);
             if was_hovered != is_hovered {
@@ -311,7 +420,7 @@ impl WaylandState {
         }
 
         if needs_repaint {
-            self.update_surface(qh);
+            self.paint_surface(qh);
         }
     }
 }
@@ -503,7 +612,7 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for WaylandState {
             zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
                 layer_surface.ack_configure(serial);
                 state.configured = true;
-                state.update_surface(qh);
+                state.paint_surface(qh);
             }
             zwlr_layer_surface_v1::Event::Closed => {
                 state.configured = false;

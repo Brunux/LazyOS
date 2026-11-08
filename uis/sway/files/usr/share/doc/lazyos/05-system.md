@@ -118,8 +118,11 @@ dismissed.
 * **Middle-click on card:** dismisses all notifications from that application.
 
 Each card carries a high-resolution icon from the LazyOS theme or a single-advance Nerd
-Font glyph fallback. Notifications also render level bars for progress hints (`value:0..100`),
-used by volume/brightness keys (`osd`) and slow background tasks.
+Font glyph fallback, rendered in the active theme's palette matching the Waybar hover tooltip
+box (`surface` background, `dim` 1px border, 6px corner radius, and `accent` highlights).
+Notifications also render level bars for progress hints (`value:0..100`), used by volume/brightness
+keys (`osd`) and slow background tasks. Volume adjustments clamp strictly at 100% (matching
+hardware brightness controls) to prevent software audio distortion.
 
 `lazyos-notify` logs notifications into structured JSONL at
 `$XDG_STATE_HOME/lazyos/notify/history.jsonl`. **Alt+Ctrl+N** opens the history

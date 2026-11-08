@@ -44,6 +44,7 @@ pub fn rows() -> Vec<(&'static str, &'static str, &'static str)> {
         ),
         ("rotation", "Rotation", "swaymsg output transform"),
         ("display", "Display arrangement", "rofi-display"),
+        ("theme", "Appearance & Themes", "rofi-theme"),
         ("automount", "Auto-mount USB drives", "automount.conf"),
         ("tablet", "Tablet mode", "tablet-mode toggle"),
         (

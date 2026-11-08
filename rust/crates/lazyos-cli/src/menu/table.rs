@@ -580,6 +580,14 @@ pub const ROOT: &[MenuItem] = &[
         },
     ),
     item(
+        "theme",
+        "Themes",
+        "browse and preview color palettes and wallpapers",
+        Glyph::Theme,
+        System,
+        session("rofi-theme"),
+    ),
+    item(
         "about",
         "About",
         "kernel, uptime, memory, battery",
@@ -705,6 +713,14 @@ pub const POWER: &[MenuItem] = &[
 /// (built at run time from `lazyos_theme::builtin`). The `.desktop` launcher
 /// entries join in spec 012, which owns their parsing and launch path.
 pub const PALETTE_EXTRA: &[MenuItem] = &[
+    item(
+        "theme-picker",
+        "Theme Selector",
+        "browse themes with live palette & wallpaper preview",
+        Glyph::Theme,
+        System,
+        session("rofi-theme"),
+    ),
     item(
         "theme-next",
         "Next theme",
