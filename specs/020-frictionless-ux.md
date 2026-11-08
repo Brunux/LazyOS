@@ -81,7 +81,7 @@ While specs 001–019 migrated all 45+ surfaces to the native Rust TUI framework
 - [ ] failure: when a required tool is missing or an operation fails, the surface renders an in-window error banner or `FailureScreen` (`Card::render`) instead of exiting silently or relying on an external toast.
 - [ ] compatibility: all symlinks in `~/.config/bin/` (`bar-net`, `bar-bt`, `bar-audio`, `bar-power`, `rofi-*`) and headless query flags (`menu net --status`, `menu clean --dry-run`, `menu places --rows`, `menu translate --languages`) remain 100% compatible.
 - [ ] witness: `scripts/check-system.sh` verifies that no `ui_say` / `bar-pick` / `makoctl` references remain in session scripts or `system/*.rs`, that `foot.ini` has `selection-target=both`, and that all menu commands pass behavioral checks.
-- [ ] witness: `uis/sway/files/usr/share/doc/lazyos/04-software.md` and `02-rofi.md` document the self-contained in-window TUI behavior, `gruvbox-rainbow` prompt, and `foot` auto-copy.
+- [ ] witness: `uis/sway/files/usr/share/doc/lazyos/04-software.md` and `02-rofi.md` document the self-contained in-window TUI behavior and `foot` auto-copy.
 - [ ] witness: `AGENTS.md` documents the three-part frictionless UX rule (anticipate primary intent on open, in-window progress over external toasts, consistent foundation with domain-tailored layouts).
 - [ ] unit tests: `cargo test --workspace` covers `ListState::update_rows` cursor preservation, `learn` row indexing, `apps` frecency round-trip, `net` state transitions, and snapshot tests for updated screens.
 

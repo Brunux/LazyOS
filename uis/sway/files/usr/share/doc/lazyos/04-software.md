@@ -79,16 +79,14 @@ in a narrower column.
 
 ### The prompt
 
-**starship**, using the **Gruvbox Rainbow** powerline pill preset
-(`https://starship.rs/presets/gruvbox-rainbow`): one coloured block per question,
-left to right - who you are, where you are, which branch and what the tree looks
-like, which languages this directory has, which container, what time - then a
-second line that is nothing but the character: green `` when the last command
-worked, red `` when it did not. The blocks follow the active theme's rainbow
-progression (`bright1` orange for the user, `regular3` yellow for directory,
-`regular6` cyan/aqua for git, `regular4` blue for languages, `dim` and `surface`
-for containers and time) and the separators are the powerline round caps and
-arrows (`U+E0B6`, `U+E0B0`, `U+E0B4`).
+**starship**, in the shape of a powerline: one coloured block per question, left
+to right - who you are, where you are, which branch and what the tree looks like,
+which languages this directory has, which container, what time - then a second
+line that is nothing but the character: cyan `❯` when the last command worked,
+red `✗` when it did not. The blocks are solarized (base3 on orange for the user,
+base02/base01 for time and containers, cyan for git, blue for the languages) and
+the separators are the triangles `U+E0B0`/`U+E0B2`, which is the form that looks
+the same in foot and in kitty.
 
 Two things are worth knowing before editing `~/.config/starship.toml`:
 

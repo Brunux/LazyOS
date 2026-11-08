@@ -24,18 +24,22 @@
 # box in every terminal. A segment that cannot be drawn is worse than a segment
 # that is not there, and the hostname already says which machine this is.
 #
-# The separators are the **round caps and arrows** (U+E0B6, U+E0B0, U+E0B4) from
-# the Gruvbox Rainbow preset (https://starship.rs/presets/gruvbox-rainbow): U+E0B6
-# opens the prompt with a smooth pill cap, U+E0B0 segments each question, and
-# U+E0B4 caps the right end.
+# The separators are **triangles**, not the rounded caps, and that is what makes
+# the prompt look the same in foot and in kitty. U+E0B0 and U+E0B2 are drawn by
+# JetBrains Mono itself - the primary font, so they tile with the cell at any
+# size - while the rounded caps U+E0B6/U+E0B4 exist only in the symbol font, and a
+# terminal that draws a fallback glyph at *that font's* size and baseline (foot
+# does; kitty scales it to the cell) puts them noticeably short of the segment
+# they are supposed to close. Both terminals were compared on the same prompt
+# before this was chosen: the triangles match, the caps do not.
 #
 # The glyphs that are here are a contract: every private-use codepoint below is
 # drawn by a font that ~/.config/foot/foot.ini names (JetBrains Mono for the
-# triangles, Symbols Nerd Font Mono for the round caps, the branch, the clock, the
-# character and the language icons, Font Awesome and Material Design Icons for the
-# folder substitutions) - foot takes the *first* font in that list which has the
-# glyph, and draws it at that font's size, so a codepoint only a third font has is
-# a glyph that renders small or not at all. check-system.sh reads this file, asks
+# triangles, Symbols Nerd Font Mono for the branch, the clock, the character and
+# the language icons, Font Awesome and Material Design Icons for the folder
+# substitutions) - foot takes the *first* font in that list which has the glyph,
+# and draws it at that font's size, so a codepoint only a third font has is a
+# glyph that renders small or not at all. check-system.sh reads this file, asks
 # fontconfig which family covers each codepoint and FAILs when it is not one foot
 # lists, so adding a glyph here without its font is a red line and not a surprise
 # on someone else's card.
@@ -45,7 +49,7 @@
 # java (U+E624), both in Symbols Nerd Font Mono.
 
 format = """
-[](color_orange)\
+[](fg:color_orange)\
 $username\
 [](bg:color_yellow fg:color_orange)\
 $directory\
@@ -70,7 +74,7 @@ $conda\
 $pixi\
 [](fg:color_bg3 bg:color_bg1)\
 $time\
-[ ](fg:color_bg1)\
+[](fg:color_bg1)\
 $line_break$character"""
 
 palette = 'solarized_dark'
@@ -79,8 +83,8 @@ palette = 'solarized_dark'
 color_fg0 = '#ffffff'
 color_bg1 = '#2c313a'
 color_bg3 = '#747a85'
-color_blue = '#61afef'
-color_aqua = '#56b6c2'
+color_blue = '#c678dd'
+color_aqua = '#61afef'
 color_green = '#98c379'
 color_orange = '#e06c75'
 color_purple = '#c678dd'
