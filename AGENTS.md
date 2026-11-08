@@ -25,8 +25,8 @@ yet present in `scripts/` as not implemented.
   `taskset -c 4-7` (and `-j 4`), leaving the Cortex-A55 efficiency cores (CPUs
   0-3) free and responsive for the desktop session.
 - **Icons first, never forced.** Icons and readable TUI tools are the house taste, not a garnish:
-  a menu row gets its `UI_I_*` glyph from `~/.config/bin/lib-rofi.sh`, a notification its name from
-  the same constants, a `rofi-files` row a `thumbnail://` or a name from the file-browser table, a
+  a menu row gets its Nerd Font glyph from `lazyos-ui`, a notification its name from
+  the theme pictures (`lazyos --icon-names`), a `lazyos menu files` row a picture from the preview pane, a
   `.desktop` entry an `Icon=` the **LazyOS** theme actually draws, and a terminal tool is picked for
   the same taste (`eza --icons`, `bat`, `glow`, fzf's preview pane, `btop`, `lazygit`) when a
   plainer one only prints the same facts. The order is fixed so the choice is testable: **a glyph
@@ -47,7 +47,7 @@ yet present in `scripts/` as not implemented.
 - **A feature ships with its three witnesses**: a `check-system.sh` line that fails when its
   dependency disappears, a paragraph in `usr/share/doc/lazyos/` (the manual is what a person
   reads on the device), and a bullet in this file that says why it is built this way.
-- **Nothing resident.** Menus are one-shot rofi scripts and a viewer is the viewer's own window,
+- **Nothing resident.** Menus are one-shot framework commands in foot and a viewer is the viewer's own window,
   so the session starts nothing that stays. Two agreed exceptions, both because only something
   watching can answer the question: `cliphist`'s watcher (no history without one) and `workstyle`
   (which windows are in which workspace, see the UI section). A slow action gets a `busy` card
@@ -71,9 +71,9 @@ yet present in `scripts/` as not implemented.
   idempotent-regeneration check, never silently overwritten); and **the AI proposes, the person
   confirms** - `lazyos mcp` never exposes an apply-level destructive tool (install, format, swap,
   power), so the MCP manifest is the witness. The framework is built and shipping at
-  `v0.4.2`: 35 surfaces have migrated into `lazyos`, 8 themes are driven by `lazyos-theme`,
-  `lazyos mcp` serves tools to OpenCode, and `specs/017-remaining-surfaces.md` scopes the
-  final 10 interactive surfaces leading to rofi closure; `docs/plan-ui.md` §16 is the order,
+  `v0.4.2`: 45+ surfaces have migrated into `lazyos`, 16 themes are driven by `lazyos-theme`,
+  `lazyos mcp` serves tools to OpenCode, `lazyos-notify` serves layer-shell notification cards,
+  and rofi/lib-rofi.sh/bar-pick are completely retired (spec 014); `docs/plan-ui.md` §16 is the order,
   and each tier lands with its three witnesses like everything else.
 - **The final 10 interactive surfaces migrate to the framework, retiring `rofi -dmenu` workflows**
   (spec 017). `bar-net` (`menu net`), `rofi-agents` (`menu agents`), `rofi-places` (`menu places`),

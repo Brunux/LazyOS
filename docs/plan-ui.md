@@ -579,24 +579,24 @@ scope, acceptance criteria, tests, three witnesses and the `opencode go` model t
 One branch (`spec/NNN-slug`) and one PR per spec; [`specs/README.md`](../specs/README.md) holds
 the workflow and the routing.
 
-1. **v0.4.0** — installer TUI fullscreen (already planned): first TaskView + typed-gate
-   confirm + splash/hero.
-2. **Framework core + first loop** — `lazyos-ui` (design system, glyphs, list, launch, notify
-   bridge), `lazyos-theme` with **solarized as theme #1** and all surface generators,
-   `lazyos` dispatch; ports: root menu (command palette + Ask strip), TaskView, wifi/bt/pkg
-   (+ download/clean/grep/dns). The loop closes where it hurts most. AI lands here too:
-   **`lazyos mcp`** + the `opencode.json` registration + the instructions file, and the Ask
-   strip v1 (single-shot `opencode run` rendered in a task window).
-3. **Pickers** — files with sixel preview, settings, power, media, notify, clip, emoji, calc,
-   learn, about (bento), keys, colour, tz, vnc, places, kill, agents, ssh, capture (+
-   post-actions popup), qr, dev, remind, display, swap, format; theme selector with live
-   preview; cycle keys.
-4. **rofi closure** — launcher command center, window switcher, run, find; welcome onboarding;
-   rofi leaves the image. AI surface upgrades here: **`menu ask` chat with streaming** via
-   `opencode serve`, the `desktop.screenshot` vision loop, and dictation → Ask.
-5. **v0.5.x** — `lazyos-notify` daemon (mako leaves), `lazyos-greeter`, the 7 extra themes +
-   gradient wallpapers, bar elevation (MPRIS/weather/calendar), theme templates for
-   btop/lazygit/nvim/fzf, `lazyos check`, `theme install`; then the host migration of
+1. **v0.4.0** — installer TUI fullscreen (done, spec 018): full TUI wizard (`lazyos installer`)
+   with user account creation, timezone picker, eMMC safety confirmation gate, and streaming
+   TaskView progress reporting.
+2. **Framework core + first loop** — done (specs 001-008): `lazyos-ui` (design system, glyphs,
+   list, launch, card/toast bridge), `lazyos-theme` with **solarized as theme #1** and all surface
+   generators, `lazyos` dispatch; ports: root menu (command palette + Ask strip), TaskView,
+   `lazyos mcp` + the `opencode.json` registration + the instructions file, and the Ask strip v1.
+3. **Pickers** — done (specs 009-011): files with sixel preview, find, grep, settings, power, media,
+   notify, clip, emoji, calc, learn, about (bento), keys, colour, tz, vnc, ssh, capture, qr, dev,
+   remind, display, swap, format.
+4. **rofi closure** — done (specs 012, 017, 014): launcher command center (`apps`), window switcher
+   (`window`), command runner (`run`), learn, keys, pkg, dev, about. The final 10 interactive surfaces
+   migrated (`net`, `agents`, `places`, `clean`, `kill`, `download`, `layout`, `file-actions`,
+   `translate`, `dictate`). `rofi`, `lib-rofi.sh`, and `bar-pick` are completely retired from the
+   shipping image and purged from `uis/sway/packages.list`.
+5. **v0.5.x** — in progress: `lazyos-notify` layer-shell daemon landed (spec 019), 16 themes with
+   wallpapers and interactive dual-pane visual theme browser (`lazyos menu theme`, spec 013) across
+   13 desktop surfaces. Next: `lazyos-greeter`, bar elevation, and the host migration of
    [`plan.md`](plan.md).
 6. **Later** — `theme from-wallpaper` (matugen-style), sound design (if enabled), custom lock
    and which-key overlay (if un-parked).

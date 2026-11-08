@@ -18,10 +18,11 @@ First target: the **Google Hayato** Chromebook (MediaTek MT8192, `google-asurada
 - **Release:** [`v0.4.2`](docs/releases/v0.4.2.md) — the precompiled image, with the **LazyOS**
   brand (the mark and the distribution's own identity) and the session this repository documents:
   **swayfx** with blur, **lazyos** (Rust/Ratatui multi-call binary) powering the launcher,
-  window switcher, runner, root menu, settings, search, reference, media, and tools across 35 ported
-  surfaces, the pure-data **theme engine** (eight built-in themes, generated wallpapers, themed
-  greeter and lock screen), **TaskView**, the **OpenCode MCP server**, and the **LazyOS** idle
-  screen and lock (see [Using the system](#using-the-system)).
+  window switcher, runner, root menu, settings, search, reference, media, installer, and tools across
+  45+ native surfaces, complete **rofi retirement** (spec 014), **lazyos-notify** (layer-shell
+  card daemon with action buttons and progress, spec 019), the pure-data **theme engine** (16 built-in
+  themes, generated wallpapers, visual theme browser, themed greeter and lock screen), **TaskView**,
+  the **OpenCode MCP server**, and the **LazyOS** idle screen and lock (see [Using the system](#using-the-system)).
 - **Using it:** [Using the system](#using-the-system) below, and the manual that ships in the image
   (`/usr/share/doc/lazyos/`, or **Learn** in the launcher) - its sources are
   [`uis/sway/files/usr/share/doc/lazyos/`](uis/sway/files/usr/share/doc/lazyos/).

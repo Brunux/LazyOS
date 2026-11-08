@@ -1,6 +1,6 @@
 # Spec 019 — The Notification Daemon: Eye-Candy Layer-Shell Cards, Actions, and Progress
 
-- **Status**: in progress
+- **Status**: merged (PR #44; layer-shell lazyos-notify daemon with action buttons and progress)
 - **Phase**: 5
 - **Depends on**: 002, 004, 006
 - **Model**: `claude-opus-5-5` (effort `high`) — Wayland `wlr-layer-shell` protocol client, D-Bus `org.freedesktop.Notifications` service implementation, `tiny-skia` 2D software card rendering, interactive hit testing for action buttons, and history persistence. Fallback `claude-sonnet-5-5`.
@@ -94,19 +94,19 @@ Building a custom notification surface in Wayland requires layer-shell support (
 
 ## Acceptance criteria
 
-- [ ] `lazyos-notify` registers `org.freedesktop.Notifications` on session D-Bus; standard `notify-send "Test" "Body"` displays an eye-candy card.
-- [ ] Notifications with actions render interactive visual buttons; clicking a button invokes `ActionInvoked` with the corresponding action key.
-- [ ] Notifications with the `value` progress hint render a smooth progress bar reflecting the integer percentage.
-- [ ] Cards display rounded corners, drop shadows, and border colors matching the active theme's urgency role.
-- [ ] In-place updates (`replaces_id` or matching synchronous tags) update title, body, and progress bar without re-triggering entrance animations.
-- [ ] Right-clicking a card immediately dismisses it and frees the layer-shell surface.
-- [ ] Notifications are recorded in `$XDG_STATE_HOME/lazyos/notify/history.jsonl` with timestamp, app name, summary, body, and urgency.
-- [ ] `lazyos-notify` consumes ≤ 15 MB PSS when active with notifications on screen, and ≤ 8 MB PSS when idle with zero cards displayed.
-- [ ] compatibility: `notify-send`, `lazyos notify`, and all existing shell scripts continue working without modification.
-- [ ] witness: `scripts/check-system.sh` verifies `lazyos-notify` is running, asserts D-Bus ownership of `org.freedesktop.Notifications`, and fails if `mako` remains running.
-- [ ] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/05-system.md` § *Notifications* documents the eye-candy layer-shell daemon, action buttons, and history format.
-- [ ] witness: an `AGENTS.md` bullet documents the `tiny-skia` software rendering choice and D-Bus action architecture.
-- [ ] unit tests: D-Bus message deserializer, action parser, history serializer, and `tiny-skia` layout engine are covered by `cargo test`.
+- [x] `lazyos-notify` registers `org.freedesktop.Notifications` on session D-Bus; standard `notify-send "Test" "Body"` displays an eye-candy card.
+- [x] Notifications with actions render interactive visual buttons; clicking a button invokes `ActionInvoked` with the corresponding action key.
+- [x] Notifications with the `value` progress hint render a smooth progress bar reflecting the integer percentage.
+- [x] Cards display rounded corners, drop shadows, and border colors matching the active theme's urgency role.
+- [x] In-place updates (`replaces_id` or matching synchronous tags) update title, body, and progress bar without re-triggering entrance animations.
+- [x] Right-clicking a card immediately dismisses it and frees the layer-shell surface.
+- [x] Notifications are recorded in `$XDG_STATE_HOME/lazyos/notify/history.jsonl` with timestamp, app name, summary, body, and urgency.
+- [x] `lazyos-notify` consumes ≤ 15 MB PSS when active with notifications on screen, and ≤ 8 MB PSS when idle with zero cards displayed.
+- [x] compatibility: `notify-send`, `lazyos notify`, and all existing shell scripts continue working without modification.
+- [x] witness: `scripts/check-system.sh` verifies `lazyos-notify` is running, asserts D-Bus ownership of `org.freedesktop.Notifications`, and fails if `mako` remains running.
+- [x] witness: a paragraph in `uis/sway/files/usr/share/doc/lazyos/05-system.md` § *Notifications* documents the eye-candy layer-shell daemon, action buttons, and history format.
+- [x] witness: an `AGENTS.md` bullet documents the `tiny-skia` software rendering choice and D-Bus action architecture.
+- [x] unit tests: D-Bus message deserializer, action parser, history serializer, and `tiny-skia` layout engine are covered by `cargo test`.
 
 ## Tests
 

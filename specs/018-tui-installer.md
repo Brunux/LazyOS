@@ -1,6 +1,6 @@
 # Spec 018 — The Full TUI Installer: Account Setup, Location, Disk Safety, and Progress
 
-- **Status**: in progress
+- **Status**: merged (PR #44; full TUI installer wizard in lazyos installer)
 - **Phase**: 4-5
 - **Depends on**: 001, 002, 005, 010
 - **Model**: `claude-opus-5-5` (effort `high`) — architecture and security boundary: irreversible disk destruction, partition manipulation, user credential generation, depthcharge FIT signing, and a multi-step TUI wizard. Fallback `claude-sonnet-5-5`.

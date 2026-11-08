@@ -1,5 +1,7 @@
 # Porting Omarchy's menus onto rofi
 
+> **Closure Status (Spec 014):** All menus, pickers, and interactive surfaces described in this document have been fully ported to the native Rust/Ratatui multi-call binary `lazyos` (`lazyos menu <subcommand>`). The `rofi` package, `bar-pick`, and `lib-rofi.sh` have been completely retired from the shipping system and purged from `uis/sway/packages.list`. All legacy script names remain operational as symlinks to `/usr/bin/lazyos`.
+
 Omarchy's desktop is a Quickshell shell: every menu is a QML tree whose leaves call a script, and
 every script prompts through `omarchy-menu-select` (a dmenu) before it acts. That is the same shape
 this port already has, one process at a time:
