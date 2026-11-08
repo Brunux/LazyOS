@@ -453,14 +453,58 @@ pub fn menu(
                 }
 
                 if let Some(archive_path) = archive_picker.answers().first() {
-                    let _ = crate::menu::spawn_detached(
-                        &[
-                            profile_bin.to_string_lossy().to_string(),
-                            "import".to_string(),
-                            archive_path.to_string(),
-                        ],
-                        &home,
-                    );
+                    let mut args = vec![
+                        profile_bin.to_string_lossy().to_string(),
+                        "import".to_string(),
+                        archive_path.to_string(),
+                    ];
+                    if archive_path.ends_with(".gpg") {
+                        let mut pw_picker = Picker::new(
+                            "Passphrase for the profile",
+                            vec![Question::input(
+                                "Passphrase for the profile",
+                                "Enter the passphrase to decrypt the archive · Escape cancels",
+                                "Passphrase",
+                                true,
+                            )],
+                        );
+                        let p_code = crate::run_screen(
+                            terminal,
+                            design,
+                            "Passphrase for the profile",
+                            &mut pw_picker,
+                        )?;
+                        if p_code != 0 {
+                            continue;
+                        }
+                        let pw = pw_picker.answers().first().cloned().unwrap_or_default();
+                        if pw.is_empty() {
+                            say(
+                                "Developer",
+                                "A passphrase is required to decrypt the profile",
+                                lazyos_ui::Urgency::Normal,
+                                Glyph::Info,
+                            );
+                            continue;
+                        }
+                        let runtime =
+                            std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+                        let pass_file =
+                            format!("{}/lazyos-profile-pass-{}", runtime, std::process::id());
+                        use std::os::unix::fs::OpenOptionsExt;
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .write(true)
+                            .create(true)
+                            .truncate(true)
+                            .mode(0o600)
+                            .open(&pass_file)
+                        {
+                            use std::io::Write;
+                            let _ = writeln!(f, "{pw}");
+                            args.extend(["--passphrase-file".to_string(), pass_file]);
+                        }
+                    }
+                    let _ = crate::menu::spawn_detached(&args, &home);
                     return Ok(0);
                 }
             }
@@ -491,14 +535,77 @@ pub fn menu(
                 }
 
                 if let Some(target_dir) = target_picker.answers().first() {
-                    let _ = crate::menu::spawn_detached(
-                        &[
-                            profile_bin.to_string_lossy().to_string(),
-                            "export".to_string(),
-                            target_dir.to_string(),
+                    let mut pw_picker = Picker::new(
+                        "Passphrase for the profile",
+                        vec![
+                            Question::input(
+                                "Passphrase for the profile",
+                                "A passphrase is required: it is what makes the archive safe to lose · Escape cancels",
+                                "Passphrase",
+                                true,
+                            ),
+                            Question::input(
+                                "Confirm passphrase",
+                                "The same passphrase again · Escape cancels",
+                                "Again",
+                                true,
+                            ),
                         ],
-                        &home,
                     );
+                    let p_code = crate::run_screen(
+                        terminal,
+                        design,
+                        "Passphrase for the profile",
+                        &mut pw_picker,
+                    )?;
+                    if p_code != 0 {
+                        continue;
+                    }
+                    let answers = pw_picker.answers();
+                    let p1 = answers.first().map(|s| s.as_str()).unwrap_or("");
+                    let p2 = answers.get(1).map(|s| s.as_str()).unwrap_or("");
+                    if p1.is_empty() {
+                        say(
+                            "Developer",
+                            "A passphrase is required: it is what makes the archive safe to lose",
+                            lazyos_ui::Urgency::Normal,
+                            Glyph::Info,
+                        );
+                        continue;
+                    }
+                    if p1 != p2 {
+                        say(
+                            "Developer",
+                            "The two passphrases differ; try again",
+                            lazyos_ui::Urgency::Normal,
+                            Glyph::Info,
+                        );
+                        continue;
+                    }
+
+                    let runtime =
+                        std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+                    let pass_file =
+                        format!("{}/lazyos-profile-pass-{}", runtime, std::process::id());
+                    use std::os::unix::fs::OpenOptionsExt;
+                    let mut args = vec![
+                        profile_bin.to_string_lossy().to_string(),
+                        "export".to_string(),
+                        target_dir.to_string(),
+                    ];
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .mode(0o600)
+                        .open(&pass_file)
+                    {
+                        use std::io::Write;
+                        let _ = writeln!(f, "{p1}");
+                        args.extend(["--passphrase-file".to_string(), pass_file]);
+                    }
+
+                    let _ = crate::menu::spawn_detached(&args, &home);
                     return Ok(0);
                 }
             }

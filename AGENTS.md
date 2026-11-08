@@ -89,6 +89,17 @@ yet present in `scripts/` as not implemented.
   `menu translate --target-name`) serve waybar and system scripts directly. `check-system.sh`
   witnesses that all 10 subcommands exist in `lazyos --symlinks` and `lazyos --help`, and passes live
   behavioral checks on the query flags.
+- **Rofi, lib-rofi.sh, and bar-pick are retired in full framework closure** (spec 014).
+  With all 45+ interactive surfaces and launchers running natively in `lazyos` (Ratatui in floating
+  foot), `rofi` is purged from `packages.list`, reducing image size and eliminating X11/Pango
+  legacy dependencies. Residual shell helpers `lib-rofi.sh` and `bar-pick` and `~/.config/rofi/` are
+  deleted; the rofi surface template and golden fixtures are dropped from `lazyos-theme` (bringing
+  active theme surfaces to 13). Session keybindings and script interfaces in `~/.config/bin/` remain
+  100% operational as symlinks to `/usr/bin/lazyos`. Sensitive password/passphrase prompts (e.g.
+  in `lazyos-profile` and Developer menu) migrate to in-memory masked TUI inputs via `Question::input`,
+  passing `--passphrase-file` to GPG. `check-system.sh` witnesses that `lib-rofi.sh` is absent, that
+  all session menus and launcher entries resolve natively, that disk menus resolve `/usr/sbin` tools
+  under stripped environments, and that notification icons resolve against `lazyos --icon-names`.
 - **Ratatui is not the expensive part, and that is measured rather than assumed**
   ([`docs/optimization.md`](docs/optimization.md) §13). Against a crossterm-only app doing the same
   job it adds 23.6 s to a clean build, 89 MB of `target/`, 328 KB of stripped binary, **no**

@@ -40,14 +40,6 @@ wvkbd
 
 # what /etc/sway/config and the drop-ins actually invoke
 waybar
-# rofi is the launcher (Search key, $mod+d), the command palette ($mod+Shift+d)
-# and the window switcher ($mod+Tab, which sway does not provide), and it is also
-# what draws the bar's dmenu popups. That is one picker where the session used to
-# have two (tofi for the launcher, fuzzel for the bar): rofi 2.0 speaks Wayland
-# natively (layer-shell + zwlr_foreign_toplevel), has no daemon, and measured
-# 16.4 MB PSS in drun mode / 15.0 MB in window mode while open, against 40.5 MB
-# for a fuzzel popup. See uis/sway/README.md, "The launcher".
-rofi
 # The browser: what rofi-files sends a PDF and the HTML file to, because it is
 # the reader with search, zoom and printing, and its own PDF renderer. It is also
 # what the minimal /usr/local/bin/xdg-open opens, so foot's ctrl+click and any CLI

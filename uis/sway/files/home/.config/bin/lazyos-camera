@@ -26,8 +26,9 @@
 # window did not appear).
 set -eu
 
-dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-. "$dir/lib-rofi.sh"
+say_err() {
+	notify-send -a LazyOS -i dialog-error -u critical "$1" "$2" 2>/dev/null || true
+}
 
 # The first node bound to uvcvideo. A machine without a camera has none, and
 # that is a state to report rather than a crash with no screen.
@@ -41,16 +42,14 @@ for node in /sys/class/video4linux/video*; do
 done
 
 if [ -z "$dev" ]; then
-	ui_say Camera \
-		'No webcam: no /dev/video* node is bound to uvcvideo. The driver is a module of this kernel - `sudo dmesg | grep -i uvc` says whether the camera was found on the bus at all.' \
-		critical "$UI_ICON_ERROR"
+	say_err Camera \
+		'No webcam: no /dev/video* node is bound to uvcvideo. The driver is a module of this kernel - `sudo dmesg | grep -i uvc` says whether the camera was found on the bus at all.'
 	exit 0
 fi
 
 if ! command -v guvcview >/dev/null 2>&1; then
-	ui_say Camera \
-		'There is a camera but nothing to look at it with: guvcview is not installed (package guvcview).' \
-		critical "$UI_ICON_ERROR"
+	say_err Camera \
+		'There is a camera but nothing to look at it with: guvcview is not installed (package guvcview).'
 	exit 0
 fi
 

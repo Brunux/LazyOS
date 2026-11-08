@@ -233,13 +233,9 @@ CRTC has no gamma table and the panel's own backlight is the monitor's.
   runner (`Alt+Shift+D`) are `lazyos menu apps|window|run` (`rofi-drun`,
   `rofi-window`, `rofi-run`), drawn in a floating `foot` window. An empty
   applications list means `/usr/share/applications` has no visible entries.
-* If a remaining rofi helper (`bar-pick`) shows a theme parse error naming a
-  file, line and column, run `rofi -show drun` in a terminal after editing
-  `~/.config/rofi/*.rasi`.
-* A bar click that does nothing: `~/.config/bin/bar-pick` must be executable.
-  The same goes for every row of the root menu: each one is a symlink to
-  `/usr/bin/lazyos` or a shell script in `~/.config/bin/`, and a missing entry
-  is a row that silently does nothing. `check-system.sh` fails for each one.
+* Every row of the root menu is a native subcommand or symlink to
+  `/usr/bin/lazyos`, and a missing entry is a row that silently does nothing.
+  `check-system.sh` fails for each one.
 * **A hole where an icon should be.** The launcher draws application *images*,
   and the session's own entries take theirs from the small **LazyOS** theme
   (`/usr/share/icons/LazyOS`, 48x48 PNGs rendered from the icon fonts). If the
@@ -778,19 +774,11 @@ card this machine boots and rescues from. It is a **Mount** row in Places.
 The menu answered `Missing: parted mkswap swapon swapoff blkid` while every one of
 them was installed. The reason is the session's `PATH`: greetd starts sway with
 the PAM environment, and Debian keeps `/usr/sbin` and `/sbin` for root, so a
-`command -v` inside a menu found none of them. Both disk menus source
-`~/.config/bin/lib-rofi.sh`, and that file appends `/usr/sbin:/sbin` once for
-every menu - one line instead of a check in each script:
+`command -v` inside a menu found none of them. The `lazyos` binary ensures
+`/usr/sbin:/sbin` and `~/.config/bin` are appended to PATH at startup, so every
+command and system tool resolves consistently regardless of how greetd launches.
 
-```sh
-. ~/.config/bin/lib-rofi.sh
-command -v mkswap          # /usr/sbin/mkswap after that line, nothing before
-```
-
-`check-system.sh` asks the same question in a session-shaped `PATH` and fails
-while the line is gone. An image built before it needs a rebuild; until then the
-tools still work from a terminal with their full path (`/usr/sbin/parted`), and
-the menu's own rows are the part that cannot see them.
+`check-system.sh` verifies tool resolution in a session-shaped `PATH`.
 
 ## Hibernation refuses, or comes back to a fresh session
 
@@ -856,7 +844,7 @@ for four reasons, and the list tells them apart by what it does show:
   carries udisks' own words (`not authorized`, `already mounted`, a filesystem
   error).
 * **It is the disk this system runs from.** The same rule as Format a disk
-  (`ui_disk_system` in `lib-rofi.sh`) keeps the eMMC and the card this machine
+  (`system::disk` in `lazyos`) keeps the eMMC and the card this machine
   boots from out of the list, even when a spare partition has nothing mounted.
   That is the guard, not a fault: use a second stick.
 * **It is an ext4 stick owned by root.** udisks mounts it, but the session

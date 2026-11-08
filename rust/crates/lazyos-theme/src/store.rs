@@ -30,7 +30,7 @@ pub struct Surface {
 
 /// The session's surfaces. A new one is one line here and one template file -
 /// and a golden test, because the test renders whatever is in this table.
-pub const SURFACES: [Surface; 14] = [
+pub const SURFACES: [Surface; 13] = [
     Surface {
         name: "foot",
         template: include_str!("../templates/foot.ini.tpl"),
@@ -45,11 +45,6 @@ pub const SURFACES: [Surface; 14] = [
         name: "mako",
         template: include_str!("../templates/mako-config.tpl"),
         target: ".config/mako/config",
-    },
-    Surface {
-        name: "rofi",
-        template: include_str!("../templates/rofi-solarized.rasi.tpl"),
-        target: ".config/rofi/solarized.rasi",
     },
     Surface {
         name: "starship",

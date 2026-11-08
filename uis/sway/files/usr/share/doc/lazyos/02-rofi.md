@@ -1,10 +1,12 @@
-# The menus: the framework's lists, and the rofi ones still to port
+# The menus: the native framework (lazyos)
 
-Two programs draw them. **The framework** (`lazyos`) draws the lists in a
-terminal window: one row per item, a Nerd Font glyph, and filtering as you type.
-**rofi** draws the rest - `bar-pick`'s dmenu and the menus whose surface has not
-been ported yet. Neither stays after its window closes (13-17 MB of memory
-while open; there is no daemon).
+**The framework** (`lazyos`) draws every session list in a dedicated, floating
+terminal window: one row per item, a Nerd Font glyph, and case-folded filtering as you type.
+`rofi` and `lib-rofi.sh` have been retired (spec 014), and all interactive menus,
+pickers, and launcher surfaces run natively in Rust/Ratatui. Nothing stays resident
+after its window closes (there is no daemon). For backwards compatibility, legacy
+`rofi-*` and `bar-*` names in `~/.config/bin/` remain installed as symlinks to
+`/usr/bin/lazyos`, preserving all ~55 keyboard shortcuts and bar actions.
 
 | You press | What opens | What it lists |
 |---|---|---|
@@ -25,7 +27,7 @@ while open; there is no daemon).
 | **Alt+Ctrl+V** | `lazyos menu clip` (`rofi-clip`) | **clipboard history**: what was copied, Enter puts it back, Alt+1 deletes that entry |
 | **Alt+Ctrl+E** | `lazyos menu emoji` (`rofi-emoji`) | **emoji**: type a name, Enter inserts the glyph at the cursor, Alt+1 only copies it |
 | **Alt+Ctrl+T** | `lazyos menu translate` (`translate`) | **translate** the selected text (or the clipboard) into the language Settings sets, English until it is set; the answer is copied, and a long one opens in a read window |
-| any bar module click | `bar-pick` → `rofi -dmenu` | the fixed list that module hands it (Wi-Fi networks, sinks, devices, power actions, …) |
+| **Alt+Shift+C** | `lazyos menu theme` (`rofi-theme`) | interactive dual-pane theme picker with live preview and wallpaper switching |
 | **Learn** (root menu) | `lazyos menu learn` (`rofi-learn`) | these pages, rendered with glow, plus a search across all of them |
 
 The root menu is also a launcher entry: **LazyOS Menu** (`Alt+D`, type
@@ -476,8 +478,7 @@ Five more lists in the root menu, each one screen of answers about the machine:
   network, compositor, process count — plus two rows: copy the summary as text,
   or open `fastfetch` in a terminal for the pretty version.
 
-They are all scripts in `~/.config/bin/`, they all use the shared row style from
-`lib-rofi.sh`, and none of them stays running.
+They are all native subcommands in `lazyos`, they all use single-advance Nerd Font glyphs, and none of them stays running.
 
 **Reminders: what the prompts expect.** The When menu has a **How do I fill
 these in?** row that says this in a notification and reopens the menu, so the
@@ -511,93 +512,43 @@ leaves nothing behind when it closes.
 
 ## The theme and the icons
 
-Two files, and everything - launcher, window list, bar panels, key view, the
-manual - reads the same theme:
+The theme engine (`lazyos-theme`) manages the unified palette across all
+desktop surfaces: `foot`, `waybar`, `mako`, `starship`, `btop`, `lazygit`,
+`nvim`, `fzf`, and `swaylock`.
 
-* `~/.config/rofi/config.rasi` - the settings: the modes, `terminal: "foot"`,
-  fuzzy matching, history, `show-icons: true`, `icon-theme: "LazyOS"`.
-* `~/.config/rofi/solarized.rasi` - the look: base03 window, 2 px cyan rim,
-  JetBrains Mono 12, base02 card on the selected row, the box shrinking to its
-  entries.
+Two kinds of picture:
 
-Three kinds of picture, because rofi has three:
-
-* the lists this session draws itself show a **font glyph** in the row text
-  (Font Awesome, the same alphabet as the bar). It costs nothing, follows the
-  palette, is filtered away by typing, and is what `lib-rofi.sh` puts in every
-  `rofi-*` menu;
-* the launcher, the window switcher and the **key view** show an **image icon**,
-  which rofi resolves through the icon theme. The launcher and the switcher ask
-  for the application's own icon and cost about 13 MB of memory for ten rows
-  while the window is open; the key view has a picture on **every row**, in three
-  steps: the tool the binding runs (`rofi-power`, `rofi-files`, `rofi-clip`,
-  `dictate`, `sway-lock`…), the action it sends (the arrow of a focus or move
-  binding, the cross of a close, the refresh of a reload, the door of an exit), and
-  for everything else its section (windows, gear, lock, sun, speaker, touchpad…).
-  Every row and not only the section line, because rofi drops the icon column for a
-  row that has no picture: that row's text starts 34 px to the left of its
-  neighbours, which is what the list looked like before;
-* **notifications** show a picture too - `clipboard-history`, `dialog-error`,
-  `user-trash`, `folder`… - which mako looks up on its `icon-path`. A name the
-  theme does not carry draws nothing: the card is text-only, with no error
-  anywhere.
+* the framework lists draw a single-advance **Nerd Font codepoint** per row
+  (Symbols Nerd Font Mono). It costs zero allocations per frame, follows the palette,
+  and is filtered as you type;
+* **desktop launcher and notification cards** show an **image icon** looked up
+  in the `LazyOS` theme (/usr/share/icons/LazyOS) or standard system icons.
 
 Debian's Adwaita ships only monochrome symbolic icons and none of this session's
-names, so the image carries a small **LazyOS** icon theme: the same Font Awesome
-codepoints, rendered once to 48×48 PNGs by `scripts/make-icons.sh`. Its
-`index.theme` inherits Adwaita and hicolor, so an application that brings its own
-icon (foot, btop, htop, anything installed later) still shows it in colour.
-
-A row is one line and rofi cannot scroll it sideways, so the second half of a row
-(a path, a revision, an emoji's block) is drawn a little smaller and, past sixty
-characters, cut with an ellipsis - a path keeps its end, because that is the part
-that identifies the file. The list grows wider instead when it can: 62% for a
-name and a sentence, 76% and 88% for the longest rows the session has (an emoji
-name is 76 characters). The full value is always in the notification that
-choosing the row raises, so nothing is lost - the list is the index, the card is
-the text.
-
-The bar's popups pass `-no-show-icons`: they draw a glyph in the text and do not
-need an icon column.
+names, so the image carries a small **LazyOS** icon theme: rendered once to 48×48 PNGs
+by `scripts/make-icons.sh`. Its `index.theme` inherits Adwaita and hicolor, so an
+application that brings its own icon still shows it in colour.
 
 ## Adding things to the launcher
 
 * **An application**: drop a `.desktop` file in `~/.local/share/applications/`.
-  For a terminal program, `Terminal=true` is enough - rofi starts it in foot.
-  This is how `org.lazyos.*` entries are made (they live in
-  `/usr/share/applications/`, shipped by the image).
-* **An icon for it**: put the name in its `Icon=`, and either let the
-  application ship the image or add a line to `scripts/make-icons.sh` (a Font
-  Awesome codepoint) and run it on the build host.
-* **A menu**: `bar-pick "Prompt" < list-of-lines` gives you a rofi dmenu with the
-  session's theme and the same "Escape means cancel" contract; the `rofi-*`
-  scripts add the shared row style from `lib-rofi.sh` (`ui_row`, `ui_pick`,
-  `ui_say`).
-* **A dynamic list**: a script mode (`-modi "name:script"`) is called when the
-  mode starts and when a row is chosen - *not* on every keystroke, which is why
-  the calculator is a one-shot prompt and not a live preview. The file browser
-  does not need it either: it lists one directory per run and reopens in the
-  chosen one.
+  For a terminal program, `Terminal=true` is enough - `lazyos menu apps` starts it in foot.
+  This is how `org.lazyos.*` entries are made (they live in `/usr/share/applications/`, shipped by the image).
+* **An icon for it**: put the name in its `Icon=`, and either let the application ship the
+  image or add a line to `scripts/make-icons.sh` and run it on the build host.
+* **A menu or tool**: implement a native subcommand in `lazyos` using `lazyos-ui` design
+  system components (`List`, `Picker`, `Task`, `Card`).
 
-## When rofi misbehaves
+## The retirement of rofi and lib-rofi.sh (Spec 014)
 
-* **A dialog in the middle of the screen naming a file, a line and a column**:
-  that is a theme parse error. `rofi` only reports it when a window opens, so
-  `rofi -dump-config` is not a syntax check.
-* **The window opens empty**: the list handed to it was empty. An empty menu is
-  indistinguishable from a hang; the scripts are written to exit instead.
-* **A row of empty space where an icon should be**: the `.desktop` names an icon
-  that no installed theme has. `check-system.sh` verifies the LazyOS theme and
-  every `org.lazyos.*` icon.
-* **A list opens no window at all, and the journal has a line about a binding**:
-  the menu was given an `Alt+1` action whose value was a sentence.
-  `-kb-custom-1` accepts a keybinding and nothing else; `lib-rofi.sh` passes one
-  word and puts the sentence in the message line.
-* **A row ends in `…` but the file name is not there**: the value did not fit the
-  window, and `ui_trim` kept the head because it contains no `/`. For a path the
-  tail is kept instead. Either way the whole value is in the notification.
-* **Nothing happens on a bar click**: `bar-pick` is not executable, or rofi is
-  missing. `check-system.sh` fails for both.
+With all surfaces running natively in the multi-call binary `lazyos`, `rofi` and
+`lib-rofi.sh` have been completely removed from the shipping system:
+* The `rofi` package is removed from `packages.list`.
+* `~/.config/rofi/` and `~/.config/bin/lib-rofi.sh` are deleted.
+* All launcher (`apps`), switcher (`window`), command palette (`run`), and bar panel
+  interactions execute purely via `lazyos`.
+* Legacy paths in `~/.config/bin/` remain installed as symlinks to `/usr/bin/lazyos`
+  so that all custom keybindings and scripts remain 100% operational without alteration.
 
 ## The migrated interactive surfaces (Spec 017)
 

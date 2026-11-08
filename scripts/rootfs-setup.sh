@@ -419,12 +419,11 @@ if [ -d /tmp/ui-files ]; then
 	# (sway's `exec` gets EACCES and the message goes to the journal, which
 	# nobody reads after a keypress). Three menus of the batch that answered the
 	# card's report were committed that way, and only a booted card found it, so
-	# the build refuses it here. lib-rofi.sh is sourced, not run.
+	# the build refuses it here.
 	if [ -d "/home/$USERNAME/.config/bin" ]; then
 		_noexec=""
 		for _f in "/home/$USERNAME"/.config/bin/*; do
 			[ -f "$_f" ] || continue
-			case ${_f##*/} in lib-rofi.sh) continue ;; esac
 			[ -x "$_f" ] || _noexec="$_noexec ${_f##*/}"
 		done
 		if [ -n "$_noexec" ]; then
