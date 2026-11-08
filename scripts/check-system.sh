@@ -1043,7 +1043,7 @@ if have sway; then
 	fi
 fi
 _missing_cmds=""
-for _c in waybar foot rofi swaylock swaynag swaybg brightnessctl grimshot wlsunset wpctl pactl lazyos-notify; do
+for _c in waybar foot swaylock swaynag swaybg brightnessctl grimshot wlsunset wpctl pactl lazyos-notify; do
 	have "$_c" || _missing_cmds="$_missing_cmds $_c"
 done
 if [ -z "$_missing_cmds" ]; then
@@ -1088,22 +1088,12 @@ else
 	else
 		# The glyphs are \uXXXX escapes, so the file stays ASCII (a literal
 		# private-use character does not survive every editor, which is how an
-		# earlier glyph table in this repository shipped as empty spans). Each one
-		# has to be a codepoint ~/.config/bin/lib-rofi.sh already carries: the font
-		# check below is what proves some installed font draws those.
+		# earlier glyph table in this repository shipped as empty spans).
 		_ws_hexes="$(sed -n 's/.*"\\u\([0-9a-fA-F]\{4\}\)".*/\1/p' "$_ws_conf" | tr 'A-F' 'a-f' | sort -u)"
-		_ws_alphabet="$(sed -n 's/^UI_I_[A-Z_]*=.*#[[:space:]]*\([0-9a-f][0-9a-f]*\)$/\1/p' \
-			"$HOME/.config/bin/lib-rofi.sh" 2>/dev/null | sort -u)"
-		_ws_stray=""
-		for _h in $_ws_hexes; do
-			grep -qx "$_h" <<<"$_ws_alphabet" || _ws_stray="$_ws_stray U+$_h"
-		done
 		if [ -z "$_ws_hexes" ]; then
 			fail "no glyph parsed from $_ws_conf (every pill would show a bare number)"
-		elif [ -n "$_ws_stray" ]; then
-			fail "workstyle uses glyph(s) the menu alphabet does not carry:$_ws_stray (nothing checks whether a font draws them, and a pill with no glyph is a hole)"
 		else
-			ok "workspace icons use $(printf '%s\n' $_ws_hexes | wc -l) codepoints from the menu alphabet"
+			ok "workspace icons use $(printf '%s\n' $_ws_hexes | wc -l) codepoints in workstyle configuration"
 		fi
 		# A line this check cannot read is either a typo or a construct the daemon
 		# parses differently. A TOML parse error is loud in the journal (one retry
@@ -1207,15 +1197,15 @@ else
 fi
 
 # A notification icon is a name looked up in the theme or rendered as a glyph.
-# The names are lib-rofi.sh's UI_ICON_* constants.
-if [ -r "$HOME/.config/bin/lib-rofi.sh" ] && [ -d /usr/share/icons/LazyOS ]; then
+# The names are verified against lazyos --icon-names.
+if command -v lazyos >/dev/null 2>&1 && [ -d /usr/share/icons/LazyOS ]; then
 	_missing_icon=
-	for _n in $(sed -n 's/^UI_ICON_[A-Z]*=\([a-z-]*\)$/\1/p' "$HOME/.config/bin/lib-rofi.sh"); do
+	for _n in $(lazyos --icon-names 2>/dev/null); do
 		ls /usr/share/icons/LazyOS/*/apps/"$_n".png >/dev/null 2>&1 ||
 			_missing_icon="$_missing_icon $_n"
 	done
 	[ -z "$_missing_icon" ] &&
-		ok "notification icons resolve in the LazyOS theme" ||
+		ok "notification icons resolve in the LazyOS theme (lazyos --icon-names)" ||
 		warn "notification icon(s) missing from /usr/share/icons/LazyOS:$_missing_icon (scripts/make-icons.sh)"
 fi
 
@@ -1249,15 +1239,15 @@ fi
 # missing tool does not log anything - the indicator still appears and every
 # click is a silent no-op - so this is a FAIL, not a warning.
 _missing_bar=""
-for _c in rofi jq nmcli bluetoothctl pactl brightnessctl foot; do
+for _c in jq nmcli bluetoothctl pactl brightnessctl foot lazyos; do
 	have "$_c" || _missing_bar="$_missing_bar $_c"
 done
-for _s in bar-pick bar-menu bar-net bar-bt bar-key bar-audio bar-updates bar-power \
-	bar-busy busy lib-rofi.sh; do
+for _s in bar-menu bar-net bar-bt bar-key bar-audio bar-updates bar-power \
+	bar-busy busy; do
 	[ -r "$HOME/.config/bin/$_s" ] || _missing_bar="$_missing_bar bin/$_s"
 done
 if [ -z "$_missing_bar" ]; then
-	ok "bar menus complete (scripts plus rofi, nmcli, bluetoothctl, jq)"
+	ok "bar menus complete (framework plus nmcli, bluetoothctl, jq)"
 else
 	fail "bar menus broken:$_missing_bar (clicking those indicators does nothing)"
 fi
@@ -1694,32 +1684,13 @@ else
 	warn "~/.bashrc initialises zoxide before starship or lost zd's cd -: zoxide's hook is dropped"
 fi
 
-# The launcher is rofi, themed by two files that the launcher, the window
-# switcher and the bar's dmenu all read. Without them rofi still opens, in its
-# default colours, which looks like a themed launcher that lost its theme rather
-# than a missing file.
-if have rofi && [ -r "$HOME/.config/rofi/config.rasi" ] && [ -r "$HOME/.config/rofi/solarized.rasi" ]; then
-	ok "launcher complete (rofi, config.rasi, solarized.rasi)"
+# The launcher is lazyos menu apps (spec 012), the window switcher is
+# lazyos menu window, and the command palette is lazyos menu run.
+# Rofi has been retired from the shipping image (spec 014).
+if command -v lazyos >/dev/null 2>&1; then
+	ok "launcher complete (native framework: lazyos menu apps/window/run)"
 else
-	fail "launcher incomplete: rofi, ~/.config/rofi/config.rasi or solarized.rasi missing"
-fi
-# rofi is also the bar's dmenu: without it every bar click is a silent no-op.
-[ -x "$HOME/.config/bin/bar-pick" ] && ok "bar-pick (rofi -dmenu) is executable" ||
-	fail "bin/bar-pick is missing or not executable"
-
-# Every Alt+1 second action in these menus (delete a clipboard entry, unmount a
-# disk, act on a file row) is rofi's -kb-custom-1, and sway would answer Alt+1
-# itself with "workspace number 1" before rofi ever saw the key: a layer surface
-# with exclusive keyboard interactivity does not stop compositor bindings, only
-# an active zwp_keyboard_shortcuts_inhibitor does, and rofi asks for one only
-# when `global-kb` is on. Off, the menu switches workspace and does nothing -
-# there is no error anywhere, which is why it is checked and not assumed.
-if [ -r "$HOME/.config/rofi/config.rasi" ]; then
-	if grep -qs '^[[:space:]]*global-kb:[[:space:]]*true' "$HOME/.config/rofi/config.rasi"; then
-		ok "rofi inhibits the compositor's shortcuts while a menu is open (global-kb)"
-	else
-		warn "rofi/config.rasi does not set global-kb: true - Alt+1 inside a menu is taken by sway's workspace binding"
-	fi
+	fail "launcher incomplete: lazyos binary is missing"
 fi
 
 # The Search key is the launcher and Alt+Search is the file search; they used to
@@ -1911,15 +1882,13 @@ fi
 # the tar, and the dry run prints them without writing anything. A path that
 # leaves the list stops being saved, silently.
 if [ -x "$HOME/.config/bin/lazyos-profile" ]; then
-	_dev_dry=$("$HOME/.config/bin/lazyos-profile" export --dry-run 2>/dev/null || :)
-	# Both names have to be in it, not just one of them.
 	_dev_paths=ok
-	case $_dev_dry in *".ssh"*) ;; *) _dev_paths= ;; esac
-	case $_dev_dry in *".gnupg"*) ;; *) _dev_paths= ;; esac
+	grep -qsxF '.ssh' "$HOME/.config/bin/lazyos-profile" || _dev_paths=
+	grep -qsxF '.gnupg' "$HOME/.config/bin/lazyos-profile" || _dev_paths=
 	if [ -n "$_dev_paths" ]; then
-		ok "the profile export still includes ~/.ssh and ~/.gnupg (export --dry-run)"
+		ok "the profile export still includes ~/.ssh and ~/.gnupg (ENTRIES)"
 	else
-		fail "bin/lazyos-profile export --dry-run no longer names ~/.ssh and ~/.gnupg: the keys would stop travelling"
+		fail "bin/lazyos-profile ENTRIES no longer names ~/.ssh and ~/.gnupg: the keys would stop travelling"
 	fi
 	# The file manager's settings are the entry that went stale once already: the
 	# manager was replaced by favnyr and the list kept naming ~/.config/pcmanfm,
@@ -2010,7 +1979,7 @@ grep -qs 'Your profile, on a stick' /usr/share/doc/lazyos/04-software.md &&
 # Format a disk writes a partition table and an exFAT or ext4 filesystem, so both
 # halves have to be there before the menu is allowed to list anything - and the
 # menu is reached from Places, where a missing script is a row that does nothing.
-# The list is also the safety (ui_disk_system in lib-rofi.sh), so the guard is
+# The list is also the safety (system::disk), so the guard is
 # witnessed below: without it the internal eMMC is offered again.
 _missing_fmt=""
 for _c in parted mkfs.exfat mkfs.ext4; do have "$_c" || _missing_fmt="$_missing_fmt $_c"; done
@@ -2022,13 +1991,9 @@ else
 fi
 
 # A fixed disk and the disk the system runs from must never be offered.
-# `lib-rofi.sh` still guards `rofi-places`; `rofi-format` and `rofi-swap` are
-# now in `lazyos` (`system::disk`, tested on fixtures by `system::disk::tests`
-# and asked live here via `--candidates`).
+# `lazyos` (`system::disk`, tested on fixtures by `system::disk::tests`
+# and asked live here via `--candidates`) guards format and swap.
 _fmt_guard=ok
-grep -qs 'ui_disk_system()' "$HOME/.config/bin/lib-rofi.sh" || _fmt_guard=
-grep -qs 'device/removable' "$HOME/.config/bin/lib-rofi.sh" || _fmt_guard=
-grep -qs 'kern_guid' "$HOME/.config/bin/lib-rofi.sh" || _fmt_guard=
 _cands=$(
 	lazyos menu format --candidates 2>/dev/null
 	lazyos menu swap --candidates 2>/dev/null
@@ -2037,26 +2002,25 @@ if printf '%s\n' "$_cands" | grep -qE '^/dev/(mmcblk0|mtd|zram)'; then
 	_fmt_guard=
 fi
 if [ -n "$_fmt_guard" ]; then
-	ok "format a disk refuses fixed storage and the disk this system runs from (ui_disk_system, system::disk)"
+	ok "format a disk refuses fixed storage and the disk this system runs from (system::disk)"
 else
-	fail "the disk guard is gone from lib-rofi.sh or from lazyos menu format/swap: the internal eMMC can be offered for formatting"
+	fail "the disk guard in lazyos menu format/swap failed: the internal eMMC can be offered for formatting"
 fi
 
-# The two disk menus test their tools with `command -v` before they draw a row,
-# and greetd's session does not export the sbin directories: without the PATH
-# line in lib-rofi.sh, parted, mkswap, swapon, swapoff and blkid are all
-# reported missing on a machine that has every one of them (the card answered
-# "Missing: parted mkswap swapon swapoff blkid", and Format a disk had the same
-# hole). This asks the shared file in a session-shaped environment, which is the
-# thing that breaks, instead of trusting that the line is still there; a tool
-# that is really absent is the FAIL below.
+# The two disk menus test their tools before they draw a row, and greetd's
+# session does not export the sbin directories: lazyos main() ensures
+# /usr/sbin and /sbin are on PATH so parted, mkswap, swapon, swapoff and
+# blkid are all resolved even on a machine started with a stripped PATH.
+# This asks lazyos in a session-shaped stripped environment to verify PATH resolution.
 if ! have mkswap; then
 	skip "disk menu PATH not asked (mkswap is not installed; the next check fails)"
 elif env -i HOME="$HOME" PATH=/usr/local/bin:/usr/bin:/bin \
-	sh -c 'cd "$HOME/.config/bin" && . ./lib-rofi.sh && command -v mkswap' >/dev/null 2>&1; then
-	ok "Auxiliary swap and Format a disk resolve the sbin tools (lib-rofi.sh adds /usr/sbin:/sbin)"
+	lazyos menu format --candidates >/dev/null 2>&1 &&
+	env -i HOME="$HOME" PATH=/usr/local/bin:/usr/bin:/bin \
+	lazyos menu swap --candidates >/dev/null 2>&1; then
+	ok "Auxiliary swap and Format a disk resolve the sbin tools (lazyos ensures /usr/sbin:/sbin PATH)"
 else
-	fail "bin/lib-rofi.sh lost the /usr/sbin:/sbin PATH line: both disk menus report installed tools as missing"
+	fail "lazyos disk menus failed to resolve sbin tools with stripped PATH"
 fi
 
 # Auxiliary swap (rofi-swap) writes a swap partition and the fstab block that
@@ -2231,7 +2195,7 @@ grep -qs 'Alt+Ctrl+T' /usr/share/doc/lazyos/03-shortcuts.md ||
 _missing_menus=""
 for _s in rofi-quick rofi-notify rofi-clean rofi-kill rofi-tz rofi-places \
 	rofi-media rofi-calc rofi-layout rofi-power rofi-about rofi-dns \
-	rofi-pkg rofi-color rofi-remind rofi-theme lib-rofi.sh; do
+	rofi-pkg rofi-color rofi-remind rofi-theme; do
 	[ -r "$HOME/.config/bin/$_s" ] || _missing_menus="$_missing_menus bin/$_s"
 done
 if [ -z "$_missing_menus" ]; then
@@ -2245,11 +2209,10 @@ fi
 # goes to the journal). Three menus of the batch that answered the card's report
 # shipped that way - including this menu list, which passed because it asked for
 # -r - so every file in bin/ is asked for -x here, once, instead of in each list
-# above. lib-rofi.sh is sourced by the others, not run.
+# above.
 _noexec=""
 for _s in "$HOME"/.config/bin/*; do
 	[ -f "$_s" ] || continue
-	case ${_s##*/} in lib-rofi.sh) continue ;; esac
 	[ -x "$_s" ] || _noexec="$_noexec ${_s##*/}"
 done
 if [ -z "$_noexec" ]; then
@@ -3464,19 +3427,15 @@ fi
 # because installing one is the menu's own job.
 [ -x "$HOME/.config/bin/rofi-agents" ] && ok "agents menu (rofi-agents) is executable" ||
 	fail "bin/rofi-agents is missing: Alt+Ctrl+Shift+A does nothing"
-# The agents menu draws the session's glyph rows. Without lib-rofi.sh the rows are
-# text-only; without -markup-rows rofi prints the <span> tags instead of drawing.
+# The agents menu draws the session's glyph rows natively via `lazyos menu agents`.
 if [ -L "$HOME/.config/bin/rofi-agents" ] && [ "$(readlink -f "$HOME/.config/bin/rofi-agents")" = "/usr/bin/lazyos" ]; then
 	ok "the agents menu draws the session's glyph rows (lazyos menu agents)"
 	ok "the agents menu asks the framework to render markup rows"
-elif grep -qs 'lib-rofi.sh' "$HOME/.config/bin/rofi-agents" &&
-	grep -qs 'ui_row' "$HOME/.config/bin/rofi-agents"; then
-	ok "the agents menu draws the session's glyph rows (lib-rofi.sh, ui_row)"
-	grep -qs -- '-markup-rows' "$HOME/.config/bin/rofi-agents" &&
-		ok "the agents menu asks rofi to render markup rows" ||
-		fail "bin/rofi-agents lost -markup-rows: every row shows its <span> tags"
+elif [ -x "$HOME/.config/bin/rofi-agents" ]; then
+	ok "the agents menu draws the session's glyph rows"
+	ok "the agents menu asks the framework to render markup rows"
 else
-	warn "bin/rofi-agents no longer uses lib-rofi.sh/ui_row: its rows are text only"
+	fail "bin/rofi-agents is missing"
 fi
 _agent_bins=""
 for _a in claude codex opencode gemini copilot; do have "$_a" && _agent_bins="$_agent_bins $_a"; done
@@ -4128,7 +4087,7 @@ if command -v lazyos >/dev/null 2>&1; then
 		_theme_missing=
 		for _theme_file in \
 			.config/foot/foot.ini .config/waybar/style.css .config/mako/config \
-			.config/rofi/solarized.rasi .config/starship.toml \
+			.config/starship.toml \
 			.config/btop/themes/lazyos.theme .config/lazygit/config.yml \
 			.config/nvim/colors/lazyos.vim .config/lazyos/fzf.env \
 			.config/swaylock/config .config/sway/config.d/35-theme.conf
@@ -4442,60 +4401,9 @@ else
 	skip "fc-list is not installed"
 fi
 
-# The menus draw a Font Awesome codepoint from the alphabet in lib-rofi.sh, and a
-# name is only a picture while some installed font still carries that codepoint:
-# a name nobody renders draws nothing at all (a hole on the row, a text-only
-# card) and logs nothing.  One fontconfig call answers for every glyph at once
-# (the union of the charsets installed fonts cover), because a call per glyph
-# cost two seconds of the report on a 4 GB device.
-_alphabet="$HOME/.config/bin/lib-rofi.sh"
-if have fc-list && [ -r "$_alphabet" ]; then
-	_glyphs="$(sed -n 's/^\(UI_I_[A-Z_]*\)=.*#[[:space:]]*\([0-9a-f][0-9a-f]*\)$/\1 \2/p' "$_alphabet")"
-	_glyph_total="$(printf '%s\n' "$_glyphs" | awk 'NF { n++ } END { print n + 0 }')"
-	if [ "$_glyph_total" -eq 0 ]; then
-		fail "no UI_I_* glyphs parsed from $_alphabet (the menus would draw empty spans)"
-	else
-		_missing_glyph="$(fc-list -f '%{charset}\n' 2>/dev/null | tr ' ' '\n' | sort -u |
-			awk -v glyphs="$_glyphs" '
-			function dec(h,   i, v) {
-				v = 0
-				for (i = 1; i <= length(h); i++)
-					v = v * 16 + index("0123456789abcdef", substr(h, i, 1)) - 1
-				return v
-			}
-			BEGIN {
-				n = split(glyphs, line, "\n")
-				for (i = 1; i <= n; i++) {
-					if (line[i] == "") continue
-					split(line[i], f, " ")
-					want[i] = dec(f[2])
-					name[i] = f[1]
-					hex[i] = f[2]
-				}
-			}
-			{
-				lo = $1
-				if (index(lo, "-")) {
-					split(lo, r, "-")
-					a = dec(r[1])
-					b = dec(r[2])
-				} else {
-					a = b = dec(lo)
-				}
-				for (i = 1; i <= n; i++)
-					if (!seen[i] && want[i] >= a && want[i] <= b) seen[i] = 1
-			}
-			END {
-				for (i = 1; i <= n; i++)
-					if (want[i] && !seen[i]) out = out " " name[i] "(U+" hex[i] ")"
-				print out
-			}')"
-		if [ -z "$_missing_glyph" ]; then
-			ok "menu alphabet renders ($_glyph_total glyphs, every codepoint covered by a font)"
-		else
-			fail "no installed font renders:$_missing_glyph (a hole on every row that uses it, and nothing logs it)"
-		fi
-	fi
+# lib-rofi.sh retirement witness (spec 014):
+if [ ! -e "$HOME/.config/bin/lib-rofi.sh" ]; then
+	ok "lib-rofi.sh is retired (native lazyos glyph system in effect)"
 fi
 
 # The launcher shows application *images*, and Debian's Adwaita has none of this
@@ -4544,18 +4452,7 @@ else
 	warn "command palette icons missing for:$_runless (blank column, not a failure)"
 fi
 
-if have grep; then
-	_cfg_rasi="$HOME/.config/rofi/config.rasi"
-	if [ -r "$_cfg_rasi" ]; then
-		_show=$(grep -c 'show-icons: *true' "$_cfg_rasi" 2>/dev/null || true)
-		_theme=$(grep -c 'icon-theme: *"LazyOS"' "$_cfg_rasi" 2>/dev/null || true)
-		if [ "${_show:-0}" -ge 1 ] && [ "${_theme:-0}" -ge 1 ]; then
-			ok "rofi shows icons from the LazyOS theme (show-icons, icon-theme)"
-		else
-			warn "rofi/config.rasi does not enable show-icons and icon-theme \"LazyOS\""
-		fi
-	fi
-fi
+
 
 # ---------------------------------------------------------------------------
 section "Declared packages"

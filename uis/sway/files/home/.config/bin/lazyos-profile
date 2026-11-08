@@ -47,9 +47,7 @@
 
 set -eu
 
-dir=$(dirname "$0")
-. "$dir/lib-rofi.sh"
-
+UI_BIN=$(dirname "$0")
 CACHE=${XDG_CACHE_HOME:-$HOME/.cache}/lazyos
 BACKUPS=$CACHE/backups
 WORK=
@@ -77,7 +75,6 @@ ENTRIES='
 .config/glow
 .config/sway
 .config/mako
-.config/rofi
 .config/gtk-3.0
 .config/gtk-4.0
 .config/lazyos
@@ -143,11 +140,11 @@ say() {
 	if on_terminal; then
 		printf '%s: %s\n' "${1:-LazyOS}" "${2:-}" >&2
 	fi
-	ui_say "$@"
+	notify-send -a LazyOS -i "${4:-dialog-information}" -u "${3:-normal}" "${1:-LazyOS}" "${2:-}" 2>/dev/null || true
 }
 
 die() {
-	say "Developer" "$*" critical "$UI_ICON_ERROR"
+	say "Developer" "$*" critical "dialog-error"
 	printf 'lazyos-profile: %s\n' "$*" >&2
 	exit 1
 }
@@ -160,6 +157,9 @@ cleanup() {
 		rm -rf "$WORK"
 	fi
 	WORK=
+	case "${_pass_file:-}" in
+	*lazyos-profile-pass-*) rm -f "$_pass_file" 2>/dev/null || : ;;
+	esac
 }
 trap cleanup EXIT
 trap 'cleanup; exit 130' INT TERM
@@ -204,18 +204,16 @@ entries_size_kb() {
 	printf '%s\n' "$_esk"
 }
 
-# have_prompt: 0 when a passphrase can be asked for - a terminal this process
-# owns (ssh and a console included) or the session's rofi.  A scripted run with
-# neither is refused before any work is done, with the flag that solves it,
-# instead of after the tar is built.
+# have_prompt: 0 when a passphrase can be asked for on a terminal (ssh and console
+# included). A headless run without a terminal uses --passphrase-file.
 have_prompt() {
-	on_terminal || in_session
+	on_terminal
 }
 
 # ask_passphrase CONFIRM: print one passphrase on stdout.  CONFIRM is `confirm`
 # when it has to be typed twice (export) and empty when it is the way into an
 # archive (import).  A terminal is asked with stty -echo because that is what a
-# passphrase prompt is; the session asks rofi, whose -password masks the line.
+# passphrase prompt is; interactive session callers pass --passphrase-file.
 ask_passphrase() {
 	_ap_confirm=${1:-}
 	_ap_first=
@@ -226,10 +224,8 @@ ask_passphrase() {
 			IFS= read -r _ap_first || _ap_first=
 			stty echo 2>/dev/null || :
 			printf '\n' >&2
-		elif in_session; then
-			_ap_first=$("$UI_BIN/bar-pick" 'Passphrase for the profile' -password) || return 1
 		else
-			die "no terminal and no session to ask for the passphrase"
+			die "no terminal to ask for the passphrase (use --passphrase-file FILE)"
 		fi
 		if [ -z "$_ap_first" ]; then
 			say 'Developer' 'A passphrase is required: it is what makes the archive safe to lose' normal
@@ -247,7 +243,7 @@ ask_passphrase() {
 			stty echo 2>/dev/null || :
 			printf '\n' >&2
 		else
-			_ap_second=$("$UI_BIN/bar-pick" 'The same passphrase again' -password) || return 1
+			die "no terminal to ask for the passphrase (use --passphrase-file FILE)"
 		fi
 		if [ "$_ap_first" = "$_ap_second" ]; then
 			printf '%s\n' "$_ap_first"
@@ -511,28 +507,44 @@ cmd_export() {
 }
 
 cmd_import() {
-	_archive=${1:-}
-	[ -n "$_archive" ] || die "usage: lazyos-profile import ARCHIVE"
+	_archive=
+	_pass_file=
+	while [ $# -gt 0 ]; do
+		case $1 in
+		--passphrase-file)
+			shift
+			_pass_file=${1:-}
+			[ -n "$_pass_file" ] || die "--passphrase-file needs a file"
+			;;
+		-*) die "unknown option: $1" ;;
+		*) _archive=$1 ;;
+		esac
+		shift
+	done
+	[ -n "$_archive" ] || die "usage: lazyos-profile import ARCHIVE [--passphrase-file FILE]"
 	[ -r "$_archive" ] || die "cannot read: $_archive"
 
 	mkdir -p "$CACHE"
 	work_dir
 	_unpacked=$WORK/restore.tar.zst
-	_pass_file=
 
 	"$UI_BIN/busy" start dev 'Developer' "Opening $(basename "$_archive")…" package-x-generic 2>/dev/null || :
 
 	case $_archive in
 	*.gpg)
-		have_prompt || die "no terminal and no session for the passphrase"
-		"$UI_BIN/busy" update dev 'Waiting for the passphrase…' 2>/dev/null || :
-		_pass=$(ask_passphrase) || {
-			"$UI_BIN/busy" stop dev 2>/dev/null || :
-			exit 0
-		}
-		_pass_file=$WORK/pass
-		passphrase_file "$_pass" "$_pass_file"
-		_pass=
+		if [ -n "$_pass_file" ]; then
+			[ -r "$_pass_file" ] || die "cannot read: $_pass_file"
+		else
+			have_prompt || die "no terminal to ask for the passphrase (use --passphrase-file FILE)"
+			"$UI_BIN/busy" update dev 'Waiting for the passphrase…' 2>/dev/null || :
+			_pass=$(ask_passphrase) || {
+				"$UI_BIN/busy" stop dev 2>/dev/null || :
+				exit 0
+			}
+			_pass_file=$WORK/pass
+			passphrase_file "$_pass" "$_pass_file"
+			_pass=
+		fi
 		if ! gpg_decrypt "$_archive" "$_unpacked" "$_pass_file"; then
 			die "cannot open the archive: $(gpg_error)"
 		fi

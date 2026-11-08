@@ -35,7 +35,7 @@ menu, the palette and Ask* has the details.
 | `Set the default agent…` | marks the agent shown with `●` |
 | `Open a terminal in ~/Work` | a shell where the agent binaries are on `PATH` |
 
-Every row carries the glyph the rest of the session's menus use (`lib-rofi.sh`):
+Every row carries the glyph the rest of the session's menus use (`lazyos-ui`):
 a code sign for an agent, two people for its accounts, a download arrow for an
 install, a gear for the default, a terminal for the shell, a bin for removing an
 account and an undo arrow for going back. The default agent is still the one
